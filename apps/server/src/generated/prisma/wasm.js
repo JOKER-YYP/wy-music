@@ -217,7 +217,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "D:\\yyp\\wy-music\\apps\\server\\src\\generated\\prisma",
+      "value": "D:\\resource\\wy-music\\apps\\server\\src\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -231,11 +231,11 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "D:\\yyp\\wy-music\\apps\\server\\prisma\\schema.prisma",
+    "sourceFilePath": "D:\\resource\\wy-music\\apps\\server\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": "../../../.env",
+    "rootEnvPath": null,
     "schemaEnvPath": "../../../.env"
   },
   "relativePath": "../../../prisma",
@@ -245,7 +245,6 @@ const config = {
     "db"
   ],
   "activeProvider": "sqlite",
-  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {

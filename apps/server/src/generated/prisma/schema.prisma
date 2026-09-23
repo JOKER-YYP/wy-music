@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+// 本地开发使用 SQLite，零依赖即可启动；生产可切换为 MySQL：
+// provider = "mysql"
+// url      = env("DATABASE_URL")
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  account      String        @unique
+  passwordHash String
+  nickname     String
+  avatarUrl    String?
+  bio          String?
+  role         String        @default("user") // user | admin
+  status       Int           @default(1) // 1 正常 0 禁用
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  tracks       Track[]
+  playlists    Playlist[]
+  likes        Like[]
+  histories    PlayHistory[]
+  comments     Comment[]
+  commentLikes CommentLike[]
+}
+
+model Track {
+  id             String          @id @default(cuid())
+  name           String
+  artists        String // JSON string array
+  album          String?
+  durationMs     Int
+  coverUrl       String?
+  audioPath      String
+  lyricText      String?
+  fileHash       String
+  fileSize       Int
+  mimeType       String
+  status         String          @default("pending") // pending|published|rejected|offline
+  rejectReason   String?
+  uploaderId     String
+  uploader       User            @relation(fields: [uploaderId], references: [id])
+  playCount      Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  likes          Like[]
+  histories      PlayHistory[]
+  playlistTracks PlaylistTrack[]
+  comments       Comment[]
+
+  @@index([status, createdAt])
+  @@index([fileHash])
+  @@index([name])
+}
+
+model Playlist {
+  id          String          @id @default(cuid())
+  name        String
+  coverUrl    String?
+  description String?
+  isSystem    Boolean         @default(false)
+  isPublic    Boolean         @default(false)
+  ownerId     String
+  owner       User            @relation(fields: [ownerId], references: [id])
+  createdAt   DateTime        @default(now())
+  tracks      PlaylistTrack[]
+}
+
+model PlaylistTrack {
+  playlistId String
+  trackId    String
+  position   Int
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([playlistId, trackId])
+}
+
+model Like {
+  userId    String
+  trackId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([userId, trackId])
+}
+
+model PlayHistory {
+  id       String   @id @default(cuid())
+  userId   String
+  trackId  String
+  playedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId, playedAt])
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  trackId   String
+  userId    String
+  content   String
+  parentId  String?
+  likeCount Int           @default(0)
+  createdAt DateTime      @default(now())
+  track     Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[]     @relation("CommentReplies")
+  likes     CommentLike[]
+
+  @@index([trackId, createdAt])
+  @@index([parentId])
+}
+
+model CommentLike {
+  userId    String
+  commentId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, commentId])
+}
+
+model Banner {
+  id       String  @id @default(cuid())
+  title    String
+  imageUrl String
+  linkUrl  String?
+  sort     Int     @default(0)
+  enabled  Boolean @default(true)
+}
+
+model SystemConfig {
+  key   String @id
+  value String
+}

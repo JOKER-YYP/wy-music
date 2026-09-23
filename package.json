@@ -1,0 +1,24 @@
+{
+  "name": "wy-music",
+  "version": "0.1.0",
+  "private": true,
+  "description": "仿网易云音乐播放器 — 自建曲库（用户端 + 管理端 + API）",
+  "scripts": {
+    "dev:server": "pnpm --filter @wy-music/server dev",
+    "dev:desktop": "pnpm --filter @wy-music/desktop dev",
+    "dev:admin": "pnpm --filter @wy-music/admin dev",
+    "build": "pnpm -r --filter=./packages/* build && pnpm -r --filter=./apps/* build",
+    "build:server": "pnpm --filter @wy-music/server build",
+    "build:desktop": "pnpm --filter @wy-music/desktop build",
+    "build:admin": "pnpm --filter @wy-music/admin build",
+    "db:generate": "pnpm --filter @wy-music/server db:generate",
+    "db:push": "pnpm --filter @wy-music/server db:push",
+    "db:seed": "pnpm --filter @wy-music/server db:seed",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

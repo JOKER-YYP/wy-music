@@ -1,0 +1,25 @@
+node_modules
+dist
+dist-electron
+out
+.release
+*.log
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Electron
+*.exe
+*.dmg
+*.AppImage
+
+# SQLite 运行时附属文件（主库 dev.db 需要提交）
+apps/server/prisma/*.db-journal
+apps/server/prisma/*.db-wal
+apps/server/prisma/*.db-shm

@@ -268,7 +268,44 @@ export function swapNameAndArtists(input: {
   }
 }
 
-/** 合并元数据与文件名解析；优先用标签，缺失时用文件名补齐 */
+/**
+ * 修复 ID3 标签「GBK/GB18030 被当成 Latin-1」乱码（如 »Æ»è）；
+ * 全是 ? 的视为无效，返回空串以便回退到文件名。
+ */
+export function repairTagText(input?: string | null): string {
+  const raw = (input || '').trim()
+  if (!raw) return ''
+  if (/^\?+$/.test(raw)) return ''
+
+  const cjk = (raw.match(/[\u4e00-\u9fff]/g) || []).length
+  const latin1 = (raw.match(/[\u00c0-\u00ff]/g) || []).length
+
+  if (latin1 === 0) return raw
+  if (cjk >= 2 && cjk >= latin1) return raw
+
+  try {
+    const bytes = Uint8Array.from(raw, (ch) => ch.charCodeAt(0) & 0xff)
+    for (const enc of ['gb18030', 'gbk'] as const) {
+      try {
+        const decoded = new TextDecoder(enc).decode(bytes).trim()
+        if (!decoded) continue
+        const dcjk = (decoded.match(/[\u4e00-\u9fff]/g) || []).length
+        const dlatin = (decoded.match(/[\u00c0-\u00ff]/g) || []).length
+        if (dcjk >= 1 && dcjk > cjk && dlatin <= latin1) return decoded
+        if (dcjk >= 2 && dlatin < latin1) return decoded
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  if (cjk === 0 && latin1 >= 2) return ''
+  return raw
+}
+
+/** 合并元数据与文件名解析；优先用标签，缺失/乱码时用文件名补齐 */
 export function resolveTrackMeta(input: {
   fileName: string
   title?: string | null
@@ -276,8 +313,10 @@ export function resolveTrackMeta(input: {
   album?: string | null
 }): { name: string; artists: string[]; album: string } {
   const fromFile = parseAudioFilename(input.fileName)
-  const tagTitle = (input.title || '').trim()
-  const tagArtists = (input.artists || []).map((s) => s.trim()).filter(Boolean)
+  const tagTitle = repairTagText(input.title)
+  const tagArtists = (input.artists || []).map((s) => repairTagText(s)).filter(Boolean)
+  const tagAlbum = repairTagText(input.album)
+
   const unknown = (a: string[]) =>
     !a.length || a.every((x) => !x || x === '未知歌手' || x.toLowerCase() === 'unknown')
 
@@ -290,13 +329,13 @@ export function resolveTrackMeta(input: {
   if (unknown(artists) && fromTitle.artists.length) artists = fromTitle.artists
 
   let name = tagTitle || fromFile.name
-  if (fromTitle.artists.length && fromTitle.name) name = fromTitle.name
+  if (fromTitle.artists.length && fromTitle.name && tagTitle) name = fromTitle.name
   else if (!tagTitle) name = fromFile.name
 
   return {
     name: name || fromFile.name || '未命名',
     artists,
-    album: (input.album || '').trim(),
+    album: tagAlbum,
   }
 }
 

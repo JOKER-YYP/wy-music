@@ -23,3 +23,5 @@ Thumbs.db
 apps/server/prisma/*.db-journal
 apps/server/prisma/*.db-wal
 apps/server/prisma/*.db-shm
+
+*.tsbuildinfo

@@ -14,10 +14,15 @@ import { pathToFileURL } from 'url'
 import { createReadStream, existsSync } from 'fs'
 import { readdir, stat, readFile } from 'fs/promises'
 import { createHash, randomUUID } from 'crypto'
-import { parseFile } from 'music-metadata'
 import FormData from 'form-data'
 import axios from 'axios'
 import { decodeLyricBytes, resolveTrackMeta } from '@wy-music/shared'
+
+/** music-metadata v10 在 CJS(Electron main) 下 require 只有 loadMusicMetadata，需动态 import */
+async function readAudioMetadata(filePath: string) {
+  const mm = await import('music-metadata')
+  return mm.parseFile(filePath, { duration: true, skipCovers: true })
+}
 
 const AUDIO_EXTS = new Set(['.mp3', '.wav', '.flac', '.m4a', '.aac'])
 const LRC_EXTS = new Set(['.lrc'])
@@ -445,14 +450,14 @@ async function parseLocalAudio(
   let durationMs = 0
 
   try {
-    const meta = await parseFile(filePath, { duration: true })
+    const meta = await readAudioMetadata(filePath)
     if (meta.common.title) title = meta.common.title
     if (meta.common.artists?.length) tagArtists = meta.common.artists
     else if (meta.common.artist) tagArtists = [meta.common.artist]
     if (meta.common.album) album = meta.common.album
     durationMs = Math.round((meta.format.duration || 0) * 1000)
-  } catch {
-    // ignore metadata errors
+  } catch (e) {
+    console.warn('[parseLocalAudio] metadata failed:', filePath, e)
   }
 
   const resolved = resolveTrackMeta({

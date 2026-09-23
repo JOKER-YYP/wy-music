@@ -32,6 +32,9 @@
           >
             上传选中（{{ selected.length }}）
           </el-button>
+          <el-button :disabled="!selected.length" @click="swapSelected">
+            互换歌名/歌手（{{ selected.length || 0 }}）
+          </el-button>
           <el-button :disabled="!items.length" @click="playAll">播放全部</el-button>
         </div>
 
@@ -48,6 +51,18 @@
           <el-table-column prop="name" label="歌曲" min-width="160" show-overflow-tooltip>
             <template #default="{ row }">
               <el-input v-model="row.name" size="small" @click.stop />
+            </template>
+          </el-table-column>
+          <el-table-column label="互换" width="64" align="center">
+            <template #default="{ row }">
+              <el-button
+                link
+                type="primary"
+                title="互换歌名与歌手"
+                @click.stop="swapRow(row)"
+              >
+                ⇄
+              </el-button>
             </template>
           </el-table-column>
           <el-table-column label="歌手" min-width="140">
@@ -115,7 +130,10 @@
             </div>
           </el-form-item>
           <el-form-item label="歌名">
-            <el-input v-model="singleForm.name" placeholder="可留空，将使用文件名" />
+            <div class="name-artist-row">
+              <el-input v-model="singleForm.name" placeholder="可留空，将使用文件名" />
+              <el-button title="互换歌名与歌手" @click="swapSingleForm">⇄ 互换</el-button>
+            </div>
           </el-form-item>
           <el-form-item label="歌手" required>
             <el-input
@@ -188,7 +206,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { decodeLyricBytes, parseAudioFilename } from '@wy-music/shared'
+import { decodeLyricBytes, parseAudioFilename, swapNameAndArtists } from '@wy-music/shared'
 import type { LocalAudioItem } from '../types/local'
 import { usePlayerStore } from '../stores/player'
 import {
@@ -270,6 +288,39 @@ function setRowArtists(row: LocalAudioItem, value: string) {
     .split(/[,，/、]/)
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+function swapRow(row: LocalAudioItem) {
+  const next = swapNameAndArtists({
+    name: row.name || '',
+    artists: row.artists || [],
+  })
+  row.name = next.name
+  row.artists = next.artists.length ? next.artists : ['未知歌手']
+}
+
+function swapSelected() {
+  const list = selected.value.length ? selected.value : []
+  if (!list.length) {
+    ElMessage.warning('请先勾选要互换的歌曲')
+    return
+  }
+  for (const row of list) swapRow(row)
+  ElMessage.success(`已互换 ${list.length} 首`)
+}
+
+function swapSingleForm() {
+  const artists = singleForm.artists
+    .split(/[,，/、]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const next = swapNameAndArtists({ name: singleForm.name, artists })
+  singleForm.name = next.name
+  singleForm.artists = next.artists.join(',')
+  if (singleItem.value) {
+    singleItem.value.name = next.name
+    singleItem.value.artists = next.artists.length ? next.artists : ['未知歌手']
+  }
 }
 
 async function ensureArtistsFilled(item: LocalAudioItem): Promise<boolean> {
@@ -650,6 +701,15 @@ async function submitSingle() {
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
+}
+.name-artist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  .el-input {
+    flex: 1;
+  }
 }
 .form {
   max-width: 640px;

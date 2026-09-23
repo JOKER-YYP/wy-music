@@ -105,34 +105,47 @@ export const AUDIO_EXT_WHITELIST = ['.mp3', '.wav', '.flac', '.m4a', '.aac'] as 
 
 export const DEFAULT_PAGE_SIZE = 20
 
-/** 网易云等常见：歌手侧带「名字-一串数字 ID」 */
-function looksLikeArtistIdToken(s: string): boolean {
-  return /^.+[-_]\d{5,}$/.test(s.trim())
-}
-
 function cjkCount(s: string): number {
   return (s.match(/[\u4e00-\u9fff]/g) || []).length
 }
 
-/** 哪一侧更像歌手（越高越像） */
+/** 去掉网易云尾部歌曲数字 ID：-466821 */
+function stripTrailingSongId(s: string): string {
+  return s.replace(/[-_]\d{5,}\s*$/u, '').replace(/_+$/u, '').trim()
+}
+
+/** 去掉下载站杂质：[mqms2] 等 */
+function stripPlatformTags(s: string): string {
+  return s
+    .replace(/\s*\[(mqms\d*|ok|sq|hq|hires?|flac|320|128)\]\s*/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function looksLikeArtistIdToken(s: string): boolean {
+  return /^.+[-_]\d{5,}$/.test(s.trim())
+}
+
 function artistLikeness(s: string): number {
   let score = 0
   if (looksLikeArtistIdToken(s)) score += 80
-  // 纯英文/数字短串更像歌手名或账号
-  if (/^[A-Za-z][A-Za-z0-9_\s.]*$/.test(s) && s.length <= 24) score += 25
-  // 含「feat/ft」多在歌名侧，略减分
+  if (/^[A-Za-z][A-Za-z0-9_\s.]*$/.test(s) && s.length <= 28) score += 30
+  const cjk = cjkCount(s)
+  if (cjk >= 1 && cjk <= 4 && s.length <= 8 && !/[《》]/.test(s)) score += 20
+  if (/^[A-Za-z0-9]+([\u4e00-\u9fff]+)?$/u.test(s) && s.length <= 16) score += 15
   if (/\b(feat\.?|ft\.?)\b/i.test(s)) score -= 15
+  if (/[《》]|主题曲|片尾曲|插曲|片头曲/.test(s)) score -= 40
   return score
 }
 
-/** 哪一侧更像歌名 */
 function titleLikeness(s: string): number {
   let score = 0
   if (looksLikeArtistIdToken(s)) score -= 60
   const cjk = cjkCount(s)
-  if (cjk >= 2) score += 10 + cjk
-  // 中文歌名通常比账号更长、更「句子」
-  if (cjk >= 4 && s.length >= 4) score += 15
+  if (cjk >= 2) score += 8 + cjk
+  if (cjk >= 4) score += 12
+  if (/[《》]|主题曲|片尾曲|插曲|\(Live\)|\(合唱|\(正式|\(纯歌/i.test(s)) score += 25
+  if (/\([^)]+\)|（[^）]+）/.test(s)) score += 8
   return score
 }
 
@@ -143,44 +156,116 @@ function splitArtistNames(raw: string): string[] {
     .filter(Boolean)
 }
 
+function decideOrder(
+  left: string,
+  right: string,
+  spaced: boolean,
+): 'artist-title' | 'title-artist' {
+  // 无空格 + 两侧短中文：优先「歌名-歌手」（网易云，如 半生雪-是七叔呢）
+  if (
+    !spaced &&
+    cjkCount(left) >= 2 &&
+    cjkCount(right) >= 2 &&
+    left.length <= 12 &&
+    right.length <= 14 &&
+    !/[《》]/.test(left) &&
+    !/[《》]/.test(right) &&
+    !looksLikeArtistIdToken(left) &&
+    !looksLikeArtistIdToken(right)
+  ) {
+    return 'title-artist'
+  }
+
+  const scoreArtistLeft = artistLikeness(left) + titleLikeness(right)
+  const scoreArtistRight = artistLikeness(right) + titleLikeness(left)
+
+  if (scoreArtistRight > scoreArtistLeft + 2) return 'title-artist'
+  if (scoreArtistLeft > scoreArtistRight + 2) return 'artist-title'
+
+  if (spaced) return 'artist-title'
+  if (cjkCount(left) > 0 && cjkCount(right) > 0) return 'title-artist'
+  return 'artist-title'
+}
+
+/** 按无空格 - 拆段：歌名[-描述]-歌手 */
+function parseDashParts(raw: string): { name: string; artists: string[] } {
+  const parts = raw
+    .split('-')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (!parts.length) return { name: '未命名', artists: [] }
+  if (parts.length === 1) return { name: parts[0], artists: [] }
+
+  if (parts.length === 2) {
+    const [left, right] = parts
+    if (decideOrder(left, right, false) === 'title-artist') {
+      return { name: left, artists: splitArtistNames(right) }
+    }
+    return { name: right, artists: splitArtistNames(left) }
+  }
+
+  // ≥3：末段歌手，首段歌名（中间多为剧名/说明）
+  return {
+    name: parts[0],
+    artists: splitArtistNames(parts[parts.length - 1]),
+  }
+}
+
 /**
  * 从文件名解析歌名/歌手。
- * 同时兼容「歌手 - 歌名」与「歌名 - 歌手」（网易云下载常见后者）。
+ * 支持仅歌名、歌手 - 歌名、歌名-歌手、歌名-歌手-数字ID、歌名-描述-歌手-ID、[mqms2] 等。
  */
 export function parseAudioFilename(fileName: string): {
   name: string
   artists: string[]
 } {
-  const base = fileName.replace(/\.[^.]+$/i, '').trim()
-  if (!base) {
-    return { name: '未命名', artists: [] }
-  }
+  let base = fileName.replace(/\.[^.]+$/i, '').trim()
+  if (!base) return { name: '未命名', artists: [] }
 
-  // 去掉常见前缀编号：01. / 01- / [12]
-  const cleaned = base
-    .replace(/^\s*[\(\[【]?\d{1,3}[\)\]】]?[\.\-_、\s]+/, '')
-    .trim()
+  base = base.replace(/^\s*[\(\[【]?\d{1,3}[\)\]】]?[\.\-_、\s]+/, '').trim()
+  base = stripPlatformTags(base)
+  base = stripTrailingSongId(base)
 
-  // 优先宽分隔符，避免把「Uu-71054953」内部的 - 当成主分隔
-  const seps = [' - ', ' – ', ' — ', ' － ', '-', '–', '—', '_']
-  for (const sep of seps) {
-    const idx = cleaned.indexOf(sep)
-    if (idx <= 0) continue
-    const left = cleaned.slice(0, idx).trim()
-    const right = cleaned.slice(idx + sep.length).trim()
-    if (!left || !right) continue
+  const spacedMatch = base.match(/^(.+?)\s+[-–—－]\s+(.+)$/u)
+  if (spacedMatch) {
+    const left = spacedMatch[1].trim()
+    let right = stripTrailingSongId(stripPlatformTags(spacedMatch[2].trim()))
 
-    // 左侧像歌名、右侧像歌手（含网易云「账号-数字ID」）→ 按「歌名 - 歌手」
-    const leftIsArtist = artistLikeness(left) + titleLikeness(right)
-    const rightIsArtist = artistLikeness(right) + titleLikeness(left)
-    if (rightIsArtist > leftIsArtist) {
+    // 「被人 - 《…》主题曲-薛之谦」
+    if (right.includes('-')) {
+      const nested = parseDashParts(right)
+      if (nested.artists.length) {
+        return { name: left, artists: nested.artists }
+      }
+    }
+
+    if (decideOrder(left, right, true) === 'title-artist') {
       return { name: left, artists: splitArtistNames(right) }
     }
-    // 默认「歌手 - 歌名」
     return { name: right, artists: splitArtistNames(left) }
   }
 
-  return { name: cleaned, artists: [] }
+  if (!/[-–—]/.test(base)) {
+    return { name: base, artists: [] }
+  }
+
+  return parseDashParts(base.replace(/[–—]/g, '-'))
+}
+
+/** 互换歌名与歌手 */
+export function swapNameAndArtists(input: {
+  name: string
+  artists: string[]
+}): { name: string; artists: string[] } {
+  const artistJoined = (input.artists || []).map((s) => s.trim()).filter(Boolean).join(' / ')
+  const name = (input.name || '').trim()
+  if (!artistJoined && !name) {
+    return { name: input.name || '', artists: [...(input.artists || [])] }
+  }
+  return {
+    name: artistJoined || name,
+    artists: name ? [name] : [],
+  }
 }
 
 /** 合并元数据与文件名解析；优先用标签，缺失时用文件名补齐 */
@@ -196,16 +281,15 @@ export function resolveTrackMeta(input: {
   const unknown = (a: string[]) =>
     !a.length || a.every((x) => !x || x === '未知歌手' || x.toLowerCase() === 'unknown')
 
-  // 标签歌名里也可能是「歌手 - 歌名」
-  const fromTitle = tagTitle.includes('-') || tagTitle.includes('–') || tagTitle.includes('—')
-    ? parseAudioFilename(`${tagTitle}.mp3`)
-    : { name: tagTitle, artists: [] as string[] }
+  const fromTitle =
+    tagTitle.includes('-') || tagTitle.includes('–') || tagTitle.includes('—')
+      ? parseAudioFilename(`${tagTitle}.mp3`)
+      : { name: tagTitle, artists: [] as string[] }
 
   let artists = !unknown(tagArtists) ? tagArtists : fromFile.artists
   if (unknown(artists) && fromTitle.artists.length) artists = fromTitle.artists
 
   let name = tagTitle || fromFile.name
-  // 若歌名仍带着「歌手 - 」且歌手已解析出，用右侧歌名
   if (fromTitle.artists.length && fromTitle.name) name = fromTitle.name
   else if (!tagTitle) name = fromFile.name
 
@@ -222,7 +306,6 @@ function scoreLyricText(text: string): number {
   const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length
   const hasLrc = /\[\d{1,2}:\d{2}/.test(text) ? 80 : 0
   const hasMeta = /\[(ti|ar|al|offset):/i.test(text) ? 20 : 0
-  // Latin-1 误读 GBK 时常见的高位拉丁字符
   const latin1Noise = (text.match(/[\u00c0-\u00ff]/g) || []).length
   return cjk * 3 + hasLrc + hasMeta - replacement * 40 - latin1Noise * 2
 }

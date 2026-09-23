@@ -105,7 +105,48 @@ export const AUDIO_EXT_WHITELIST = ['.mp3', '.wav', '.flac', '.m4a', '.aac'] as 
 
 export const DEFAULT_PAGE_SIZE = 20
 
-/** 从文件名解析歌名/歌手，支持「歌手 - 歌名」「歌手-歌名」等 */
+/** 网易云等常见：歌手侧带「名字-一串数字 ID」 */
+function looksLikeArtistIdToken(s: string): boolean {
+  return /^.+[-_]\d{5,}$/.test(s.trim())
+}
+
+function cjkCount(s: string): number {
+  return (s.match(/[\u4e00-\u9fff]/g) || []).length
+}
+
+/** 哪一侧更像歌手（越高越像） */
+function artistLikeness(s: string): number {
+  let score = 0
+  if (looksLikeArtistIdToken(s)) score += 80
+  // 纯英文/数字短串更像歌手名或账号
+  if (/^[A-Za-z][A-Za-z0-9_\s.]*$/.test(s) && s.length <= 24) score += 25
+  // 含「feat/ft」多在歌名侧，略减分
+  if (/\b(feat\.?|ft\.?)\b/i.test(s)) score -= 15
+  return score
+}
+
+/** 哪一侧更像歌名 */
+function titleLikeness(s: string): number {
+  let score = 0
+  if (looksLikeArtistIdToken(s)) score -= 60
+  const cjk = cjkCount(s)
+  if (cjk >= 2) score += 10 + cjk
+  // 中文歌名通常比账号更长、更「句子」
+  if (cjk >= 4 && s.length >= 4) score += 15
+  return score
+}
+
+function splitArtistNames(raw: string): string[] {
+  return raw
+    .split(/[/、,&＆]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/**
+ * 从文件名解析歌名/歌手。
+ * 同时兼容「歌手 - 歌名」与「歌名 - 歌手」（网易云下载常见后者）。
+ */
 export function parseAudioFilename(fileName: string): {
   name: string
   artists: string[]
@@ -120,20 +161,23 @@ export function parseAudioFilename(fileName: string): {
     .replace(/^\s*[\(\[【]?\d{1,3}[\)\]】]?[\.\-_、\s]+/, '')
     .trim()
 
+  // 优先宽分隔符，避免把「Uu-71054953」内部的 - 当成主分隔
   const seps = [' - ', ' – ', ' — ', ' － ', '-', '–', '—', '_']
   for (const sep of seps) {
     const idx = cleaned.indexOf(sep)
     if (idx <= 0) continue
     const left = cleaned.slice(0, idx).trim()
     const right = cleaned.slice(idx + sep.length).trim()
-    if (left && right) {
-      // 多歌手：A/B 或 A、B 或 A&B
-      const artists = left
-        .split(/[/、,&＆]/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-      return { name: right, artists }
+    if (!left || !right) continue
+
+    // 左侧像歌名、右侧像歌手（含网易云「账号-数字ID」）→ 按「歌名 - 歌手」
+    const leftIsArtist = artistLikeness(left) + titleLikeness(right)
+    const rightIsArtist = artistLikeness(right) + titleLikeness(left)
+    if (rightIsArtist > leftIsArtist) {
+      return { name: left, artists: splitArtistNames(right) }
     }
+    // 默认「歌手 - 歌名」
+    return { name: right, artists: splitArtistNames(left) }
   }
 
   return { name: cleaned, artists: [] }

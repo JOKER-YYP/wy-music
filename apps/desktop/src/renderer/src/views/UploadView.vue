@@ -52,17 +52,17 @@
             <template #default="{ row }">
               <el-input
                 v-if="editingCell === `${row.id}:name`"
-                v-model="row.name"
+                v-model="nameDraft"
                 size="small"
                 @click.stop
-                @blur="editingCell = ''"
+                @blur="commitNameEdit(row)"
                 @keydown.enter="blurActiveInput"
               />
               <span
                 v-else
                 class="cell-edit"
                 :title="row.name"
-                @click.stop="startEdit(row.id, 'name')"
+                @click.stop="startEditName(row)"
               >
                 {{ row.name || '—' }}
               </span>
@@ -256,8 +256,9 @@ const lyricMatchedCount = computed(() => items.value.filter((i) => i.lyricText).
 const uploadingId = ref('')
 const batchUploading = ref(false)
 const singleUploading = ref(false)
-/** 仅编辑当前单元格，避免千行同时挂载 el-input */
+/** 仅编辑当前单元格，避免千行同时挂载 el-input；草稿写入避免每键触发表格重渲染 */
 const editingCell = ref('')
+const nameDraft = ref('')
 const artistDraft = ref('')
 
 /** 桌面端选中的本地文件元数据 */
@@ -333,6 +334,18 @@ function startEdit(rowId: string, field: 'name' | 'artists') {
 function blurActiveInput() {
   const el = document.activeElement as HTMLElement | null
   el?.blur?.()
+}
+
+function startEditName(row: LocalAudioItem) {
+  nameDraft.value = row.name || ''
+  startEdit(row.id, 'name')
+}
+
+function commitNameEdit(row: LocalAudioItem) {
+  if (editingCell.value !== `${row.id}:name`) return
+  row.name = nameDraft.value.trim()
+  editingCell.value = ''
+  nameDraft.value = ''
 }
 
 function startEditArtists(row: LocalAudioItem) {

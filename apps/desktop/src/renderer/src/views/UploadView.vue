@@ -2,7 +2,7 @@
   <div class="upload-page">
     <h2>上传到公共曲库</h2>
     <p class="tip">
-      支持 mp3 / wav / flac / m4a / aac，单文件不超过 50MB。
+      支持 mp3 / wav / flac / m4a / aac，单文件不超过 100MB。
       <template v-if="isDesktop">
         桌面端可扫描文件夹批量上传；同目录下同名 <code>.lrc</code> 会自动匹配歌词。
       </template>
@@ -35,12 +35,25 @@
           <el-button :disabled="!selected.length" @click="swapSelected">
             互换歌名/歌手（{{ selected.length || 0 }}）
           </el-button>
-          <el-button :disabled="!items.length" @click="playAll">播放全部</el-button>
+          <el-button :disabled="!filteredItems.length" @click="playAll">播放全部</el-button>
+          <el-input
+            v-model="listQuery"
+            class="list-search"
+            clearable
+            placeholder="搜索歌名 / 歌手 / 专辑 / 文件名"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <span v-if="listQuery.trim()" class="filter-count">
+            显示 {{ filteredItems.length }} / {{ items.length }}
+          </span>
         </div>
 
         <el-table
           v-loading="scanning"
-          :data="items"
+          :data="filteredItems"
           stripe
           height="calc(100vh - 320px)"
           @selection-change="onSelectionChange"
@@ -108,7 +121,11 @@
           </el-table-column>
         </el-table>
 
-        <el-empty v-if="!scanning && !items.length" description="请选择文件夹开始扫描" />
+        <el-empty
+          v-if="!scanning && items.length && !filteredItems.length"
+          description="没有匹配的歌曲"
+        />
+        <el-empty v-else-if="!scanning && !items.length" description="请选择文件夹开始扫描" />
       </el-tab-pane>
 
       <el-tab-pane label="单曲上传" name="single">
@@ -198,9 +215,75 @@
     >
       <el-progress :percentage="progressPercent" :status="progressStatus" />
       <p class="progress-text">{{ progressText }}</p>
-      <ul v-if="failMessages.length" class="fail-list">
-        <li v-for="(msg, i) in failMessages" :key="i">{{ msg }}</li>
-      </ul>
+      <template v-if="!batchUploading && pendingRetries.length">
+        <p class="retry-hint">有 {{ pendingRetries.length }} 首失败或跳过，可调整后再次上传</p>
+        <el-button type="danger" @click="openRetryDialog">查看并处理</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="retryVisible"
+      title="失败 / 跳过 — 调整后再次上传"
+      width="860px"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <div class="retry-toolbar">
+        <el-button
+          type="danger"
+          :disabled="!pendingRetries.length"
+          :loading="retryUploading"
+          @click="retryUploadAll"
+        >
+          全部重新上传（{{ pendingRetries.length }}）
+        </el-button>
+        <el-button :disabled="!pendingRetries.length" @click="pendingRetries = []">清空列表</el-button>
+      </div>
+      <el-table :data="pendingRetries" stripe max-height="420" empty-text="没有待处理项">
+        <el-table-column type="index" width="48" label="#" />
+        <el-table-column label="原因" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span :class="row.kind === 'skip' ? 'reason-skip' : 'reason-fail'">{{ row.reason }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="歌曲" min-width="160">
+          <template #default="{ row }">
+            <el-input v-model="row.item.name" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column label="歌手" min-width="150">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.item.artists?.join(' / ') || ''"
+              size="small"
+              placeholder="必填"
+              :class="{ 'need-artist': isUnknownArtist(row.item) }"
+              @update:model-value="(v) => setRowArtists(row.item, String(v ?? ''))"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="专辑" min-width="120">
+          <template #default="{ row }">
+            <el-input v-model="row.item.album" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column label="文件名" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.item.fileName }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right">
+          <template #default="{ row, $index }">
+            <el-button
+              link
+              type="danger"
+              :loading="retryingId === row.item.id"
+              @click="retryUploadOne(row, $index)"
+            >
+              上传
+            </el-button>
+            <el-button link @click="pendingRetries.splice($index, 1)">移除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-dialog>
   </div>
 </template>
@@ -208,6 +291,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, shallowRef, triggerRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import { decodeLyricBytes, parseAudioFilename, swapNameAndArtists } from '@wy-music/shared'
 import type { LocalAudioItem } from '../types/local'
 import { usePlayerStore } from '../stores/player'
@@ -230,7 +314,19 @@ const folderPath = ref('')
 /** shallow：行内字段改动不触发整表深响应，避免失焦保存卡顿 */
 const items = shallowRef<LocalAudioItem[]>([])
 const selected = shallowRef<LocalAudioItem[]>([])
+const listQuery = ref('')
 const lyricMatchedCount = computed(() => items.value.filter((i) => i.lyricText).length)
+
+const filteredItems = computed(() => {
+  const q = listQuery.value.trim().toLowerCase()
+  if (!q) return items.value
+  return items.value.filter((row) => {
+    const artists = (row.artists || []).join(' ')
+    const hay = `${row.name || ''} ${artists} ${row.album || ''} ${row.fileName || ''}`.toLowerCase()
+    return hay.includes(q)
+  })
+})
+
 const uploadingId = ref('')
 const batchUploading = ref(false)
 const singleUploading = ref(false)
@@ -255,8 +351,17 @@ const progressVisible = ref(false)
 const progressDone = ref(0)
 const progressTotal = ref(0)
 const progressText = ref('')
-const failMessages = ref<string[]>([])
 const progressStatus = ref<'' | 'success' | 'exception'>('')
+
+type PendingRetry = {
+  item: LocalAudioItem
+  reason: string
+  kind: 'skip' | 'fail'
+}
+const pendingRetries = ref<PendingRetry[]>([])
+const retryVisible = ref(false)
+const retryUploading = ref(false)
+const retryingId = ref('')
 
 const player = usePlayerStore()
 
@@ -454,6 +559,7 @@ async function rescan() {
 async function doScan(folder: string) {
   scanning.value = true
   selected.value = []
+  listQuery.value = ''
   try {
     const result = await window.wyAPI!.scanFolder(folder)
     items.value = result.items
@@ -472,14 +578,14 @@ async function doScan(folder: string) {
 }
 
 function playOne(item: LocalAudioItem) {
-  const source = items.value.length ? items.value : [item]
-  const queue = source.map(localItemToQueueTrack)
-  player.playTrack(localItemToQueueTrack(item), queue)
+  const source = filteredItems.value.length ? filteredItems.value : items.value.length ? items.value : [item]
+  player.playTrack(localItemToQueueTrack(item), source.map(localItemToQueueTrack))
 }
 
 function playAll() {
-  if (!items.value.length) return
-  player.setQueue(items.value.map(localItemToQueueTrack), 0)
+  const list = filteredItems.value
+  if (!list.length) return
+  player.setQueue(list.map(localItemToQueueTrack), 0)
 }
 
 async function uploadOne(item: LocalAudioItem) {
@@ -515,13 +621,17 @@ async function uploadSelected() {
   progressDone.value = 0
   progressTotal.value = list.length
   progressStatus.value = ''
-  failMessages.value = []
+  pendingRetries.value = []
   let okCount = 0
   for (const item of list) {
     progressText.value = `正在上传：${item.name}`
     const filled = await ensureArtistsFilled(item)
     if (!filled) {
-      failMessages.value.push(`${item.name}：未填写歌手，已跳过`)
+      pendingRetries.value.push({
+        item,
+        reason: '未填写歌手，已跳过',
+        kind: 'skip',
+      })
       progressDone.value += 1
       continue
     }
@@ -537,15 +647,92 @@ async function uploadSelected() {
       const msg =
         e && typeof e === 'object' && 'message' in e
           ? String((e as { message: string }).message)
-          : '失败'
-      failMessages.value.push(`${item.name}：${msg}`)
+          : '上传失败'
+      pendingRetries.value.push({ item, reason: msg, kind: 'fail' })
     }
     progressDone.value += 1
   }
   progressText.value = `完成：成功 ${okCount} / ${list.length}`
-  progressStatus.value = failMessages.value.length ? 'exception' : 'success'
+  progressStatus.value = pendingRetries.value.length ? 'exception' : 'success'
   batchUploading.value = false
   if (okCount) ElMessage.success(`成功上传 ${okCount} 首`)
+  if (pendingRetries.value.length) {
+    ElMessage.warning(`${pendingRetries.value.length} 首失败或跳过，可在弹窗中调整后重试`)
+    retryVisible.value = true
+  }
+}
+
+function openRetryDialog() {
+  progressVisible.value = false
+  retryVisible.value = true
+}
+
+async function doUploadItem(item: LocalAudioItem) {
+  if (isUnknownArtist(item)) {
+    throw new Error('请先填写歌手')
+  }
+  await uploadLocalItem(item, {
+    name: item.name,
+    artists: item.artists.join(','),
+    album: item.album,
+    lyricText: item.lyricText || undefined,
+  })
+}
+
+async function retryUploadOne(row: PendingRetry, index: number) {
+  retryingId.value = row.item.id
+  try {
+    await doUploadItem(row.item)
+    pendingRetries.value.splice(index, 1)
+    triggerRef(items)
+    ElMessage.success(`「${row.item.name}」上传成功`)
+    if (!pendingRetries.value.length) {
+      retryVisible.value = false
+      ElMessage.success('待处理项已全部上传完成')
+    }
+  } catch (e: unknown) {
+    const msg =
+      e && typeof e === 'object' && 'message' in e
+        ? String((e as { message: string }).message)
+        : '上传失败'
+    row.reason = msg
+    row.kind = 'fail'
+    ElMessage.error(msg)
+  } finally {
+    retryingId.value = ''
+  }
+}
+
+async function retryUploadAll() {
+  const list = [...pendingRetries.value]
+  if (!list.length) return
+  retryUploading.value = true
+  let okCount = 0
+  const remain: PendingRetry[] = []
+  for (const row of list) {
+    retryingId.value = row.item.id
+    try {
+      await doUploadItem(row.item)
+      okCount += 1
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e
+          ? String((e as { message: string }).message)
+          : '上传失败'
+      remain.push({ item: row.item, reason: msg, kind: 'fail' })
+    }
+  }
+  retryingId.value = ''
+  pendingRetries.value = remain
+  triggerRef(items)
+  retryUploading.value = false
+  if (okCount) ElMessage.success(`成功上传 ${okCount} 首`)
+  if (!remain.length) {
+    retryVisible.value = false
+    ElMessage.success('待处理项已全部上传完成')
+  } else {
+    ElMessage.warning(`仍有 ${remain.length} 首失败，请检查后重试`)
+  }
 }
 
 function triggerWebFile() {
@@ -716,6 +903,15 @@ async function submitSingle() {
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.list-search {
+  width: 260px;
+  margin-left: auto;
+}
+.filter-count {
+  color: #888;
+  font-size: 12px;
 }
 .name-artist-row {
   display: flex;
@@ -768,12 +964,25 @@ async function submitSingle() {
   margin-top: 12px;
   color: #666;
 }
-.fail-list {
-  margin: 8px 0 0;
-  padding-left: 18px;
+.retry-hint {
+  margin: 12px 0 8px;
+  color: #e6a23c;
+  font-size: 13px;
+}
+.retry-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.reason-skip {
+  color: #e6a23c;
+  font-size: 12px;
+}
+.reason-fail {
   color: #f56c6c;
   font-size: 12px;
-  max-height: 160px;
-  overflow: auto;
+}
+:deep(.need-artist .el-input__wrapper) {
+  box-shadow: 0 0 0 1px #e6a23c inset;
 }
 </style>

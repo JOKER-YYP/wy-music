@@ -756,9 +756,9 @@ app.whenReady().then(() => {
         }
 
         const st = await stat(filePath)
-        const maxBytes = 50 * 1024 * 1024
+        const maxBytes = 100 * 1024 * 1024
         if (st.size > maxBytes) {
-          return { ok: false, message: '文件超过 50MB 限制' }
+          return { ok: false, message: '文件超过 100MB 限制' }
         }
 
         const fileName = basename(filePath)

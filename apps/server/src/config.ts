@@ -15,6 +15,6 @@ export const config = {
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   storageRoot: path.resolve(rootDir, process.env.STORAGE_ROOT || './storage'),
   uploadNeedReview: process.env.UPLOAD_NEED_REVIEW === 'true',
-  uploadMaxSizeMb: Number(process.env.UPLOAD_MAX_SIZE_MB || 50),
+  uploadMaxSizeMb: Number(process.env.UPLOAD_MAX_SIZE_MB || 100),
   corsOrigin: (process.env.CORS_ORIGIN || '*').split(',').map((s) => s.trim()),
 }

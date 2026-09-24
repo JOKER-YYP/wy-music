@@ -111,16 +111,19 @@ function cjkCount(s: string): number {
 
 /** 括号内剧名/推广说明，不是真实歌名：如 (电影《左耳》推广曲) */
 function isParenDescription(s: string): boolean {
-  const t = s.trim()
+  const t = (s || '').trim()
   if (!t) return false
-  const inner = t.replace(/^[(\uFF08（]\s*|\s*[)\uFF09）]$/gu, '')
-  const wrapped = inner !== t
-  const desc =
-    /电影|电视剧|网络剧|综艺|动画|推广曲|宣传曲|主题曲|片头曲|片尾曲|插曲|原声|配乐|片头|片尾|同名曲|推广/.test(
-      wrapped ? inner : t,
-    )
-  if (wrapped && desc) return true
+
+  const wrapped = /^[(\uFF08（].+[)\uFF09）]$/u.test(t)
+  const inner = wrapped ? t.slice(1, -1).trim() : t
+  const descRe =
+    /电影|电视剧|网络剧|综艺|动画|推广曲|宣传曲|主题曲|片头曲|片尾曲|插曲|原声|配乐|片头|片尾|同名曲|推广/
+  if (wrapped && (descRe.test(inner) || /[《》]/.test(inner))) return true
   if (!wrapped && /^(电影|电视剧|网络剧).{0,24}(主题曲|片头曲|片尾曲|插曲|推广曲|宣传曲)$/u.test(t)) {
+    return true
+  }
+  // 无外层括号但整段像「电影《左耳》推广曲」
+  if (!wrapped && descRe.test(t) && /[《》]/.test(t) && cjkCount(t) <= 16 && !/-/.test(t)) {
     return true
   }
   return false
@@ -404,7 +407,27 @@ export function resolveTrackMeta(input: {
     name = fromFile.name
   }
 
+  // 仍像说明时，尝试用专辑名（部分网易云导出把歌名写在 album）
+  if (
+    isParenDescription(name) &&
+    tagAlbum &&
+    !isParenDescription(tagAlbum) &&
+    cjkCount(tagAlbum) >= 2
+  ) {
+    name = tagAlbum
+  }
+
   name = stripTrailingDescriptions(name) || name
+
+  // 文件名能拆出「歌名-说明-歌手」时，优先采用文件名歌名（比错误 ID3 更准）
+  if (
+    fromFile.name &&
+    !isParenDescription(fromFile.name) &&
+    fromFile.artists.length &&
+    (isParenDescription(tagTitle) || isParenDescription(fromTitle.name) || !tagTitle)
+  ) {
+    name = fromFile.name
+  }
 
   return {
     name: name || fromFile.name || '未命名',

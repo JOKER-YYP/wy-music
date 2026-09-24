@@ -109,6 +109,36 @@ function cjkCount(s: string): number {
   return (s.match(/[\u4e00-\u9fff]/g) || []).length
 }
 
+/** 括号内剧名/推广说明，不是真实歌名：如 (电影《左耳》推广曲) */
+function isParenDescription(s: string): boolean {
+  const t = s.trim()
+  if (!t) return false
+  const inner = t.replace(/^[(\uFF08（]\s*|\s*[)\uFF09）]$/gu, '')
+  const wrapped = inner !== t
+  const desc =
+    /电影|电视剧|网络剧|综艺|动画|推广曲|宣传曲|主题曲|片头曲|片尾曲|插曲|原声|配乐|片头|片尾|同名曲|推广/.test(
+      wrapped ? inner : t,
+    )
+  if (wrapped && desc) return true
+  if (!wrapped && /^(电影|电视剧|网络剧).{0,24}(主题曲|片头曲|片尾曲|插曲|推广曲|宣传曲)$/u.test(t)) {
+    return true
+  }
+  return false
+}
+
+/** 去掉末尾剧名说明：美好的昨天-(电影《左耳》推广曲) → 美好的昨天 */
+function stripTrailingDescriptions(s: string): string {
+  let out = s.trim()
+  for (let i = 0; i < 3; i++) {
+    const next = out
+      .replace(/(?:[-–—－_\s]*)[(\uFF08（][^)\uFF09）]*[)\uFF09）]\s*$/u, '')
+      .trim()
+    if (next === out) break
+    out = next
+  }
+  return out || s.trim()
+}
+
 /** 去掉网易云尾部歌曲数字 ID：-466821 */
 function stripTrailingSongId(s: string): string {
   return s.replace(/[-_]\d{5,}\s*$/u, '').replace(/_+$/u, '').trim()
@@ -128,24 +158,29 @@ function looksLikeArtistIdToken(s: string): boolean {
 
 function artistLikeness(s: string): number {
   let score = 0
+  if (isParenDescription(s)) return -100
   if (looksLikeArtistIdToken(s)) score += 80
   if (/^[A-Za-z][A-Za-z0-9_\s.]*$/.test(s) && s.length <= 28) score += 30
   const cjk = cjkCount(s)
   if (cjk >= 1 && cjk <= 4 && s.length <= 8 && !/[《》]/.test(s)) score += 20
   if (/^[A-Za-z0-9]+([\u4e00-\u9fff]+)?$/u.test(s) && s.length <= 16) score += 15
   if (/\b(feat\.?|ft\.?)\b/i.test(s)) score -= 15
-  if (/[《》]|主题曲|片尾曲|插曲|片头曲/.test(s)) score -= 40
+  if (/[《》]|主题曲|片尾曲|插曲|片头曲|推广曲/.test(s)) score -= 40
   return score
 }
 
 function titleLikeness(s: string): number {
   let score = 0
+  // 整段都是「(电影《…》推广曲)」这类说明，绝不能当歌名
+  if (isParenDescription(s)) return -80
   if (looksLikeArtistIdToken(s)) score -= 60
   const cjk = cjkCount(s)
   if (cjk >= 2) score += 8 + cjk
   if (cjk >= 4) score += 12
-  if (/[《》]|主题曲|片尾曲|插曲|\(Live\)|\(合唱|\(正式|\(纯歌/i.test(s)) score += 25
-  if (/\([^)]+\)|（[^）]+）/.test(s)) score += 8
+  // 歌名后带副标题加分；纯括号说明已在上方剔除
+  if (/主题曲|片尾曲|插曲|片头曲|\(Live\)|\(合唱|\(正式|\(纯歌/i.test(s)) score += 25
+  if (/[《》]/.test(s) && !/^[(\uFF08（]/.test(s.trim())) score += 15
+  if (/\([^)]+\)|（[^）]+）/.test(s) && !isParenDescription(s)) score += 8
   return score
 }
 
@@ -194,20 +229,35 @@ function parseDashParts(raw: string): { name: string; artists: string[] } {
     .map((p) => p.trim())
     .filter(Boolean)
   if (!parts.length) return { name: '未命名', artists: [] }
-  if (parts.length === 1) return { name: parts[0], artists: [] }
+  if (parts.length === 1) {
+    return { name: stripTrailingDescriptions(parts[0]), artists: [] }
+  }
 
   if (parts.length === 2) {
     const [left, right] = parts
-    if (decideOrder(left, right, false) === 'title-artist') {
-      return { name: left, artists: splitArtistNames(right) }
+    // 歌名-(电影《…》推广曲) ：右侧是说明，不是歌手
+    if (isParenDescription(right) && !isParenDescription(left)) {
+      return { name: stripTrailingDescriptions(left), artists: [] }
     }
-    return { name: right, artists: splitArtistNames(left) }
+    if (isParenDescription(left) && !isParenDescription(right)) {
+      return { name: stripTrailingDescriptions(right), artists: [] }
+    }
+    if (decideOrder(left, right, false) === 'title-artist') {
+      return { name: stripTrailingDescriptions(left), artists: splitArtistNames(right) }
+    }
+    return { name: stripTrailingDescriptions(right), artists: splitArtistNames(left) }
   }
 
-  // ≥3：末段歌手，首段歌名（中间多为剧名/说明）
+  // ≥3：末段歌手，首个非说明段为歌名（中间多为剧名/说明）
+  const artistPart = parts[parts.length - 1]
+  if (isParenDescription(artistPart)) {
+    const namePart = parts.find((p) => !isParenDescription(p)) || parts[0]
+    return { name: stripTrailingDescriptions(namePart), artists: [] }
+  }
+  const namePart = parts.slice(0, -1).find((p) => !isParenDescription(p)) || parts[0]
   return {
-    name: parts[0],
-    artists: splitArtistNames(parts[parts.length - 1]),
+    name: stripTrailingDescriptions(namePart),
+    artists: splitArtistNames(artistPart),
   }
 }
 
@@ -231,22 +281,32 @@ export function parseAudioFilename(fileName: string): {
     const left = spacedMatch[1].trim()
     let right = stripTrailingSongId(stripPlatformTags(spacedMatch[2].trim()))
 
+    if (isParenDescription(right) && !isParenDescription(left)) {
+      return { name: stripTrailingDescriptions(left), artists: [] }
+    }
+    if (isParenDescription(left) && !isParenDescription(right)) {
+      return { name: stripTrailingDescriptions(right), artists: [] }
+    }
+
     // 「被人 - 《…》主题曲-薛之谦」
     if (right.includes('-')) {
       const nested = parseDashParts(right)
       if (nested.artists.length) {
-        return { name: left, artists: nested.artists }
+        return { name: stripTrailingDescriptions(left), artists: nested.artists }
+      }
+      if (nested.name && !isParenDescription(nested.name)) {
+        return { name: stripTrailingDescriptions(left), artists: nested.artists }
       }
     }
 
     if (decideOrder(left, right, true) === 'title-artist') {
-      return { name: left, artists: splitArtistNames(right) }
+      return { name: stripTrailingDescriptions(left), artists: splitArtistNames(right) }
     }
-    return { name: right, artists: splitArtistNames(left) }
+    return { name: stripTrailingDescriptions(right), artists: splitArtistNames(left) }
   }
 
   if (!/[-–—]/.test(base)) {
-    return { name: base, artists: [] }
+    return { name: stripTrailingDescriptions(base), artists: [] }
   }
 
   return parseDashParts(base.replace(/[–—]/g, '-'))
@@ -305,7 +365,7 @@ export function repairTagText(input?: string | null): string {
   return raw
 }
 
-/** 合并元数据与文件名解析；优先用标签，缺失/乱码时用文件名补齐 */
+/** 合并元数据与文件名解析；优先用标签，缺失/乱码/剧名说明时用文件名补齐 */
 export function resolveTrackMeta(input: {
   fileName: string
   title?: string | null
@@ -328,9 +388,23 @@ export function resolveTrackMeta(input: {
   let artists = !unknown(tagArtists) ? tagArtists : fromFile.artists
   if (unknown(artists) && fromTitle.artists.length) artists = fromTitle.artists
 
-  let name = tagTitle || fromFile.name
-  if (fromTitle.artists.length && fromTitle.name && tagTitle) name = fromTitle.name
-  else if (!tagTitle) name = fromFile.name
+  let name = ''
+  // 标签整段是「(电影《…》推广曲)」时不可用，回退文件名
+  if (tagTitle && !isParenDescription(tagTitle)) {
+    if (fromTitle.name && !isParenDescription(fromTitle.name)) {
+      name = fromTitle.name
+    } else {
+      name = stripTrailingDescriptions(tagTitle) || tagTitle
+    }
+  } else {
+    name = fromFile.name
+  }
+
+  if (isParenDescription(name) && fromFile.name && !isParenDescription(fromFile.name)) {
+    name = fromFile.name
+  }
+
+  name = stripTrailingDescriptions(name) || name
 
   return {
     name: name || fromFile.name || '未命名',

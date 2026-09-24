@@ -68,6 +68,6 @@ docs/
 
 ## 说明
 
-- 本地开发数据库为 **SQLite**（`apps/server/prisma/dev.db`），便于零配置启动；生产可按文档切换 MySQL。
-- 上传文件保存在 `apps/server/storage/`。
+- 本地开发数据库为 **SQLite**（`apps/server/prisma/dev.db`，已 gitignore；克隆后执行 `pnpm db:push`，再 `pnpm db:seed` 写入管理员与 3 首示例曲）。
+- 上传文件保存在 `apps/server/storage/`（日常上传不提交；`storage/samples/` 内置示例音频可提交）。
 - 请勿上传无版权授权的商用音乐；本项目仅供学习演示。

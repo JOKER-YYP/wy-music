@@ -50,7 +50,22 @@
           <el-table-column type="index" width="50" label="#" />
           <el-table-column prop="name" label="歌曲" min-width="160" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-input v-model="row.name" size="small" @click.stop />
+              <el-input
+                v-if="editingCell === `${row.id}:name`"
+                v-model="row.name"
+                size="small"
+                @click.stop
+                @blur="editingCell = ''"
+                @keydown.enter="blurActiveInput"
+              />
+              <span
+                v-else
+                class="cell-edit"
+                :title="row.name"
+                @click.stop="startEdit(row.id, 'name')"
+              >
+                {{ row.name || '—' }}
+              </span>
             </template>
           </el-table-column>
           <el-table-column label="互换" width="64" align="center">
@@ -68,13 +83,24 @@
           <el-table-column label="歌手" min-width="140">
             <template #default="{ row }">
               <el-input
-                :model-value="row.artists?.join(' / ') || ''"
+                v-if="editingCell === `${row.id}:artists`"
+                v-model="artistDraft"
                 size="small"
                 :class="{ 'need-artist': isUnknownArtist(row) }"
                 placeholder="必填，如：许嵩"
                 @click.stop
-                @update:model-value="(v) => setRowArtists(row, String(v || ''))"
+                @blur="commitArtistEdit(row)"
+                @keydown.enter="blurActiveInput"
               />
+              <span
+                v-else
+                class="cell-edit"
+                :class="{ 'need-artist-text': isUnknownArtist(row) }"
+                :title="row.artists?.join(' / ') || ''"
+                @click.stop="startEditArtists(row)"
+              >
+                {{ row.artists?.join(' / ') || '点击填写' }}
+              </span>
             </template>
           </el-table-column>
           <el-table-column prop="album" label="专辑" min-width="120" show-overflow-tooltip />
@@ -204,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { decodeLyricBytes, parseAudioFilename, swapNameAndArtists } from '@wy-music/shared'
 import type { LocalAudioItem } from '../types/local'
@@ -230,6 +256,9 @@ const lyricMatchedCount = computed(() => items.value.filter((i) => i.lyricText).
 const uploadingId = ref('')
 const batchUploading = ref(false)
 const singleUploading = ref(false)
+/** 仅编辑当前单元格，避免千行同时挂载 el-input */
+const editingCell = ref('')
+const artistDraft = ref('')
 
 /** 桌面端选中的本地文件元数据 */
 const singleItem = ref<LocalAudioItem | null>(null)
@@ -288,6 +317,34 @@ function setRowArtists(row: LocalAudioItem, value: string) {
     .split(/[,，/、]/)
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+function startEdit(rowId: string, field: 'name' | 'artists') {
+  editingCell.value = `${rowId}:${field}`
+  void nextTick(() => {
+    const el = document.querySelector(
+      '.el-table .el-input__inner, .el-table .el-input__wrapper input',
+    ) as HTMLInputElement | null
+    el?.focus()
+    el?.select()
+  })
+}
+
+function blurActiveInput() {
+  const el = document.activeElement as HTMLElement | null
+  el?.blur?.()
+}
+
+function startEditArtists(row: LocalAudioItem) {
+  artistDraft.value = row.artists?.join(' / ') || ''
+  startEdit(row.id, 'artists')
+}
+
+function commitArtistEdit(row: LocalAudioItem) {
+  if (editingCell.value !== `${row.id}:artists`) return
+  setRowArtists(row, artistDraft.value)
+  editingCell.value = ''
+  artistDraft.value = ''
 }
 
 function swapRow(row: LocalAudioItem) {
@@ -751,6 +808,25 @@ async function submitSingle() {
 }
 :deep(.need-artist .el-input__wrapper) {
   box-shadow: 0 0 0 1px #e6a23c inset;
+}
+.cell-edit {
+  display: inline-block;
+  width: 100%;
+  min-height: 24px;
+  line-height: 24px;
+  padding: 0 4px;
+  border-radius: 4px;
+  cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+}
+.need-artist-text {
+  color: #e6a23c;
 }
 .progress-text {
   margin-top: 12px;

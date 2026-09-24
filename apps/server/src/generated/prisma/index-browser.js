@@ -211,6 +211,18 @@ exports.Prisma.SystemConfigScalarFieldEnum = {
   value: 'value'
 };
 
+exports.Prisma.UserNotificationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  type: 'type',
+  title: 'title',
+  body: 'body',
+  trackId: 'trackId',
+  trackName: 'trackName',
+  read: 'read',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -232,7 +244,8 @@ exports.Prisma.ModelName = {
   Comment: 'Comment',
   CommentLike: 'CommentLike',
   Banner: 'Banner',
-  SystemConfig: 'SystemConfig'
+  SystemConfig: 'SystemConfig',
+  UserNotification: 'UserNotification'
 };
 
 /**

@@ -11,6 +11,7 @@ import discoverRoutes from './routes/discover.js'
 import adminRoutes from './routes/admin/index.js'
 import playlistRoutes from './routes/playlists.js'
 import commentRoutes from './routes/comments.js'
+import notificationRoutes from './routes/notifications.js'
 import { ok } from './utils/response.js'
 
 ensureStorageDirs()
@@ -38,6 +39,7 @@ app.use('/api/history', historyRoutes)
 app.use('/api/discover', discoverRoutes)
 app.use('/api/playlists', playlistRoutes)
 app.use('/api/comments', commentRoutes)
+app.use('/api/notifications', notificationRoutes)
 app.use('/api/admin', adminRoutes)
 
 app.use((_req, res) => {

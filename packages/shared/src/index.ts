@@ -38,6 +38,17 @@ export interface TrackDto {
   updatedAt: string
 }
 
+export interface UserNotificationDto {
+  id: string
+  type: string
+  title: string
+  body: string
+  trackId?: string | null
+  trackName?: string | null
+  read: boolean
+  createdAt: string
+}
+
 export interface PlaylistDto {
   id: string
   name: string

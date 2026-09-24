@@ -4,7 +4,7 @@
       <div class="logo">WY Admin</div>
       <el-menu :default-active="route.path" router>
         <el-menu-item index="/dashboard">仪表盘</el-menu-item>
-        <el-menu-item index="/tracks">歌曲管理</el-menu-item>
+        <el-menu-item index="/tracks">公共曲库</el-menu-item>
         <el-menu-item index="/users">用户管理</el-menu-item>
       </el-menu>
     </el-aside>

@@ -28,6 +28,7 @@ model User {
   histories    PlayHistory[]
   comments     Comment[]
   commentLikes CommentLike[]
+  notifications UserNotification[]
 }
 
 model Track {
@@ -143,4 +144,20 @@ model Banner {
 model SystemConfig {
   key   String @id
   value String
+}
+
+/** 用户通知：如收藏/歌单中的歌曲被删除或下架 */
+model UserNotification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // track_removed
+  title     String
+  body      String
+  trackId   String?
+  trackName String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
 }

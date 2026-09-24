@@ -9,6 +9,7 @@ import {
   signRefreshToken,
   type AuthedRequest,
 } from '../../middleware/auth.js'
+import { deleteTrackFully, offlineTrackById } from '../../services/trackLifecycle.js'
 
 const router = Router()
 
@@ -98,14 +99,18 @@ router.patch('/users/:id/status', async (req, res) => {
 
 router.get('/tracks', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1)
-  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 20))
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20))
   const status = String(req.query.status || '').trim()
   const keyword = String(req.query.keyword || '').trim()
   const where = {
     ...(status ? { status } : {}),
     ...(keyword
       ? {
-          OR: [{ name: { contains: keyword } }, { artists: { contains: keyword } }],
+          OR: [
+            { name: { contains: keyword } },
+            { artists: { contains: keyword } },
+            { album: { contains: keyword } },
+          ],
         }
       : {}),
   }
@@ -125,6 +130,74 @@ router.get('/tracks', async (req, res) => {
     page,
     pageSize,
   })
+})
+
+router.get('/tracks/:id', async (req, res) => {
+  const track = await prisma.track.findUnique({
+    where: { id: req.params.id },
+    include: { uploader: { select: { nickname: true } } },
+  })
+  if (!track) return fail(res, 40401, '歌曲不存在', 404)
+  return ok(res, toTrackDto(track))
+})
+
+router.put('/tracks/:id', async (req, res) => {
+  const track = await prisma.track.findUnique({ where: { id: req.params.id } })
+  if (!track) return fail(res, 40401, '歌曲不存在', 404)
+
+  const nextStatus =
+    req.body.status !== undefined ? String(req.body.status) : undefined
+  if (
+    nextStatus &&
+    !['pending', 'published', 'rejected', 'offline'].includes(nextStatus)
+  ) {
+    return fail(res, 40001, '状态无效')
+  }
+
+  // 改为下架：走统一下架（通知 + 清理收藏/歌单）
+  if (nextStatus === 'offline' && track.status !== 'offline') {
+    const offlined = await offlineTrackById(track.id)
+    if (!offlined) return fail(res, 40401, '歌曲不存在', 404)
+  }
+
+  const data: Record<string, unknown> = {}
+  if (req.body.name !== undefined) {
+    const name = String(req.body.name || '').trim()
+    if (!name) return fail(res, 40001, '歌名不能为空')
+    data.name = name
+  }
+  if (req.body.artists !== undefined) {
+    const artists = String(req.body.artists)
+      .split(/[,，/、]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (!artists.length) return fail(res, 40001, '歌手不能为空')
+    data.artists = JSON.stringify(artists)
+  }
+  if (req.body.album !== undefined) data.album = String(req.body.album || '') || null
+  if (req.body.lyricText !== undefined) data.lyricText = String(req.body.lyricText || '') || null
+  if (req.body.durationMs !== undefined) {
+    const ms = Number(req.body.durationMs)
+    if (!Number.isFinite(ms) || ms < 0) return fail(res, 40001, '时长无效')
+    data.durationMs = Math.round(ms)
+  }
+  if (nextStatus && nextStatus !== 'offline') {
+    data.status = nextStatus
+  }
+  if (req.body.rejectReason !== undefined) {
+    data.rejectReason = String(req.body.rejectReason || '') || null
+  }
+  if (data.status === 'published' || nextStatus === 'published') {
+    data.rejectReason = null
+    data.status = 'published'
+  }
+
+  const updated = await prisma.track.update({
+    where: { id: track.id },
+    data,
+    include: { uploader: { select: { nickname: true } } },
+  })
+  return ok(res, toTrackDto(updated))
 })
 
 router.post('/tracks/:id/approve', async (req, res) => {
@@ -147,17 +220,15 @@ router.post('/tracks/:id/reject', async (req, res) => {
 })
 
 router.post('/tracks/:id/offline', async (req, res) => {
-  const track = await prisma.track.update({
-    where: { id: req.params.id },
-    data: { status: 'offline' },
-    include: { uploader: { select: { nickname: true } } },
-  })
-  return ok(res, toTrackDto(track))
+  const track = await offlineTrackById(req.params.id)
+  if (!track) return fail(res, 40401, '歌曲不存在', 404)
+  return ok(res, toTrackDto(track), '已下架并通知相关用户')
 })
 
 router.delete('/tracks/:id', async (req: AuthedRequest, res) => {
-  await prisma.track.delete({ where: { id: req.params.id } })
-  return ok(res, true)
+  const okDelete = await deleteTrackFully(req.params.id)
+  if (!okDelete) return fail(res, 40401, '歌曲不存在', 404)
+  return ok(res, true, '已删除并通知相关用户')
 })
 
 export default router

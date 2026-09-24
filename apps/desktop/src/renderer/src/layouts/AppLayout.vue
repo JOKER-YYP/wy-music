@@ -135,7 +135,7 @@ import type { PlaylistDto } from '@wy-music/shared'
 import { useUserStore } from '../stores/user'
 import { useUiStore } from '../stores/ui'
 import { usePlaylistStore } from '../stores/playlist'
-import { mediaUrl } from '../services/http'
+import { http, mediaUrl } from '../services/http'
 import PlayerBar from '../components/PlayerBar.vue'
 import PlayerIpcBridge from '../components/PlayerIpcBridge.vue'
 import LoginModal from '../components/LoginModal.vue'
@@ -173,16 +173,53 @@ onMounted(() => {
     ui.openLogin('login')
   } else {
     void playlistStore.fetchMine()
+    void checkTrackRemovedNotices()
   }
 })
 
 watch(
   () => user.accessToken,
   (token) => {
-    if (token) void playlistStore.fetchMine()
-    else playlistStore.list = []
+    if (token) {
+      void playlistStore.fetchMine()
+      void checkTrackRemovedNotices()
+    } else {
+      playlistStore.list = []
+    }
   },
 )
+
+async function checkTrackRemovedNotices() {
+  if (!user.accessToken) return
+  try {
+    const { data } = await http.get('/api/notifications', {
+      params: { unreadOnly: true, type: 'track_removed', pageSize: 50 },
+    })
+    const list = (data.data?.list || []) as Array<{
+      id: string
+      trackName?: string | null
+      body: string
+    }>
+    if (!list.length) return
+
+    const names = [
+      ...new Set(list.map((n) => n.trackName).filter(Boolean) as string[]),
+    ]
+    const detail =
+      names.length > 0
+        ? names.map((n) => `《${n}》`).join('、')
+        : list.map((n) => n.body).join('\n')
+
+    await ElMessageBox.alert(
+      `以下歌曲已被下架，已从你的收藏/歌单中移除：\n\n${detail}`,
+      '歌曲下架通知',
+      { confirmButtonText: '知道了', type: 'warning' },
+    )
+    await http.post('/api/notifications/read', { ids: list.map((n) => n.id) })
+  } catch (e) {
+    console.warn('[notifications]', e)
+  }
+}
 
 function isActive(path: string) {
   return route.path === path || route.path.startsWith(path + '/')

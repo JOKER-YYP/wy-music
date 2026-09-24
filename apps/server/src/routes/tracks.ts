@@ -417,17 +417,8 @@ router.delete('/:id', requireAuth, async (req: AuthedRequest, res) => {
   if (track.uploaderId !== req.user!.id && req.user!.role !== 'admin') {
     return fail(res, 40301, '无权删除', 403)
   }
-  await prisma.track.delete({ where: { id: track.id } })
-  try {
-    const abs = audioAbsolutePath(track.audioPath)
-    if (fs.existsSync(abs)) fs.unlinkSync(abs)
-    if (track.coverUrl) {
-      const coverAbs = audioAbsolutePath(track.coverUrl)
-      if (fs.existsSync(coverAbs)) fs.unlinkSync(coverAbs)
-    }
-  } catch {
-    // ignore file cleanup errors
-  }
+  const { deleteTrackFully } = await import('../services/trackLifecycle.js')
+  await deleteTrackFully(track.id)
   return ok(res, true, '已删除')
 })
 

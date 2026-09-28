@@ -8,6 +8,8 @@ export interface LocalAudioItem {
   durationMs: number
   size: number
   ext: string
+  /** 音频文件内容 SHA256，用于精确去重 */
+  fileHash?: string
   /** 匹配到的 LRC 文本 */
   lyricText?: string | null
   /** 匹配到的歌词文件名 */

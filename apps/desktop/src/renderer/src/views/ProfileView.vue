@@ -5,7 +5,7 @@
       <div class="info">
         <div class="name-row">
           <h1>{{ user.user?.nickname || '未登录' }}</h1>
-          <button class="edit-btn" type="button" title="修改昵称" @click="onEditNickname">
+          <button class="edit-btn" type="button" title="编辑资料" @click="router.push('/profile/edit')">
             <el-icon :size="16"><Edit /></el-icon>
           </button>
           <span class="lv">LV.{{ level }}</span>
@@ -15,7 +15,11 @@
           <span>粉丝 <b>{{ followers }}</b></span>
         </div>
         <div v-if="user.user?.bio" class="bio">{{ user.user.bio }}</div>
-        <div class="account">账号：{{ user.user?.account }}</div>
+        <div class="meta-line">
+          <span v-if="genderLabel">{{ genderLabel }}</span>
+          <span v-if="regionLabel">{{ regionLabel }}</span>
+          <span>账号：{{ user.user?.account }}</span>
+        </div>
       </div>
     </header>
 
@@ -103,7 +107,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { Edit, Headset, StarFilled } from '@element-plus/icons-vue'
 import type { PlaylistDto } from '@wy-music/shared'
 import { useUserStore } from '../stores/user'
 import { usePlaylistStore } from '../stores/playlist'
@@ -171,6 +175,20 @@ const emptyTip = computed(() => {
   return '暂无内容'
 })
 
+const genderLabel = computed(() => {
+  const g = user.user?.gender
+  if (g === 'male') return '男'
+  if (g === 'female') return '女'
+  return ''
+})
+
+const regionLabel = computed(() => {
+  const p = user.user?.province
+  const c = user.user?.city
+  if (p && c && p !== c) return `${p} · ${c}`
+  return p || c || ''
+})
+
 function coverStyle(p: PlaylistDto) {
   const url = mediaUrl(p.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
@@ -187,25 +205,6 @@ async function load() {
     historyCount.value = (data.data || []).length
   } finally {
     loading.value = false
-  }
-}
-
-async function onEditNickname() {
-  if (!user.user) return
-  try {
-    const { value } = await ElMessageBox.prompt('修改昵称', '编辑资料', {
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      inputValue: user.user.nickname,
-      inputPattern: /\S+/,
-      inputErrorMessage: '昵称不能为空',
-    })
-    const { data } = await http.put('/api/auth/me', { nickname: value.trim() })
-    user.user = data.data
-    localStorage.setItem('user', JSON.stringify(data.data))
-    ElMessage.success('已更新')
-  } catch {
-    // cancel
   }
 }
 
@@ -293,10 +292,13 @@ onMounted(load)
   font-size: 13px;
   color: #666;
 }
-.account {
+.meta-line {
   margin-top: 8px;
   font-size: 12px;
   color: #aaa;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 .main-tabs {
   display: flex;

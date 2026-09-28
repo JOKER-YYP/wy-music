@@ -60,6 +60,8 @@ export interface LocalAudioItem {
   durationMs: number
   size: number
   ext: string
+  /** 音频文件内容 SHA256，用于精确去重 */
+  fileHash?: string
   lyricText?: string | null
   lyricFileName?: string | null
 }
@@ -435,6 +437,16 @@ async function matchLrcForAudio(
   }
 }
 
+async function hashFileContent(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256')
+    const stream = createReadStream(filePath)
+    stream.on('data', (chunk) => hash.update(chunk))
+    stream.on('error', reject)
+    stream.on('end', () => resolve(hash.digest('hex')))
+  })
+}
+
 async function parseLocalAudio(
   filePath: string,
   lrcIndex?: Map<string, string>,
@@ -448,6 +460,7 @@ async function parseLocalAudio(
   let tagArtists: string[] = []
   let album = ''
   let durationMs = 0
+  let fileHash = ''
 
   try {
     const meta = await readAudioMetadata(filePath)
@@ -458,6 +471,12 @@ async function parseLocalAudio(
     durationMs = Math.round((meta.format.duration || 0) * 1000)
   } catch (e) {
     console.warn('[parseLocalAudio] metadata failed:', filePath, e)
+  }
+
+  try {
+    fileHash = await hashFileContent(filePath)
+  } catch (e) {
+    console.warn('[parseLocalAudio] hash failed:', filePath, e)
   }
 
   const resolved = resolveTrackMeta({
@@ -479,6 +498,7 @@ async function parseLocalAudio(
     durationMs,
     size: st.size,
     ext,
+    fileHash,
     lyricText: lyric?.lyricText || null,
     lyricFileName: lyric?.lyricFileName || null,
   }
@@ -512,6 +532,148 @@ function resolveAppIcon() {
     if (!img.isEmpty()) return img
   }
   return undefined
+}
+
+function normalizeDedupePart(s: string) {
+  return (s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function knownArtistsKey(artists?: string[]) {
+  return (artists || [])
+    .map(normalizeDedupePart)
+    .filter((a) => a && a !== '未知歌手' && a !== 'unknown')
+    .sort()
+    .join(',')
+}
+
+function isUnknownArtists(artists?: string[]) {
+  return !knownArtistsKey(artists)
+}
+
+function pickBetterName(a: string, b: string) {
+  const na = (a || '').trim()
+  const nb = (b || '').trim()
+  if (!na || na === '未命名') return nb || na
+  if (!nb || nb === '未命名') return na
+  // 更长的通常信息更全（带副标题等）
+  return na.length >= nb.length ? na : nb
+}
+
+function pickBetterArtists(a?: string[], b?: string[]) {
+  if (isUnknownArtists(a) && !isUnknownArtists(b)) return [...(b || [])]
+  if (isUnknownArtists(b) && !isUnknownArtists(a)) return [...(a || [])]
+  const aa = a || []
+  const bb = b || []
+  return aa.length >= bb.length ? [...aa] : [...bb]
+}
+
+function fileQualityScore(item: LocalAudioItem) {
+  let score = 0
+  const ext = (item.ext || '').toLowerCase()
+  if (ext === '.flac') score += 80
+  else if (ext === '.wav') score += 60
+  else if (ext === '.m4a' || ext === '.aac') score += 40
+  else if (ext === '.mp3') score += 20
+  score += Math.min(item.size / (1024 * 1024), 80)
+  if (item.durationMs > 0) score += 5
+  return score
+}
+
+/**
+ * 整合两首重复曲：逐字段取两边更优值
+ * （如 A 有歌词无专辑、B 有专辑无歌词 → 结果两者都有）
+ */
+function mergeLocalTrackKeepBest(a: LocalAudioItem, b: LocalAudioItem): LocalAudioItem {
+  const base = fileQualityScore(a) >= fileQualityScore(b) ? a : b
+  const lyricFrom =
+    (a.lyricText?.trim().length || 0) >= (b.lyricText?.trim().length || 0) ? a : b
+
+  return {
+    id: base.id,
+    path: base.path,
+    fileName: base.fileName,
+    ext: base.ext,
+    size: base.size,
+    name: pickBetterName(a.name, b.name),
+    artists: pickBetterArtists(a.artists, b.artists),
+    album: (a.album || '').trim() || (b.album || '').trim() || '',
+    durationMs: Math.max(a.durationMs || 0, b.durationMs || 0),
+    fileHash: a.fileHash || b.fileHash || '',
+    lyricText: lyricFrom.lyricText || null,
+    lyricFileName: lyricFrom.lyricFileName || null,
+  }
+}
+
+/** 歌名维度能否合并：同名近时长；若两边都有明确且不同的歌手则不合并 */
+function canMergeByMeta(a: LocalAudioItem, b: LocalAudioItem) {
+  if (normalizeDedupePart(a.name) !== normalizeDedupePart(b.name)) return false
+  if (!normalizeDedupePart(a.name)) return false
+
+  const da = a.durationMs > 0 ? Math.round(a.durationMs / 2000) : -1
+  const db = b.durationMs > 0 ? Math.round(b.durationMs / 2000) : -1
+  if (da >= 0 && db >= 0 && Math.abs(da - db) > 1) return false
+
+  const aa = knownArtistsKey(a.artists)
+  const bb = knownArtistsKey(b.artists)
+  if (aa && bb && aa !== bb) return false
+  return true
+}
+
+function keepBetterInMap(
+  map: Map<string, LocalAudioItem>,
+  key: string,
+  item: LocalAudioItem,
+): boolean {
+  const prev = map.get(key)
+  if (!prev) {
+    map.set(key, item)
+    return false
+  }
+  map.set(key, mergeLocalTrackKeepBest(prev, item))
+  return true
+}
+
+/**
+ * 去重策略：
+ * 1) 音频文件内容 SHA256 相同 → 必为重复
+ * 2) 同歌名+近时长（歌手不冲突）→ 合并，并整合两边元数据
+ */
+function dedupeLocalTracks(items: LocalAudioItem[]): {
+  items: LocalAudioItem[]
+  removed: number
+} {
+  const byHash = new Map<string, LocalAudioItem>()
+  const noHash: LocalAudioItem[] = []
+  let removed = 0
+
+  for (const item of items) {
+    const hash = (item.fileHash || '').trim()
+    if (!hash) {
+      noHash.push(item)
+      continue
+    }
+    if (keepBetterInMap(byHash, hash, item)) removed += 1
+  }
+
+  // 第二轮：按歌名合并，并做歌手冲突校验
+  const merged: LocalAudioItem[] = []
+  for (const item of [...byHash.values(), ...noHash]) {
+    let absorbed = false
+    for (let i = 0; i < merged.length; i++) {
+      if (!canMergeByMeta(merged[i], item)) continue
+      merged[i] = mergeLocalTrackKeepBest(merged[i], item)
+      removed += 1
+      absorbed = true
+      break
+    }
+    if (!absorbed) merged.push(item)
+  }
+
+  merged.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+  return { items: merged, removed }
 }
 
 app.whenReady().then(() => {
@@ -686,22 +848,37 @@ app.whenReady().then(() => {
 
   ipcMain.handle('local:scanFolder', async (_e, folderPath: string) => {
     if (!folderPath) {
-      return { folderPath: '', total: 0, items: [] as LocalAudioItem[], lyricMatched: 0 }
+      return { folderPath: '', total: 0, items: [] as LocalAudioItem[], lyricMatched: 0, deduped: 0 }
     }
     console.log('[scan] start', folderPath)
     try {
       const { audios, lrcs } = await walkMediaFiles(folderPath)
       const lrcIndex = buildLrcIndex(lrcs)
-      const items: LocalAudioItem[] = []
-      let lyricMatched = 0
+      const rawItems: LocalAudioItem[] = []
       for (const file of audios) {
-        const item = await parseLocalAudio(file, lrcIndex)
-        if (item.lyricText) lyricMatched += 1
-        items.push(item)
+        rawItems.push(await parseLocalAudio(file, lrcIndex))
       }
-      items.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-      console.log('[scan] done', items.length, 'lrc matched', lyricMatched, '/', lrcs.length)
-      return { folderPath, total: items.length, items, lyricMatched }
+      const { items, removed } = dedupeLocalTracks(rawItems)
+      const lyricMatched = items.filter((i) => i.lyricText).length
+      console.log(
+        '[scan] done',
+        items.length,
+        'raw',
+        rawItems.length,
+        'deduped',
+        removed,
+        'lrc matched',
+        lyricMatched,
+        '/',
+        lrcs.length,
+      )
+      return {
+        folderPath,
+        total: items.length,
+        items,
+        lyricMatched,
+        deduped: removed,
+      }
     } catch (e) {
       console.error('[scan] error', e)
       throw e

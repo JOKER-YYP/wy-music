@@ -10,6 +10,8 @@ export interface LocalAudioItem {
   durationMs: number
   size: number
   ext: string
+  /** 音频文件内容 SHA256，用于精确去重 */
+  fileHash?: string
   lyricText?: string | null
   lyricFileName?: string | null
 }
@@ -57,6 +59,7 @@ const wyAPI = {
       total: number
       items: LocalAudioItem[]
       lyricMatched?: number
+      deduped?: number
     }>,
   parseFiles: (paths: string[]) =>
     ipcRenderer.invoke('local:parseFiles', paths) as Promise<LocalAudioItem[]>,

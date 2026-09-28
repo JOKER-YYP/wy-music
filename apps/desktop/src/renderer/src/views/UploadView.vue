@@ -35,6 +35,9 @@
           <el-button :disabled="!selected.length" @click="swapSelected">
             互换歌名/歌手（{{ selected.length || 0 }}）
           </el-button>
+          <el-button type="danger" plain :disabled="!selected.length" @click="removeSelected">
+            删除选中（{{ selected.length || 0 }}）
+          </el-button>
           <el-button :disabled="!filteredItems.length" @click="playAll">播放全部</el-button>
           <el-input
             v-model="listQuery"
@@ -92,7 +95,15 @@
               />
             </template>
           </el-table-column>
-          <el-table-column prop="album" label="专辑" min-width="120" show-overflow-tooltip />
+          <el-table-column label="专辑" min-width="120" show-overflow-tooltip>
+            <template #default="{ row }">
+              <UploadEditCell
+                :model-value="row.album || ''"
+                empty-text="点击填写"
+                @update:model-value="(v) => onAlbumCommit(row, v)"
+              />
+            </template>
+          </el-table-column>
           <el-table-column label="歌词" width="100">
             <template #default="{ row }">
               <span v-if="row.lyricFileName" class="lrc-ok" :title="row.lyricFileName">已匹配</span>
@@ -106,7 +117,7 @@
             <template #default="{ row }">{{ formatBytes(row.size) }}</template>
           </el-table-column>
           <el-table-column prop="fileName" label="文件名" min-width="140" show-overflow-tooltip />
-          <el-table-column label="操作" width="180" fixed="right">
+          <el-table-column label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="playOne(row)">播放</el-button>
               <el-button
@@ -117,6 +128,7 @@
               >
                 上传
               </el-button>
+              <el-button link type="info" @click="removeOne(row)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -407,6 +419,10 @@ function onArtistsCommit(row: LocalAudioItem, value: string) {
   setRowArtists(row, value)
 }
 
+function onAlbumCommit(row: LocalAudioItem, value: string) {
+  row.album = value
+}
+
 function swapRow(row: LocalAudioItem, refresh = true) {
   const next = swapNameAndArtists({
     name: row.name || '',
@@ -426,6 +442,38 @@ function swapSelected() {
   for (const row of list) swapRow(row, false)
   triggerRef(items)
   ElMessage.success(`已互换 ${list.length} 首`)
+}
+
+function removeItemsByIds(ids: Set<string>) {
+  if (!ids.size) return 0
+  const before = items.value.length
+  items.value = items.value.filter((i) => !ids.has(i.id))
+  selected.value = selected.value.filter((i) => !ids.has(i.id))
+  return before - items.value.length
+}
+
+function removeOne(row: LocalAudioItem) {
+  const n = removeItemsByIds(new Set([row.id]))
+  if (n) ElMessage.success(`已从列表移除「${row.name}」`)
+}
+
+async function removeSelected() {
+  const list = selected.value
+  if (!list.length) {
+    ElMessage.warning('请先勾选要删除的歌曲')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认从上传列表移除选中的 ${list.length} 首？不会删除本地文件。`,
+      '删除选中',
+      { type: 'warning', confirmButtonText: '移除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  const n = removeItemsByIds(new Set(list.map((i) => i.id)))
+  if (n) ElMessage.success(`已从列表移除 ${n} 首`)
 }
 
 function swapSingleForm() {
@@ -564,11 +612,11 @@ async function doScan(folder: string) {
     const result = await window.wyAPI!.scanFolder(folder)
     items.value = result.items
     const matched = result.lyricMatched ?? result.items.filter((i) => i.lyricText).length
-    ElMessage.success(
-      matched
-        ? `扫描完成：${result.total} 首音频，自动匹配歌词 ${matched} 首`
-        : `扫描完成，共 ${result.total} 首音频`,
-    )
+    const deduped = result.deduped || 0
+    const parts = [`扫描完成：${result.total} 首`]
+    if (matched) parts.push(`已匹配歌词 ${matched} 首`)
+    if (deduped) parts.push(`已过滤重复 ${deduped} 首`)
+    ElMessage.success(parts.join('，'))
   } catch (e) {
     console.error('[scan]', e)
     ElMessage.error(e instanceof Error ? `扫描失败：${e.message}` : '扫描失败')

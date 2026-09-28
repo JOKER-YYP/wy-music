@@ -9,6 +9,9 @@
       <el-descriptions-item label="个人主页">
         <el-button link type="primary" @click="$router.push('/profile')">前往主页</el-button>
       </el-descriptions-item>
+      <el-descriptions-item label="编辑资料">
+        <el-button link type="primary" @click="$router.push('/profile/edit')">修改头像 / 昵称等</el-button>
+      </el-descriptions-item>
       <el-descriptions-item label="API">默认代理至 http://127.0.0.1:3001</el-descriptions-item>
     </el-descriptions>
   </div>

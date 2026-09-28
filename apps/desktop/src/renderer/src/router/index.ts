@@ -106,6 +106,12 @@ const router = createRouter({
           component: () => import('../views/ProfileView.vue'),
           meta: { auth: true },
         },
+        {
+          path: 'profile/edit',
+          name: 'profile-edit',
+          component: () => import('../views/EditProfileView.vue'),
+          meta: { auth: true },
+        },
       ],
     },
     // 兼容旧链接：整页登录改为打开弹窗

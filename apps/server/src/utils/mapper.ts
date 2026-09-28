@@ -7,8 +7,12 @@ export function toUserPublic(user: User): UserPublic {
     id: user.id,
     account: user.account,
     nickname: user.nickname,
-    avatarUrl: user.avatarUrl,
+    avatarUrl: toPublicUrl(user.avatarUrl),
     bio: user.bio,
+    gender: user.gender,
+    birthday: user.birthday,
+    province: user.province,
+    city: user.city,
     role: user.role as UserPublic['role'],
     createdAt: user.createdAt.toISOString(),
   }

@@ -36,5 +36,7 @@ apps/server/storage/**
 !apps/server/storage/lyrics/.gitkeep
 !apps/server/storage/samples/
 !apps/server/storage/samples/**
+!apps/server/storage/avatars/
+!apps/server/storage/avatars/.gitkeep
 
 *.tsbuildinfo

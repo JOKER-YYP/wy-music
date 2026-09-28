@@ -12,22 +12,27 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  account      String        @unique
-  passwordHash String
-  nickname     String
-  avatarUrl    String?
-  bio          String?
-  role         String        @default("user") // user | admin
-  status       Int           @default(1) // 1 正常 0 禁用
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  tracks       Track[]
-  playlists    Playlist[]
-  likes        Like[]
-  histories    PlayHistory[]
-  comments     Comment[]
-  commentLikes CommentLike[]
+  id            String             @id @default(cuid())
+  account       String             @unique
+  passwordHash  String
+  nickname      String
+  avatarUrl     String?
+  bio           String?
+  gender        String? // unknown | male | female
+  birthday      String? // YYYY-MM-DD
+  province      String?
+  city          String?
+  role          String             @default("user") // user | admin
+  status        Int                @default(1) // 1 正常 0 禁用
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  tracks        Track[]
+  playlists     Playlist[]
+  likes         Like[]
+  histories     PlayHistory[]
+  comments      Comment[]
+  commentLikes  CommentLike[]
+  notifications UserNotification[]
 }
 
 model Track {
@@ -143,4 +148,22 @@ model Banner {
 model SystemConfig {
   key   String @id
   value String
+}
+
+/**
+ * 用户通知：如收藏/歌单中的歌曲被删除或下架
+ */
+model UserNotification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // track_removed
+  title     String
+  body      String
+  trackId   String?
+  trackName String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
 }

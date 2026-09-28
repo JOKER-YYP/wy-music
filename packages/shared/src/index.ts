@@ -14,6 +14,12 @@ export interface UserPublic {
   nickname: string
   avatarUrl?: string | null
   bio?: string | null
+  /** unknown | male | female */
+  gender?: string | null
+  /** YYYY-MM-DD */
+  birthday?: string | null
+  province?: string | null
+  city?: string | null
   role: Role
   createdAt: string
 }

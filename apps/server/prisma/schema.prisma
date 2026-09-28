@@ -18,6 +18,10 @@ model User {
   nickname     String
   avatarUrl    String?
   bio          String?
+  gender       String? // unknown | male | female
+  birthday     String? // YYYY-MM-DD
+  province     String?
+  city         String?
   role         String     @default("user") // user | admin
   status       Int        @default(1) // 1 正常 0 禁用
   createdAt    DateTime   @default(now())

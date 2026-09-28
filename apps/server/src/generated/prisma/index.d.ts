@@ -2011,6 +2011,10 @@ export namespace Prisma {
     nickname: string | null
     avatarUrl: string | null
     bio: string | null
+    gender: string | null
+    birthday: string | null
+    province: string | null
+    city: string | null
     role: string | null
     status: number | null
     createdAt: Date | null
@@ -2024,6 +2028,10 @@ export namespace Prisma {
     nickname: string | null
     avatarUrl: string | null
     bio: string | null
+    gender: string | null
+    birthday: string | null
+    province: string | null
+    city: string | null
     role: string | null
     status: number | null
     createdAt: Date | null
@@ -2037,6 +2045,10 @@ export namespace Prisma {
     nickname: number
     avatarUrl: number
     bio: number
+    gender: number
+    birthday: number
+    province: number
+    city: number
     role: number
     status: number
     createdAt: number
@@ -2060,6 +2072,10 @@ export namespace Prisma {
     nickname?: true
     avatarUrl?: true
     bio?: true
+    gender?: true
+    birthday?: true
+    province?: true
+    city?: true
     role?: true
     status?: true
     createdAt?: true
@@ -2073,6 +2089,10 @@ export namespace Prisma {
     nickname?: true
     avatarUrl?: true
     bio?: true
+    gender?: true
+    birthday?: true
+    province?: true
+    city?: true
     role?: true
     status?: true
     createdAt?: true
@@ -2086,6 +2106,10 @@ export namespace Prisma {
     nickname?: true
     avatarUrl?: true
     bio?: true
+    gender?: true
+    birthday?: true
+    province?: true
+    city?: true
     role?: true
     status?: true
     createdAt?: true
@@ -2186,6 +2210,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl: string | null
     bio: string | null
+    gender: string | null
+    birthday: string | null
+    province: string | null
+    city: string | null
     role: string
     status: number
     createdAt: Date
@@ -2218,6 +2246,10 @@ export namespace Prisma {
     nickname?: boolean
     avatarUrl?: boolean
     bio?: boolean
+    gender?: boolean
+    birthday?: boolean
+    province?: boolean
+    city?: boolean
     role?: boolean
     status?: boolean
     createdAt?: boolean
@@ -2239,6 +2271,10 @@ export namespace Prisma {
     nickname?: boolean
     avatarUrl?: boolean
     bio?: boolean
+    gender?: boolean
+    birthday?: boolean
+    province?: boolean
+    city?: boolean
     role?: boolean
     status?: boolean
     createdAt?: boolean
@@ -2252,6 +2288,10 @@ export namespace Prisma {
     nickname?: boolean
     avatarUrl?: boolean
     bio?: boolean
+    gender?: boolean
+    birthday?: boolean
+    province?: boolean
+    city?: boolean
     role?: boolean
     status?: boolean
     createdAt?: boolean
@@ -2265,13 +2305,17 @@ export namespace Prisma {
     nickname?: boolean
     avatarUrl?: boolean
     bio?: boolean
+    gender?: boolean
+    birthday?: boolean
+    province?: boolean
+    city?: boolean
     role?: boolean
     status?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "account" | "passwordHash" | "nickname" | "avatarUrl" | "bio" | "role" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "account" | "passwordHash" | "nickname" | "avatarUrl" | "bio" | "gender" | "birthday" | "province" | "city" | "role" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     tracks?: boolean | User$tracksArgs<ExtArgs>
     playlists?: boolean | User$playlistsArgs<ExtArgs>
@@ -2303,6 +2347,10 @@ export namespace Prisma {
       nickname: string
       avatarUrl: string | null
       bio: string | null
+      gender: string | null
+      birthday: string | null
+      province: string | null
+      city: string | null
       role: string
       status: number
       createdAt: Date
@@ -2743,6 +2791,10 @@ export namespace Prisma {
     readonly nickname: FieldRef<"User", 'String'>
     readonly avatarUrl: FieldRef<"User", 'String'>
     readonly bio: FieldRef<"User", 'String'>
+    readonly gender: FieldRef<"User", 'String'>
+    readonly birthday: FieldRef<"User", 'String'>
+    readonly province: FieldRef<"User", 'String'>
+    readonly city: FieldRef<"User", 'String'>
     readonly role: FieldRef<"User", 'String'>
     readonly status: FieldRef<"User", 'Int'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
@@ -14340,6 +14392,10 @@ export namespace Prisma {
     nickname: 'nickname',
     avatarUrl: 'avatarUrl',
     bio: 'bio',
+    gender: 'gender',
+    birthday: 'birthday',
+    province: 'province',
+    city: 'city',
     role: 'role',
     status: 'status',
     createdAt: 'createdAt',
@@ -14540,6 +14596,10 @@ export namespace Prisma {
     nickname?: StringFilter<"User"> | string
     avatarUrl?: StringNullableFilter<"User"> | string | null
     bio?: StringNullableFilter<"User"> | string | null
+    gender?: StringNullableFilter<"User"> | string | null
+    birthday?: StringNullableFilter<"User"> | string | null
+    province?: StringNullableFilter<"User"> | string | null
+    city?: StringNullableFilter<"User"> | string | null
     role?: StringFilter<"User"> | string
     status?: IntFilter<"User"> | number
     createdAt?: DateTimeFilter<"User"> | Date | string
@@ -14560,6 +14620,10 @@ export namespace Prisma {
     nickname?: SortOrder
     avatarUrl?: SortOrderInput | SortOrder
     bio?: SortOrderInput | SortOrder
+    gender?: SortOrderInput | SortOrder
+    birthday?: SortOrderInput | SortOrder
+    province?: SortOrderInput | SortOrder
+    city?: SortOrderInput | SortOrder
     role?: SortOrder
     status?: SortOrder
     createdAt?: SortOrder
@@ -14583,6 +14647,10 @@ export namespace Prisma {
     nickname?: StringFilter<"User"> | string
     avatarUrl?: StringNullableFilter<"User"> | string | null
     bio?: StringNullableFilter<"User"> | string | null
+    gender?: StringNullableFilter<"User"> | string | null
+    birthday?: StringNullableFilter<"User"> | string | null
+    province?: StringNullableFilter<"User"> | string | null
+    city?: StringNullableFilter<"User"> | string | null
     role?: StringFilter<"User"> | string
     status?: IntFilter<"User"> | number
     createdAt?: DateTimeFilter<"User"> | Date | string
@@ -14603,6 +14671,10 @@ export namespace Prisma {
     nickname?: SortOrder
     avatarUrl?: SortOrderInput | SortOrder
     bio?: SortOrderInput | SortOrder
+    gender?: SortOrderInput | SortOrder
+    birthday?: SortOrderInput | SortOrder
+    province?: SortOrderInput | SortOrder
+    city?: SortOrderInput | SortOrder
     role?: SortOrder
     status?: SortOrder
     createdAt?: SortOrder
@@ -14624,6 +14696,10 @@ export namespace Prisma {
     nickname?: StringWithAggregatesFilter<"User"> | string
     avatarUrl?: StringNullableWithAggregatesFilter<"User"> | string | null
     bio?: StringNullableWithAggregatesFilter<"User"> | string | null
+    gender?: StringNullableWithAggregatesFilter<"User"> | string | null
+    birthday?: StringNullableWithAggregatesFilter<"User"> | string | null
+    province?: StringNullableWithAggregatesFilter<"User"> | string | null
+    city?: StringNullableWithAggregatesFilter<"User"> | string | null
     role?: StringWithAggregatesFilter<"User"> | string
     status?: IntWithAggregatesFilter<"User"> | number
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
@@ -15291,6 +15367,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -15311,6 +15391,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -15331,6 +15415,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -15351,6 +15439,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -15371,6 +15463,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -15384,6 +15480,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -15397,6 +15497,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -16193,6 +16297,10 @@ export namespace Prisma {
     nickname?: SortOrder
     avatarUrl?: SortOrder
     bio?: SortOrder
+    gender?: SortOrder
+    birthday?: SortOrder
+    province?: SortOrder
+    city?: SortOrder
     role?: SortOrder
     status?: SortOrder
     createdAt?: SortOrder
@@ -16210,6 +16318,10 @@ export namespace Prisma {
     nickname?: SortOrder
     avatarUrl?: SortOrder
     bio?: SortOrder
+    gender?: SortOrder
+    birthday?: SortOrder
+    province?: SortOrder
+    city?: SortOrder
     role?: SortOrder
     status?: SortOrder
     createdAt?: SortOrder
@@ -16223,6 +16335,10 @@ export namespace Prisma {
     nickname?: SortOrder
     avatarUrl?: SortOrder
     bio?: SortOrder
+    gender?: SortOrder
+    birthday?: SortOrder
+    province?: SortOrder
+    city?: SortOrder
     role?: SortOrder
     status?: SortOrder
     createdAt?: SortOrder
@@ -18050,6 +18166,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -18069,6 +18189,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -18194,6 +18318,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -18213,6 +18341,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -18305,6 +18437,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -18324,6 +18460,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -18378,6 +18518,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -18397,6 +18541,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -18600,6 +18748,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -18619,6 +18771,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -18705,6 +18861,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -18724,6 +18884,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -18800,6 +18964,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -18819,6 +18987,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -18905,6 +19077,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -18924,6 +19100,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -19051,6 +19231,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -19070,6 +19254,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -19239,6 +19427,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -19258,6 +19450,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -19342,6 +19538,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -19361,6 +19561,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -19423,6 +19627,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -19442,6 +19650,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -19494,6 +19706,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -19513,6 +19729,10 @@ export namespace Prisma {
     nickname: string
     avatarUrl?: string | null
     bio?: string | null
+    gender?: string | null
+    birthday?: string | null
+    province?: string | null
+    city?: string | null
     role?: string
     status?: number
     createdAt?: Date | string
@@ -19548,6 +19768,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -19567,6 +19791,10 @@ export namespace Prisma {
     nickname?: StringFieldUpdateOperationsInput | string
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    gender?: NullableStringFieldUpdateOperationsInput | string | null
+    birthday?: NullableStringFieldUpdateOperationsInput | string | null
+    province?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
     role?: StringFieldUpdateOperationsInput | string
     status?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string

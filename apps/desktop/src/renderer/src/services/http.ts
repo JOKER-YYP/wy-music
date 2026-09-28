@@ -27,6 +27,9 @@ http.interceptors.response.use(
     return res
   },
   (err) => {
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') {
+      return Promise.reject(err)
+    }
     const msg = err.response?.data?.message || err.message || '网络错误'
     if (err.response?.status === 401) {
       localStorage.removeItem('accessToken')

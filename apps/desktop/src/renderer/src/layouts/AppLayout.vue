@@ -1,11 +1,76 @@
 <template>
   <div class="layout">
-    <aside class="sidebar">
-      <div class="brand">
-        <img class="brand-logo" :src="logoUrl" alt="WY Music" />
-        <span class="brand-name">WY Music</span>
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand" @click="router.push('/discover')">
+          <img class="brand-logo" :src="logoUrl" alt="WY Music" />
+          <span class="brand-name">WY Music</span>
+        </div>
+        <div class="hist-nav">
+          <button type="button" class="hist-btn" title="后退" @click="router.back()">
+            <el-icon :size="14"><ArrowLeft /></el-icon>
+          </button>
+          <button type="button" class="hist-btn" title="前进" @click="router.forward()">
+            <el-icon :size="14"><ArrowRight /></el-icon>
+          </button>
+        </div>
+        <div ref="searchAnchorRef" class="search-anchor">
+          <div class="search-wrap" :class="{ focused: searchOpen }">
+            <el-icon class="search-icon"><Search /></el-icon>
+            <input
+              ref="searchInputRef"
+              v-model="keyword"
+              class="search-input"
+              placeholder="搜索"
+              @focus="openSearchPanel"
+              @input="onSearchInput"
+              @keydown.down.prevent="noop"
+              @keyup.enter="goSearch"
+              @keydown.esc="closeSearchPanel"
+            />
+            <button
+              v-if="keyword"
+              type="button"
+              class="clear-btn"
+              title="清空"
+              @mousedown.prevent
+              @click="clearKeyword"
+            >
+              <el-icon :size="14"><CircleClose /></el-icon>
+            </button>
+            <span v-else class="mic-slot" aria-hidden="true">
+              <el-icon :size="14"><Microphone /></el-icon>
+            </span>
+          </div>
+          <Teleport to="body">
+            <SearchDropdown
+              v-if="searchOpen"
+              ref="searchDropdownRef"
+              :visible="searchOpen"
+              :keyword="keyword"
+              :anchor-style="searchPanelStyle"
+              @search="onSuggestSearch"
+            />
+          </Teleport>
+        </div>
       </div>
 
+      <div class="topbar-right">
+        <button class="user-chip" type="button" @click="onUserClick">
+          <img v-if="avatarSrc" class="avatar avatar-img" :src="avatarSrc" alt="" />
+          <span v-else class="avatar">{{ avatarText }}</span>
+          <span class="uname">{{ user.user?.nickname || '未登录' }}</span>
+        </button>
+        <button class="icon-btn" type="button" title="设置" @click="goSettings">
+          <el-icon><Setting /></el-icon>
+        </button>
+        <button v-if="user.accessToken" class="text-btn" type="button" @click="onLogout">
+          退出
+        </button>
+      </div>
+    </header>
+
+    <aside class="sidebar">
       <nav class="nav">
         <div class="nav-group">
           <router-link
@@ -80,29 +145,6 @@
     </aside>
 
     <main class="main">
-      <header class="topbar">
-        <div class="search-wrap">
-          <el-icon class="search-icon"><Search /></el-icon>
-          <input
-            v-model="keyword"
-            class="search-input"
-            placeholder="搜索歌曲 / 歌手 / 专辑"
-            @keyup.enter="goSearch"
-          />
-        </div>
-        <div class="top-actions">
-          <button class="user-chip" type="button" @click="onUserClick">
-            <span class="avatar">{{ avatarText }}</span>
-            <span class="uname">{{ user.user?.nickname || '未登录' }}</span>
-          </button>
-          <button class="icon-btn" type="button" title="设置" @click="goSettings">
-            <el-icon><Setting /></el-icon>
-          </button>
-          <button v-if="user.accessToken" class="text-btn" type="button" @click="onLogout">
-            退出
-          </button>
-        </div>
-      </header>
       <div class="content">
         <router-view />
       </div>
@@ -118,14 +160,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  ArrowLeft,
+  ArrowRight,
   Calendar,
+  CircleClose,
   Clock,
   FolderOpened,
   Headset,
+  Microphone,
   Plus,
   Search,
   Setting,
@@ -143,6 +189,7 @@ import LoginModal from '../components/LoginModal.vue'
 import NowPlayingPanel from '../components/NowPlayingPanel.vue'
 import CollectPlaylistModal from '../components/CollectPlaylistModal.vue'
 import CommentsPanel from '../components/CommentsPanel.vue'
+import SearchDropdown from '../components/SearchDropdown.vue'
 import logoUrl from '../assets/logo.png'
 
 const route = useRoute()
@@ -151,6 +198,25 @@ const user = useUserStore()
 const ui = useUiStore()
 const playlistStore = usePlaylistStore()
 const keyword = ref('')
+const searchOpen = ref(false)
+const searchAnchorRef = ref<HTMLElement | null>(null)
+const searchInputRef = ref<HTMLInputElement | null>(null)
+const searchDropdownRef = ref<{ pushHistory: (kw: string) => void } | null>(null)
+const searchPanelStyle = ref<Record<string, string>>({})
+
+function updateSearchPanelPos() {
+  const el = searchAnchorRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  searchPanelStyle.value = {
+    position: 'fixed',
+    top: `${Math.round(rect.bottom + 8)}px`,
+    left: `${Math.round(rect.left)}px`,
+    width: '520px',
+    maxWidth: 'min(520px, calc(100vw - 24px))',
+    zIndex: '2000',
+  }
+}
 
 const primaryNav = [
   { to: '/discover', label: '精选', icon: Headset, auth: false },
@@ -169,6 +235,8 @@ const avatarText = computed(() => {
   return n.slice(0, 1)
 })
 
+const avatarSrc = computed(() => mediaUrl(user.user?.avatarUrl) || '')
+
 onMounted(() => {
   user.restore()
   if (!user.accessToken) {
@@ -177,6 +245,13 @@ onMounted(() => {
     void playlistStore.fetchMine()
     void checkTrackRemovedNotices()
   }
+  document.addEventListener('mousedown', onDocPointerDown)
+  window.addEventListener('resize', updateSearchPanelPos)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocPointerDown)
+  window.removeEventListener('resize', updateSearchPanelPos)
 })
 
 watch(
@@ -231,9 +306,62 @@ function plistCoverSrc(p: PlaylistDto) {
   return mediaUrl(p.coverUrl) || ''
 }
 
+function openSearchPanel() {
+  updateSearchPanelPos()
+  searchOpen.value = true
+}
+
+function closeSearchPanel() {
+  searchOpen.value = false
+}
+
+function onSearchInput() {
+  if (!searchOpen.value) {
+    updateSearchPanelPos()
+    searchOpen.value = true
+  }
+}
+
+function clearKeyword() {
+  keyword.value = ''
+  searchInputRef.value?.focus()
+  updateSearchPanelPos()
+  searchOpen.value = true
+}
+
+function noop() {}
+
+function onDocPointerDown(e: MouseEvent) {
+  const el = searchAnchorRef.value
+  const panel = document.querySelector('.search-dropdown')
+  const target = e.target as Node
+  if (el?.contains(target) || panel?.contains(target)) return
+  closeSearchPanel()
+}
+
 function goSearch() {
   const q = keyword.value.trim()
+  if (q) {
+    searchDropdownRef.value?.pushHistory(q)
+    // 面板未挂载时也写入本地历史
+    try {
+      const key = 'wy-search-history'
+      const raw = localStorage.getItem(key)
+      const arr = raw ? (JSON.parse(raw) as string[]) : []
+      const next = [q, ...(Array.isArray(arr) ? arr.filter((h) => h !== q) : [])].slice(0, 20)
+      localStorage.setItem(key, JSON.stringify(next))
+    } catch {
+      // ignore
+    }
+  }
+  closeSearchPanel()
   router.push({ path: '/search', query: q ? { keyword: q } : {} })
+}
+
+function onSuggestSearch(q: string) {
+  keyword.value = q
+  closeSearchPanel()
+  router.push({ path: '/search', query: { keyword: q } })
 }
 
 watch(
@@ -302,14 +430,200 @@ function onLogout() {
 .layout {
   display: grid;
   grid-template-columns: 210px 1fr;
-  grid-template-rows: 1fr var(--wy-player-h);
+  grid-template-rows: 54px 1fr var(--wy-player-h);
   height: 100%;
   max-height: 100%;
   overflow: hidden;
   background: #fff;
 }
+.topbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  height: 54px;
+  background: #ec4141;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px 0 14px;
+  gap: 16px;
+  position: relative;
+  z-index: 30;
+  color: #fff;
+}
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+}
+.brand-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.hist-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.hist-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  &:hover {
+    background: rgba(0, 0, 0, 0.2);
+    color: #fff;
+  }
+}
+.search-anchor {
+  position: relative;
+  width: 240px;
+  flex-shrink: 0;
+}
+.search-wrap {
+  height: 30px;
+  border-radius: 15px;
+  background: rgba(0, 0, 0, 0.16);
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 12px;
+  gap: 6px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  &.focused {
+    background: rgba(0, 0, 0, 0.22);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+  }
+}
+.search-icon {
+  color: rgba(255, 255, 255, 0.75);
+  flex-shrink: 0;
+}
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  color: #fff;
+  min-width: 0;
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+  }
+}
+.clear-btn,
+.mic-slot {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+.clear-btn {
+  cursor: pointer;
+  &:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 3px 8px 3px 3px;
+  border-radius: 16px;
+  color: #fff;
+  &:hover {
+    background: rgba(0, 0, 0, 0.12);
+  }
+}
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.avatar-img {
+  object-fit: cover;
+  padding: 0;
+  background: #fff;
+}
+.uname {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.95);
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.icon-btn,
+.text-btn {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  &:hover {
+    background: rgba(0, 0, 0, 0.12);
+    color: #fff;
+  }
+}
+.text-btn {
+  font-size: 12px;
+  padding: 6px 8px;
+}
 .sidebar {
-  grid-row: 1 / 2;
+  grid-column: 1;
+  grid-row: 2;
   background: #f5f5f7;
   border-right: 1px solid #ececec;
   display: flex;
@@ -317,33 +631,12 @@ function onLogout() {
   min-height: 0;
   overflow: hidden;
 }
-.brand {
-  height: 58px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 18px;
-}
-.brand-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  object-fit: cover;
-  flex-shrink: 0;
-  display: block;
-}
-.brand-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #333;
-}
 .nav {
   flex: 1;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 4px 10px 16px;
+  padding: 10px 10px 16px;
   overscroll-behavior: contain;
 }
 .nav-title {
@@ -423,102 +716,14 @@ function onLogout() {
   color: #bbb;
 }
 .main {
-  grid-row: 1 / 2;
+  grid-column: 2;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: #fff;
-}
-.topbar {
-  height: 58px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px 0 20px;
-  gap: 16px;
-}
-.search-wrap {
-  flex: 1;
-  max-width: 420px;
-  height: 34px;
-  border-radius: 17px;
-  background: #f2f2f3;
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  gap: 8px;
-}
-.search-icon {
-  color: #999;
-}
-.search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 13px;
-  color: #333;
-  min-width: 0;
-  &::placeholder {
-    color: #aaa;
-  }
-}
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.user-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 16px;
-  &:hover {
-    background: #f5f5f5;
-  }
-}
-.avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, #ec4141);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  font-weight: 700;
-}
-.uname {
-  font-size: 13px;
-  color: #555;
-  max-width: 88px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.icon-btn,
-.text-btn {
-  border: none;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
-  &:hover {
-    background: #f5f5f5;
-    color: #333;
-  }
-}
-.text-btn {
-  font-size: 13px;
-  padding: 6px 8px;
 }
 .content {
   flex: 1;

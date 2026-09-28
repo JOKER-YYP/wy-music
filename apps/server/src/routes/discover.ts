@@ -77,6 +77,146 @@ router.get('/playlists', optionalAuth, async (_req, res) => {
   return ok(res, { list: cards })
 })
 
+/** 搜索下拉：空态热搜/猜你喜欢/榜单；有关键词时返回联想 */
+router.get('/search-suggest', optionalAuth, async (req: AuthedRequest, res) => {
+  const q = String(req.query.q || req.query.keyword || '').trim()
+  const include = { uploader: { select: { nickname: true } } } as const
+
+  const tracks = await prisma.track.findMany({
+    where: { status: 'published' },
+    include,
+    orderBy: { playCount: 'desc' },
+    take: 120,
+  })
+
+  const hotKeywords: { text: string; badge?: string }[] = []
+  const seenHot = new Set<string>()
+  for (const t of tracks) {
+    for (const text of [t.name, ...parseArtists(t.artists)].map((s) => s.trim()).filter(Boolean)) {
+      const key = text.toLowerCase()
+      if (seenHot.has(key) || text === '未知歌手') continue
+      seenHot.add(key)
+      hotKeywords.push({
+        text,
+        badge: hotKeywords.length < 3 ? '爆' : hotKeywords.length < 6 ? '热' : undefined,
+      })
+      if (hotKeywords.length >= 9) break
+    }
+    if (hotKeywords.length >= 9) break
+  }
+
+  if (q) {
+    const ql = q.toLowerCase()
+    const hotSet = new Set(hotKeywords.map((h) => h.text.toLowerCase()))
+    const suggests: { text: string; tag?: '热搜' | '歌词' }[] = []
+    const seen = new Set<string>()
+
+    const push = (text: string, tag?: '热搜' | '歌词') => {
+      const key = text.toLowerCase()
+      if (!text || seen.has(key)) return
+      seen.add(key)
+      suggests.push({ text, tag })
+    }
+
+    // 以关键词开头的优先
+    const scored: { text: string; tag?: '热搜' | '歌词'; score: number }[] = []
+    for (const t of tracks) {
+      const artists = parseArtists(t.artists)
+      const candidates = [
+        { text: t.name, lyric: Boolean(t.lyricText) },
+        ...artists.map((a) => ({ text: a, lyric: false })),
+        ...(t.album ? [{ text: t.album, lyric: false }] : []),
+        ...artists.map((a) => ({ text: `${a} ${t.name}`, lyric: Boolean(t.lyricText) })),
+      ]
+      for (const c of candidates) {
+        const text = c.text.trim()
+        if (!text || text === '未知歌手' || text === '未知专辑') continue
+        const tl = text.toLowerCase()
+        if (!tl.includes(ql)) continue
+        let score = tl.startsWith(ql) ? 100 : 50
+        score += Math.min(20, Math.log10((t.playCount || 0) + 1) * 4)
+        const tag: '热搜' | '歌词' | undefined = hotSet.has(tl)
+          ? '热搜'
+          : c.lyric && tl.includes(ql)
+            ? '歌词'
+            : undefined
+        scored.push({ text, tag, score })
+      }
+    }
+    scored.sort((a, b) => b.score - a.score)
+    for (const s of scored) {
+      push(s.text, s.tag)
+      if (suggests.length >= 12) break
+    }
+
+    // 补几条「关键词 + 后缀」联想，贴近网易云体验
+    if (suggests.length < 8) {
+      for (const suffix of ['', ' 歌曲', ' 专辑', ' 歌单']) {
+        const text = `${q}${suffix}`.trim()
+        push(text, hotSet.has(q.toLowerCase()) ? '热搜' : undefined)
+        if (suggests.length >= 10) break
+      }
+    }
+
+    return ok(res, { mode: 'suggest' as const, suggests, hot: hotKeywords })
+  }
+
+  // 猜你喜欢：登录用户从喜欢/最近播放取歌手；否则用热门歌手
+  const guess: string[] = []
+  const guessSeen = new Set<string>()
+  const addGuess = (name: string) => {
+    const n = name.trim()
+    if (!n || n === '未知歌手' || guessSeen.has(n.toLowerCase())) return
+    guessSeen.add(n.toLowerCase())
+    guess.push(n)
+  }
+
+  if (req.user?.id) {
+    const [likes, history] = await Promise.all([
+      prisma.like.findMany({
+        where: { userId: req.user.id },
+        include: { track: true },
+        take: 30,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.playHistory.findMany({
+        where: { userId: req.user.id },
+        include: { track: true },
+        take: 40,
+        orderBy: { playedAt: 'desc' },
+      }),
+    ])
+    for (const row of [...likes, ...history]) {
+      for (const a of parseArtists(row.track.artists)) addGuess(a)
+      if (guess.length >= 10) break
+    }
+  }
+  if (guess.length < 8) {
+    for (const h of hotKeywords) {
+      addGuess(h.text)
+      if (guess.length >= 10) break
+    }
+  }
+
+  const chartTracks = tracks.slice(0, 9).map((t, i) => ({
+    rank: i + 1,
+    text: t.name,
+    artists: parseArtists(t.artists),
+    trackId: t.id,
+  }))
+
+  return ok(res, {
+    mode: 'panel' as const,
+    hot: hotKeywords,
+    guess,
+    chart: {
+      id: 'hot',
+      name: '热歌榜',
+      items: chartTracks,
+    },
+  })
+})
+
 /** 排行榜 */
 router.get('/charts', optionalAuth, async (_req, res) => {
   const include = { uploader: { select: { nickname: true } } } as const

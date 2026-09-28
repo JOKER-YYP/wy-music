@@ -44,13 +44,20 @@ export interface TrackDto {
   updatedAt: string
 }
 
+export type NotificationChannel = 'dm' | 'comment' | 'mention' | 'notice'
+
 export interface UserNotificationDto {
   id: string
+  channel: NotificationChannel | string
   type: string
   title: string
   body: string
   trackId?: string | null
   trackName?: string | null
+  actorId?: string | null
+  actorNickname?: string | null
+  actorAvatarUrl?: string | null
+  refId?: string | null
   read: boolean
   createdAt: string
 }

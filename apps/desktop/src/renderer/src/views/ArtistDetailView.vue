@@ -134,6 +134,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import type { TrackDto } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
@@ -242,8 +243,16 @@ async function load() {
   try {
     const { data } = await http.get(`/api/discover/artists/${encodeURIComponent(name)}`)
     detail.value = data.data
-    const key = `artist_follow_${name}`
-    followed.value = localStorage.getItem(key) === '1'
+    if (user.accessToken) {
+      try {
+        const st = await http.get('/api/follows/artists/status', { params: { name } })
+        followed.value = Boolean(st.data.data?.followed)
+      } catch {
+        followed.value = false
+      }
+    } else {
+      followed.value = false
+    }
   } catch {
     detail.value = null
   } finally {
@@ -267,11 +276,23 @@ async function toggleLike(row: TrackDto) {
   row.liked = data.data.liked
 }
 
-function toggleFollow() {
+async function toggleFollow() {
   if (!detail.value) return
   if (!ensureLogin()) return
-  followed.value = !followed.value
-  localStorage.setItem(`artist_follow_${detail.value.name}`, followed.value ? '1' : '0')
+  const name = detail.value.name
+  try {
+    if (followed.value) {
+      await http.delete(`/api/follows/artists/${encodeURIComponent(name)}`)
+      followed.value = false
+      ElMessage.success('已取消关注')
+    } else {
+      await http.post('/api/follows/artists', { name })
+      followed.value = true
+      ElMessage.success('关注成功，有新歌时会通知你')
+    }
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 function goArtist(name: string) {

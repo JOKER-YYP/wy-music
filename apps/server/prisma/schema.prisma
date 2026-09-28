@@ -33,6 +33,7 @@ model User {
   comments     Comment[]
   commentLikes CommentLike[]
   notifications UserNotification[]
+  artistFollows ArtistFollow[]
 }
 
 model Track {
@@ -150,18 +151,39 @@ model SystemConfig {
   value String
 }
 
-/** 用户通知：如收藏/歌单中的歌曲被删除或下架 */
-model UserNotification {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String // track_removed
-  title     String
-  body      String
-  trackId   String?
-  trackName String?
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+/** 关注歌手（按歌手名，与曲库 artists 字段对应） */
+model ArtistFollow {
+  userId     String
+  artistName String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@id([userId, artistName])
+  @@index([artistName])
+}
+
+/**
+ * 用户消息/通知
+ * channel: dm | comment | mention | notice
+ * type: track_removed | comment_reply | mention | artist_new_track | system_dm | ...
+ */
+model UserNotification {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel        String   @default("notice") // dm | comment | mention | notice
+  type           String
+  title          String
+  body           String
+  trackId        String?
+  trackName      String?
+  actorId        String?
+  actorNickname  String?
+  actorAvatarUrl String?
+  refId          String?
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([userId, channel, createdAt])
   @@index([userId, read, createdAt])
 }

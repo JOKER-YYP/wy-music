@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import { prisma } from '../db.js'
 import { audioAbsolutePath } from '../utils/storage.js'
 import { parseArtists } from '../utils/mapper.js'
+import { createNotifications } from './notify.js'
 
 /** 收藏或歌单中引用该曲的用户 */
 export async function collectAffectedUserIds(trackId: string): Promise<string[]> {
@@ -30,23 +31,24 @@ export async function notifyTrackRemoved(input: {
 
   const artistText = (input.artists || []).filter(Boolean).join(' / ')
   const label = artistText ? `《${input.trackName}》 - ${artistText}` : `《${input.trackName}》`
-  const title = '歌曲已被下架'
+  const title = '系统通知'
   const body =
     input.kind === 'deleted'
       ? `${label} 已被下架删除，已从你的收藏/歌单中移除。`
       : `${label} 已被下架，将不再出现在公共曲库与你的收藏/歌单展示中。`
 
-  await prisma.userNotification.createMany({
-    data: userIds.map((userId) => ({
+  await createNotifications(
+    userIds.map((userId) => ({
       userId,
+      channel: 'notice',
       type: 'track_removed',
       title,
       body,
       trackId: input.kind === 'deleted' ? null : input.trackId,
       trackName: input.trackName,
-      read: false,
+      actorNickname: '系统通知',
     })),
-  })
+  )
 
   return { notified: userIds.length }
 }

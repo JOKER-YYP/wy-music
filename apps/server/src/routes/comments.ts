@@ -100,7 +100,8 @@ router.get('/track/:trackId/count', async (req, res) => {
 
 /** POST /api/comments/track/:trackId */
 router.post('/track/:trackId', requireAuth, async (req: AuthedRequest, res) => {
-  const trackId = req.params.trackId
+  const trackIdParam = req.params.trackId
+  const trackId = String(Array.isArray(trackIdParam) ? trackIdParam[0] : trackIdParam)
   const parsed = z
     .object({
       content: z.string().trim().min(1).max(500),
@@ -117,11 +118,13 @@ router.post('/track/:trackId', requireAuth, async (req: AuthedRequest, res) => {
   }
 
   let parentId: string | null = parsed.data.parentId || null
+  let replyToUserId: string | null = null
   if (parentId) {
     const parent = await prisma.comment.findUnique({ where: { id: parentId } })
     if (!parent || parent.trackId !== trackId) {
       return fail(res, 40002, '回复的评论不存在')
     }
+    replyToUserId = parent.userId
     // 只允许一层回复：挂到根评论下
     if (parent.parentId) parentId = parent.parentId
   }
@@ -138,6 +141,19 @@ router.post('/track/:trackId', requireAuth, async (req: AuthedRequest, res) => {
       _count: { select: { replies: true } },
     },
   })
+
+  try {
+    const { notifyCommentEvents } = await import('../services/notify.js')
+    await notifyCommentEvents({
+      actor: comment.user,
+      track: { id: track.id, name: track.name, uploaderId: track.uploaderId },
+      commentId: comment.id,
+      content: comment.content,
+      replyToUserId,
+    })
+  } catch (e) {
+    console.warn('[notifyCommentEvents]', e)
+  }
 
   return ok(res, toCommentDto(comment, false), '发布成功')
 })

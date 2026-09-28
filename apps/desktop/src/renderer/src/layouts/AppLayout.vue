@@ -56,6 +56,17 @@
       </div>
 
       <div class="topbar-right">
+        <button
+          class="icon-btn msg-btn"
+          type="button"
+          title="消息"
+          @click="toggleMessagePanel"
+        >
+          <el-icon :size="18"><Message /></el-icon>
+          <span v-if="unreadTotal > 0" class="msg-badge">
+            {{ unreadTotal > 99 ? '99+' : unreadTotal }}
+          </span>
+        </button>
         <button class="user-chip" type="button" @click="onUserClick">
           <img v-if="avatarSrc" class="avatar avatar-img" :src="avatarSrc" alt="" />
           <span v-else class="avatar">{{ avatarText }}</span>
@@ -156,6 +167,11 @@
     <NowPlayingPanel />
     <CollectPlaylistModal />
     <CommentsPanel />
+    <MessagePanel
+      :visible="messageOpen"
+      @close="messageOpen = false"
+      @changed="refreshUnreadCount"
+    />
   </div>
 </template>
 
@@ -171,6 +187,7 @@ import {
   Clock,
   FolderOpened,
   Headset,
+  Message,
   Microphone,
   Plus,
   Search,
@@ -190,6 +207,7 @@ import NowPlayingPanel from '../components/NowPlayingPanel.vue'
 import CollectPlaylistModal from '../components/CollectPlaylistModal.vue'
 import CommentsPanel from '../components/CommentsPanel.vue'
 import SearchDropdown from '../components/SearchDropdown.vue'
+import MessagePanel from '../components/MessagePanel.vue'
 import logoUrl from '../assets/logo.png'
 
 const route = useRoute()
@@ -203,6 +221,8 @@ const searchAnchorRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchDropdownRef = ref<{ pushHistory: (kw: string) => void } | null>(null)
 const searchPanelStyle = ref<Record<string, string>>({})
+const messageOpen = ref(false)
+const unreadTotal = ref(0)
 
 function updateSearchPanelPos() {
   const el = searchAnchorRef.value
@@ -244,6 +264,7 @@ onMounted(() => {
   } else {
     void playlistStore.fetchMine()
     void checkTrackRemovedNotices()
+    void refreshUnreadCount()
   }
   document.addEventListener('mousedown', onDocPointerDown)
   window.addEventListener('resize', updateSearchPanelPos)
@@ -260,11 +281,35 @@ watch(
     if (token) {
       void playlistStore.fetchMine()
       void checkTrackRemovedNotices()
+      void refreshUnreadCount()
     } else {
       playlistStore.list = []
+      unreadTotal.value = 0
+      messageOpen.value = false
     }
   },
 )
+
+async function refreshUnreadCount() {
+  if (!user.accessToken) {
+    unreadTotal.value = 0
+    return
+  }
+  try {
+    const { data } = await http.get('/api/notifications/unread-count')
+    unreadTotal.value = Number(data.data?.total || 0)
+  } catch {
+    // ignore
+  }
+}
+
+function toggleMessagePanel() {
+  if (!user.accessToken) {
+    ui.openLogin('login')
+    return
+  }
+  messageOpen.value = !messageOpen.value
+}
 
 async function checkTrackRemovedNotices() {
   if (!user.accessToken) return
@@ -293,6 +338,7 @@ async function checkTrackRemovedNotices() {
       { confirmButtonText: '知道了', type: 'warning' },
     )
     await http.post('/api/notifications/read', { ids: list.map((n) => n.id) })
+    void refreshUnreadCount()
   } catch (e) {
     console.warn('[notifications]', e)
   }
@@ -616,6 +662,29 @@ function onLogout() {
     background: rgba(0, 0, 0, 0.12);
     color: #fff;
   }
+}
+.msg-btn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+}
+.msg-badge {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #fff;
+  color: #ec4141;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 1px rgba(236, 65, 65, 0.2);
 }
 .text-btn {
   font-size: 12px;

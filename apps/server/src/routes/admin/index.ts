@@ -202,11 +202,30 @@ router.put('/tracks/:id', async (req, res) => {
 })
 
 router.post('/tracks/:id/approve', async (req, res) => {
+  const prev = await prisma.track.findUnique({ where: { id: req.params.id } })
   const track = await prisma.track.update({
     where: { id: req.params.id },
     data: { status: 'published', rejectReason: null },
     include: { uploader: { select: { nickname: true } } },
   })
+  if (prev && prev.status !== 'published') {
+    try {
+      const { notifyArtistNewTrack, createNotification } = await import('../../services/notify.js')
+      await notifyArtistNewTrack(track)
+      await createNotification({
+        userId: track.uploaderId,
+        channel: 'notice',
+        type: 'track_approved',
+        title: '系统通知',
+        body: `你上传的《${track.name}》已通过审核并发布。`,
+        trackId: track.id,
+        trackName: track.name,
+        actorNickname: '系统通知',
+      })
+    } catch (e) {
+      console.warn('[approve notify]', e)
+    }
+  }
   return ok(res, toTrackDto(track))
 })
 
@@ -217,6 +236,21 @@ router.post('/tracks/:id/reject', async (req, res) => {
     data: { status: 'rejected', rejectReason: reason },
     include: { uploader: { select: { nickname: true } } },
   })
+  try {
+    const { createNotification } = await import('../../services/notify.js')
+    await createNotification({
+      userId: track.uploaderId,
+      channel: 'notice',
+      type: 'track_rejected',
+      title: '系统通知',
+      body: `你上传的《${track.name}》未通过审核：${reason}`,
+      trackId: track.id,
+      trackName: track.name,
+      actorNickname: '系统通知',
+    })
+  } catch (e) {
+    console.warn('[reject notify]', e)
+  }
   return ok(res, toTrackDto(track))
 })
 

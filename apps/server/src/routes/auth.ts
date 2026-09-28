@@ -80,6 +80,12 @@ router.post('/register', async (req, res) => {
       ownerId: user.id,
     },
   })
+  try {
+    const { sendWelcomeDm } = await import('../services/notify.js')
+    await sendWelcomeDm(user.id)
+  } catch (e) {
+    console.warn('[welcome dm]', e)
+  }
   const payload = { sub: user.id, role: 'user' as const }
   return ok(res, {
     accessToken: signAccessToken(payload),

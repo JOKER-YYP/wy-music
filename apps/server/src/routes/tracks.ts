@@ -396,6 +396,15 @@ router.post(
       include: { uploader: { select: { nickname: true } } },
     })
 
+    if (status === 'published') {
+      try {
+        const { notifyArtistNewTrack } = await import('../services/notify.js')
+        await notifyArtistNewTrack(track)
+      } catch (e) {
+        console.warn('[notifyArtistNewTrack]', e)
+      }
+    }
+
     return ok(res, toTrackDto(track), '上传成功')
   },
 )

@@ -3,7 +3,7 @@ import { prisma } from '../db.js'
 import { fail, ok } from '../utils/response.js'
 import { toTrackDto } from '../utils/mapper.js'
 import { toPublicUrl } from '../utils/storage.js'
-import { optionalAuth } from '../middleware/auth.js'
+import { optionalAuth, requireAuth, type AuthedRequest } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -446,6 +446,206 @@ router.get('/artists/:name/tracks', optionalAuth, async (req, res) => {
     .map((t) => toTrackDto(t))
 
   return ok(res, { list, name })
+})
+
+/** 上海时区下的「推荐日」：每天 6:00 刷新 */
+function recommendDateParts(now = new Date()) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    hour12: false,
+  })
+  const parts = Object.fromEntries(fmt.formatToParts(now).map((p) => [p.type, p.value]))
+  let year = Number(parts.year)
+  let month = Number(parts.month)
+  let day = Number(parts.day)
+  const hour = Number(parts.hour)
+  if (hour < 6) {
+    const d = new Date(Date.UTC(year, month - 1, day))
+    d.setUTCDate(d.getUTCDate() - 1)
+    year = d.getUTCFullYear()
+    month = d.getUTCMonth() + 1
+    day = d.getUTCDate()
+  }
+  const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  return { year, month, day, dateKey }
+}
+
+function dailyHash(seed: string): number {
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+function isWeakArtist(name: string) {
+  const n = name.trim()
+  return !n || n === '未知歌手'
+}
+
+function isWeakAlbum(name: string | null | undefined) {
+  const n = (name || '').trim()
+  return !n || n === '未知专辑'
+}
+
+/**
+ * 每日推荐：根据喜欢 / 歌单 / 最近播放提取歌手·专辑口味，匹配 20 首
+ * 同日（6:00 前算前一天）对同一用户结果稳定
+ */
+router.get('/daily', requireAuth, async (req: AuthedRequest, res) => {
+  const userId = req.user!.id
+  const { year, month, day, dateKey } = recommendDateParts()
+  const LIMIT = 20
+
+  const [likes, history, playlistTracks, published] = await Promise.all([
+    prisma.like.findMany({
+      where: { userId },
+      include: { track: true },
+      orderBy: { createdAt: 'desc' },
+      take: 80,
+    }),
+    prisma.playHistory.findMany({
+      where: { userId },
+      include: { track: true },
+      orderBy: { playedAt: 'desc' },
+      take: 120,
+    }),
+    prisma.playlistTrack.findMany({
+      where: { playlist: { ownerId: userId } },
+      include: { track: true },
+      orderBy: { position: 'asc' },
+      take: 200,
+    }),
+    prisma.track.findMany({
+      where: { status: 'published' },
+      include: { uploader: { select: { nickname: true } } },
+      orderBy: { playCount: 'desc' },
+      take: 400,
+    }),
+  ])
+
+  const artistScore = new Map<string, number>()
+  const albumScore = new Map<string, number>()
+  const seedIds = new Set<string>()
+
+  const bumpArtist = (name: string, w: number) => {
+    if (isWeakArtist(name)) return
+    artistScore.set(name, (artistScore.get(name) || 0) + w)
+  }
+  const bumpAlbum = (name: string | null | undefined, w: number) => {
+    if (isWeakAlbum(name)) return
+    const key = String(name).trim()
+    albumScore.set(key, (albumScore.get(key) || 0) + w)
+  }
+  const absorb = (
+    track: { id: string; artists: string; album: string | null; status: string },
+    weight: number,
+  ) => {
+    if (track.status !== 'published') return
+    seedIds.add(track.id)
+    for (const a of parseArtists(track.artists)) bumpArtist(a, weight)
+    bumpAlbum(track.album, weight * 0.6)
+  }
+
+  // 喜欢权重最高，其次最近播放（越近越高），歌单曲目次之
+  for (const like of likes) absorb(like.track, 5)
+  const seenHist = new Set<string>()
+  let histIdx = 0
+  for (const h of history) {
+    if (seenHist.has(h.trackId)) continue
+    seenHist.add(h.trackId)
+    const recency = Math.max(1.2, 4 - histIdx * 0.08)
+    absorb(h.track, recency)
+    histIdx += 1
+    if (histIdx >= 60) break
+  }
+  for (const pt of playlistTracks) absorb(pt.track, 2.2)
+
+  type Scored = { track: (typeof published)[number]; score: number; tie: number }
+  const scored: Scored[] = []
+
+  for (const t of published) {
+    if (seedIds.has(t.id)) continue
+    let score = 0
+    for (const a of parseArtists(t.artists)) {
+      if (isWeakArtist(a)) continue
+      score += (artistScore.get(a) || 0) * 10
+    }
+    if (!isWeakAlbum(t.album)) {
+      score += (albumScore.get(String(t.album).trim()) || 0) * 5
+    }
+    // 轻微热度，避免完全冷门；日推扰动保证同日稳定、跨日变化
+    score += Math.log10((t.playCount || 0) + 1) * 0.8
+    if (score <= 0) continue
+    scored.push({
+      track: t,
+      score,
+      tie: dailyHash(`${userId}|${dateKey}|${t.id}`),
+    })
+  }
+
+  scored.sort((a, b) => b.score - a.score || a.tie - b.tie)
+
+  let picked = scored.slice(0, LIMIT).map((s) => s.track)
+
+  // 口味信号不足或候选不够：用热门/新歌按日推种子填充
+  if (picked.length < LIMIT) {
+    const used = new Set(picked.map((t) => t.id))
+    const fillers = [...published]
+      .filter((t) => !used.has(t.id) && !seedIds.has(t.id))
+      .sort(
+        (a, b) =>
+          dailyHash(`${userId}|${dateKey}|fill|${a.id}`) -
+          dailyHash(`${userId}|${dateKey}|fill|${b.id}`),
+      )
+    for (const t of fillers) {
+      picked.push(t)
+      if (picked.length >= LIMIT) break
+    }
+  }
+
+  // 极端冷库：仍不够则允许包含种子曲
+  if (picked.length < LIMIT) {
+    const used = new Set(picked.map((t) => t.id))
+    for (const t of published) {
+      if (used.has(t.id)) continue
+      picked.push(t)
+      if (picked.length >= LIMIT) break
+    }
+  }
+
+  picked = picked.slice(0, LIMIT)
+
+  const likedSet = new Set(
+    (
+      await prisma.like.findMany({
+        where: { userId, trackId: { in: picked.map((t) => t.id) } },
+        select: { trackId: true },
+      })
+    ).map((l) => l.trackId),
+  )
+
+  const topArtists = [...artistScore.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name]) => name)
+
+  return ok(res, {
+    date: dateKey,
+    day,
+    month,
+    year,
+    updateTip: '每天 6:00 更新',
+    description: topArtists.length
+      ? `根据你常听的「${topArtists.join('、')}」等口味生成`
+      : '根据你的音乐口味生成，每天 6:00 更新',
+    tracks: picked.map((t) => toTrackDto(t, likedSet.has(t.id))),
+  })
 })
 
 export default router

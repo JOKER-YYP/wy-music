@@ -20,7 +20,9 @@
           v-for="(b, i) in banners"
           :key="i"
           class="banner"
+          :class="{ clickable: !!b.to }"
           :style="{ background: b.bg }"
+          @click="onBannerClick(b)"
         >
           <div class="banner-title">{{ b.title }}</div>
           <div class="banner-sub">{{ b.sub }}</div>
@@ -111,6 +113,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { TrackDto } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
@@ -120,6 +123,7 @@ import PlaylistPlazaPanel from '../components/discover/PlaylistPlazaPanel.vue'
 import ChartsPanel from '../components/discover/ChartsPanel.vue'
 import ArtistsPanel from '../components/discover/ArtistsPanel.vue'
 
+const router = useRouter()
 const tabs = ['精选', '歌单', '排行榜', '歌手']
 const activeTab = ref('精选')
 const loading = ref(false)
@@ -130,7 +134,12 @@ const user = useUserStore()
 const ui = useUiStore()
 
 const banners = [
-  { title: '今日推荐', sub: '根据你的口味生成', bg: 'linear-gradient(135deg,#ff6b6b,#ee5a24)' },
+  {
+    title: '今日推荐',
+    sub: '根据你的口味生成',
+    bg: 'linear-gradient(135deg,#ff6b6b,#ee5a24)',
+    to: '/recommend/daily',
+  },
   { title: '新歌速递', sub: '发现刚上传的好声音', bg: 'linear-gradient(135deg,#54a0ff,#2e86de)' },
   { title: '热门精选', sub: '大家正在听', bg: 'linear-gradient(135deg,#5f27cd,#341f97)' },
 ]
@@ -155,6 +164,23 @@ function ensureLogin() {
   if (user.accessToken) return true
   ui.openLogin('login')
   return false
+}
+
+function onBannerClick(b: { to?: string; title: string }) {
+  if (!b.to) {
+    if (b.title === '新歌速递') {
+      document.querySelector('.section')?.scrollIntoView({ behavior: 'smooth' })
+    } else if (b.title === '热门精选') {
+      const sections = document.querySelectorAll('.section')
+      sections[sections.length - 1]?.scrollIntoView({ behavior: 'smooth' })
+    }
+    return
+  }
+  if (!ensureLogin()) {
+    sessionStorage.setItem('loginRedirect', b.to)
+    return
+  }
+  void router.push(b.to)
 }
 
 function playTrack(item: TrackDto) {
@@ -237,6 +263,14 @@ onMounted(async () => {
   flex-direction: column;
   justify-content: flex-end;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  &.clickable {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+    }
+  }
 }
 .banner-title {
   font-size: 22px;

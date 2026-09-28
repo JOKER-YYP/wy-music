@@ -53,6 +53,12 @@ const router = createRouter({
           meta: { auth: true },
         },
         {
+          path: 'recommend/daily',
+          name: 'daily-recommend',
+          component: () => import('../views/DailyRecommendView.vue'),
+          meta: { auth: true },
+        },
+        {
           path: 'liked',
           name: 'liked',
           component: () => import('../views/LikedView.vue'),

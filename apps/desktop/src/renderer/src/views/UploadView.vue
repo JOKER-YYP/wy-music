@@ -88,9 +88,8 @@
             <template #default="{ row }">
               <UploadEditCell
                 :model-value="row.artists?.join(' / ') || ''"
-                check-unknown-artist
-                placeholder="必填，如：许嵩"
-                empty-text="点击填写"
+                placeholder="可留空，默认未知歌手"
+                empty-text="未知歌手"
                 @update:model-value="(v) => onArtistsCommit(row, v)"
               />
             </template>
@@ -99,7 +98,8 @@
             <template #default="{ row }">
               <UploadEditCell
                 :model-value="row.album || ''"
-                empty-text="点击填写"
+                empty-text="未知专辑"
+                placeholder="可留空，默认未知专辑"
                 @update:model-value="(v) => onAlbumCommit(row, v)"
               />
             </template>
@@ -166,15 +166,14 @@
               <el-button title="互换歌名与歌手" @click="swapSingleForm">⇄ 互换</el-button>
             </div>
           </el-form-item>
-          <el-form-item label="歌手" required>
+          <el-form-item label="歌手">
             <el-input
               v-model="singleForm.artists"
-              placeholder="未解析到时请手动填写，多个歌手用逗号分隔"
+              placeholder="可留空，默认「未知歌手」，多个用逗号分隔"
             />
-            <div v-if="!singleForm.artists.trim()" class="hint warn">未识别到歌手，请手动填写后再上传</div>
           </el-form-item>
           <el-form-item label="专辑">
-            <el-input v-model="singleForm.album" />
+            <el-input v-model="singleForm.album" placeholder="可留空，默认「未知专辑」" />
           </el-form-item>
           <el-form-item label="歌词">
             <div class="lyric-tools">
@@ -268,15 +267,14 @@
             <el-input
               :model-value="row.item.artists?.join(' / ') || ''"
               size="small"
-              placeholder="必填"
-              :class="{ 'need-artist': isUnknownArtist(row.item) }"
+              placeholder="可留空，默认未知歌手"
               @update:model-value="(v) => setRowArtists(row.item, String(v ?? ''))"
             />
           </template>
         </el-table-column>
         <el-table-column label="专辑" min-width="120">
           <template #default="{ row }">
-            <el-input v-model="row.item.album" size="small" />
+            <el-input v-model="row.item.album" size="small" placeholder="可留空，默认未知专辑" />
           </template>
         </el-table-column>
         <el-table-column label="文件名" min-width="120" show-overflow-tooltip>
@@ -404,6 +402,25 @@ function isUnknownArtist(item: LocalAudioItem) {
   return !a.length || a.every((x) => !x || x === '未知歌手')
 }
 
+const DEFAULT_ARTIST = '未知歌手'
+const DEFAULT_ALBUM = '未知专辑'
+
+/** 上传前补齐歌手/专辑默认值（非必填） */
+function applyUploadDefaults(item: LocalAudioItem) {
+  if (isUnknownArtist(item)) {
+    item.artists = [DEFAULT_ARTIST]
+  }
+  if (!(item.album || '').trim()) {
+    item.album = DEFAULT_ALBUM
+  }
+  return {
+    name: item.name,
+    artists: item.artists.join(','),
+    album: item.album,
+    lyricText: item.lyricText || undefined,
+  }
+}
+
 function setRowArtists(row: LocalAudioItem, value: string) {
   row.artists = value
     .split(/[,，/、]/)
@@ -487,28 +504,6 @@ function swapSingleForm() {
   if (singleItem.value) {
     singleItem.value.name = next.name
     singleItem.value.artists = next.artists.length ? next.artists : ['未知歌手']
-  }
-}
-
-async function ensureArtistsFilled(item: LocalAudioItem): Promise<boolean> {
-  if (!isUnknownArtist(item)) return true
-  try {
-    const { value } = await ElMessageBox.prompt(
-      `「${item.name}」未识别到歌手，请填写后继续上传`,
-      '填写歌手',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '跳过',
-        inputPattern: /\S+/,
-        inputErrorMessage: '歌手不能为空',
-        inputPlaceholder: '例如：许嵩',
-      },
-    )
-    setRowArtists(item, value.trim())
-    triggerRef(items)
-    return true
-  } catch {
-    return false
   }
 }
 
@@ -637,19 +632,10 @@ function playAll() {
 }
 
 async function uploadOne(item: LocalAudioItem) {
-  const ok = await ensureArtistsFilled(item)
-  if (!ok) {
-    ElMessage.info('已取消上传')
-    return
-  }
   uploadingId.value = item.id
   try {
-    const result = await uploadLocalItem(item, {
-      name: item.name,
-      artists: item.artists.join(','),
-      album: item.album,
-      lyricText: item.lyricText || undefined,
-    })
+    const result = await uploadLocalItem(item, applyUploadDefaults(item))
+    triggerRef(items)
     ElMessage.success(result.message || `「${item.name}」上传成功`)
   } catch (e) {
     console.error(e)
@@ -673,23 +659,8 @@ async function uploadSelected() {
   let okCount = 0
   for (const item of list) {
     progressText.value = `正在上传：${item.name}`
-    const filled = await ensureArtistsFilled(item)
-    if (!filled) {
-      pendingRetries.value.push({
-        item,
-        reason: '未填写歌手，已跳过',
-        kind: 'skip',
-      })
-      progressDone.value += 1
-      continue
-    }
     try {
-      await uploadLocalItem(item, {
-        name: item.name,
-        artists: item.artists.join(','),
-        album: item.album,
-        lyricText: item.lyricText || undefined,
-      })
+      await uploadLocalItem(item, applyUploadDefaults(item))
       okCount += 1
     } catch (e: unknown) {
       const msg =
@@ -705,7 +676,7 @@ async function uploadSelected() {
   batchUploading.value = false
   if (okCount) ElMessage.success(`成功上传 ${okCount} 首`)
   if (pendingRetries.value.length) {
-    ElMessage.warning(`${pendingRetries.value.length} 首失败或跳过，可在弹窗中调整后重试`)
+    ElMessage.warning(`${pendingRetries.value.length} 首上传失败，可在弹窗中调整后重试`)
     retryVisible.value = true
   }
 }
@@ -716,15 +687,7 @@ function openRetryDialog() {
 }
 
 async function doUploadItem(item: LocalAudioItem) {
-  if (isUnknownArtist(item)) {
-    throw new Error('请先填写歌手')
-  }
-  await uploadLocalItem(item, {
-    name: item.name,
-    artists: item.artists.join(','),
-    album: item.album,
-    lyricText: item.lyricText || undefined,
-  })
+  await uploadLocalItem(item, applyUploadDefaults(item))
 }
 
 async function retryUploadOne(row: PendingRetry, index: number) {
@@ -866,19 +829,20 @@ async function submitSingle() {
     ElMessage.warning('请先选择音频文件')
     return
   }
-  if (!singleForm.artists.trim()) {
-    ElMessage.warning('请填写歌手名称')
-    return
-  }
+  const artists = singleForm.artists.trim() || DEFAULT_ARTIST
+  const album = singleForm.album.trim() || DEFAULT_ALBUM
+  singleForm.artists = artists
+  singleForm.album = album
   singleUploading.value = true
   try {
     if (isDesktop && singleItem.value) {
-      setRowArtists(singleItem.value, singleForm.artists)
+      setRowArtists(singleItem.value, artists)
       singleItem.value.name = singleForm.name || singleItem.value.name
+      singleItem.value.album = album
       const result = await uploadLocalItem(singleItem.value, {
         name: singleForm.name,
-        artists: singleForm.artists,
-        album: singleForm.album,
+        artists,
+        album,
         lyricText: singleForm.lyricText,
       })
       ElMessage.success(result.message || '上传成功')
@@ -888,8 +852,8 @@ async function submitSingle() {
     if (webFile.value) {
       const result = await uploadBrowserFile(webFile.value, {
         name: singleForm.name,
-        artists: singleForm.artists,
-        album: singleForm.album,
+        artists,
+        album,
         lyricText: singleForm.lyricText,
       })
       ElMessage.success(result?.message || '上传成功')
@@ -1029,8 +993,5 @@ async function submitSingle() {
 .reason-fail {
   color: #f56c6c;
   font-size: 12px;
-}
-:deep(.need-artist .el-input__wrapper) {
-  box-shadow: 0 0 0 1px #e6a23c inset;
 }
 </style>

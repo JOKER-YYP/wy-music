@@ -494,7 +494,7 @@ async function parseLocalAudio(
     fileName,
     name: resolved.name,
     artists: resolved.artists.length ? resolved.artists : ['未知歌手'],
-    album: resolved.album,
+    album: (resolved.album || '').trim() || '未知专辑',
     durationMs,
     size: st.size,
     ext,

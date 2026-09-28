@@ -122,6 +122,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  Calendar,
   Clock,
   FolderOpened,
   Headset,
@@ -158,6 +159,7 @@ const primaryNav = [
 ]
 
 const myNav = [
+  { to: '/recommend/daily', label: '每日推荐', icon: Calendar, auth: true },
   { to: '/liked', label: '我喜欢的音乐', icon: Star, auth: true },
   { to: '/recent', label: '最近播放', icon: Clock, auth: true },
 ]

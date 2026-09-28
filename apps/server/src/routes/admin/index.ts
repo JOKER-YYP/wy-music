@@ -167,14 +167,15 @@ router.put('/tracks/:id', async (req, res) => {
     data.name = name
   }
   if (req.body.artists !== undefined) {
-    const artists = String(req.body.artists)
+    const artists = String(req.body.artists || '')
       .split(/[,，/、]/)
       .map((s) => s.trim())
       .filter(Boolean)
-    if (!artists.length) return fail(res, 40001, '歌手不能为空')
-    data.artists = JSON.stringify(artists)
+    data.artists = JSON.stringify(artists.length ? artists : ['未知歌手'])
   }
-  if (req.body.album !== undefined) data.album = String(req.body.album || '') || null
+  if (req.body.album !== undefined) {
+    data.album = String(req.body.album || '').trim() || '未知专辑'
+  }
   if (req.body.lyricText !== undefined) data.lyricText = String(req.body.lyricText || '') || null
   if (req.body.durationMs !== undefined) {
     const ms = Number(req.body.durationMs)

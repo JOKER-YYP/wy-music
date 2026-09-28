@@ -94,11 +94,14 @@
         <el-form-item label="歌名" required>
           <el-input v-model="editForm.name" />
         </el-form-item>
-        <el-form-item label="歌手" required>
-          <el-input v-model="editForm.artists" placeholder="多个用逗号分隔" />
+        <el-form-item label="歌手">
+          <el-input
+            v-model="editForm.artists"
+            placeholder="可留空，默认未知歌手；多个用逗号分隔"
+          />
         </el-form-item>
         <el-form-item label="专辑">
-          <el-input v-model="editForm.album" />
+          <el-input v-model="editForm.album" placeholder="可留空，默认未知专辑" />
         </el-form-item>
         <el-form-item label="时长(秒)">
           <el-input-number v-model="editForm.durationSec" :min="0" :step="1" />
@@ -245,16 +248,16 @@ async function saveEdit() {
     ElMessage.warning('请填写歌名')
     return
   }
-  if (!editForm.artists.trim()) {
-    ElMessage.warning('请填写歌手')
-    return
-  }
+  const artists = editForm.artists.trim() || '未知歌手'
+  const album = editForm.album.trim() || '未知专辑'
+  editForm.artists = artists
+  editForm.album = album
   saving.value = true
   try {
     await http.put(`/api/admin/tracks/${editForm.id}`, {
       name: editForm.name.trim(),
-      artists: editForm.artists.trim(),
-      album: editForm.album,
+      artists,
+      album,
       lyricText: editForm.lyricText,
       durationMs: Math.round(editForm.durationSec * 1000),
       status: editForm.status,

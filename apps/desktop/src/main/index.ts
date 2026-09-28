@@ -27,6 +27,12 @@ async function readAudioMetadata(filePath: string) {
 const AUDIO_EXTS = new Set(['.mp3', '.wav', '.flac', '.m4a', '.aac'])
 const LRC_EXTS = new Set(['.lrc'])
 const API_BASE = process.env.WY_API_BASE || 'http://127.0.0.1:3001'
+/** 上传/扫描忽略不足此时长的音频（毫秒） */
+const MIN_UPLOAD_DURATION_MS = 30_000
+
+function isTooShortAudio(durationMs: number) {
+  return durationMs > 0 && durationMs < MIN_UPLOAD_DURATION_MS
+}
 
 let mainWindow: BrowserWindow | null = null
 let miniWindow: BrowserWindow | null = null
@@ -848,7 +854,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('local:scanFolder', async (_e, folderPath: string) => {
     if (!folderPath) {
-      return { folderPath: '', total: 0, items: [] as LocalAudioItem[], lyricMatched: 0, deduped: 0 }
+      return {
+        folderPath: '',
+        total: 0,
+        items: [] as LocalAudioItem[],
+        lyricMatched: 0,
+        deduped: 0,
+        shortFiltered: 0,
+      }
     }
     console.log('[scan] start', folderPath)
     try {
@@ -858,13 +871,17 @@ app.whenReady().then(() => {
       for (const file of audios) {
         rawItems.push(await parseLocalAudio(file, lrcIndex))
       }
-      const { items, removed } = dedupeLocalTracks(rawItems)
+      const longEnough = rawItems.filter((i) => !isTooShortAudio(i.durationMs))
+      const shortFiltered = rawItems.length - longEnough.length
+      const { items, removed } = dedupeLocalTracks(longEnough)
       const lyricMatched = items.filter((i) => i.lyricText).length
       console.log(
         '[scan] done',
         items.length,
         'raw',
         rawItems.length,
+        'shortFiltered',
+        shortFiltered,
         'deduped',
         removed,
         'lrc matched',
@@ -878,6 +895,7 @@ app.whenReady().then(() => {
         items,
         lyricMatched,
         deduped: removed,
+        shortFiltered,
       }
     } catch (e) {
       console.error('[scan] error', e)
@@ -887,11 +905,17 @@ app.whenReady().then(() => {
 
   ipcMain.handle('local:parseFiles', async (_e, paths: string[]) => {
     const items: LocalAudioItem[] = []
+    let shortFiltered = 0
     for (const p of paths || []) {
       if (!AUDIO_EXTS.has(extname(p).toLowerCase())) continue
-      items.push(await parseLocalAudio(p))
+      const item = await parseLocalAudio(p)
+      if (isTooShortAudio(item.durationMs)) {
+        shortFiltered += 1
+        continue
+      }
+      items.push(item)
     }
-    return items
+    return { items, shortFiltered }
   })
 
   ipcMain.handle('local:readFileForUpload', async (_e, filePath: string) => {
@@ -936,6 +960,16 @@ app.whenReady().then(() => {
         const maxBytes = 100 * 1024 * 1024
         if (st.size > maxBytes) {
           return { ok: false, message: '文件超过 100MB 限制' }
+        }
+
+        try {
+          const meta = await readAudioMetadata(filePath)
+          const durationMs = Math.round((meta.format.duration || 0) * 1000)
+          if (isTooShortAudio(durationMs)) {
+            return { ok: false, message: '音频时长过短（需至少 30 秒），已忽略' }
+          }
+        } catch {
+          // 时长解析失败不阻断，交由服务端再校验
         }
 
         const fileName = basename(filePath)

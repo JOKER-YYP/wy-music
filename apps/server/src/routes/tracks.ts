@@ -244,6 +244,25 @@ router.post(
       // 元数据解析失败不阻断上传
     }
 
+    // 过滤过短音频（能解析出时长且不足 30 秒）
+    const MIN_DURATION_MS = 30_000
+    if (durationMs > 0 && durationMs < MIN_DURATION_MS) {
+      try {
+        if (fs.existsSync(absPath)) fs.unlinkSync(absPath)
+      } catch {
+        // ignore
+      }
+      if (coverRelative) {
+        try {
+          const coverAbs = audioAbsolutePath(coverRelative)
+          if (fs.existsSync(coverAbs)) fs.unlinkSync(coverAbs)
+        } catch {
+          // ignore
+        }
+      }
+      return fail(res, 40013, '音频时长过短（需至少 30 秒），已忽略')
+    }
+
     const fromFile = resolveTrackMeta({
       fileName: req.file.originalname,
       title: metaName,

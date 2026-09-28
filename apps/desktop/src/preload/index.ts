@@ -60,9 +60,13 @@ const wyAPI = {
       items: LocalAudioItem[]
       lyricMatched?: number
       deduped?: number
+      shortFiltered?: number
     }>,
   parseFiles: (paths: string[]) =>
-    ipcRenderer.invoke('local:parseFiles', paths) as Promise<LocalAudioItem[]>,
+    ipcRenderer.invoke('local:parseFiles', paths) as Promise<{
+      items: LocalAudioItem[]
+      shortFiltered: number
+    }>,
   readFileForUpload: (filePath: string) =>
     ipcRenderer.invoke('local:readFileForUpload', filePath) as Promise<{
       fileName: string

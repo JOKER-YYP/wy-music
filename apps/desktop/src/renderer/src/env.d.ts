@@ -46,8 +46,12 @@ declare global {
         items: LocalAudioItem[]
         lyricMatched?: number
         deduped?: number
+        shortFiltered?: number
       }>
-      parseFiles: (paths: string[]) => Promise<LocalAudioItem[]>
+      parseFiles: (paths: string[]) => Promise<{
+        items: LocalAudioItem[]
+        shortFiltered: number
+      }>
       readFileForUpload: (filePath: string) => Promise<{
         fileName: string
         mimeType: string

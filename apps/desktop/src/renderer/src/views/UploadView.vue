@@ -404,6 +404,35 @@ function isUnknownArtist(item: LocalAudioItem) {
 
 const DEFAULT_ARTIST = '未知歌手'
 const DEFAULT_ALBUM = '未知专辑'
+const MIN_UPLOAD_DURATION_MS = 30_000
+
+function isTooShortAudio(durationMs: number) {
+  return durationMs > 0 && durationMs < MIN_UPLOAD_DURATION_MS
+}
+
+function assertUploadDuration(item: LocalAudioItem) {
+  if (isTooShortAudio(item.durationMs)) {
+    throw new Error('音频时长过短（需至少 30 秒）')
+  }
+}
+
+function probeBrowserAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const audio = new Audio()
+    audio.preload = 'metadata'
+    const done = (ms: number) => {
+      URL.revokeObjectURL(url)
+      resolve(ms)
+    }
+    audio.onloadedmetadata = () => {
+      const sec = audio.duration
+      done(Number.isFinite(sec) ? Math.round(sec * 1000) : 0)
+    }
+    audio.onerror = () => done(0)
+    audio.src = url
+  })
+}
 
 /** 上传前补齐歌手/专辑默认值（非必填） */
 function applyUploadDefaults(item: LocalAudioItem) {
@@ -608,9 +637,11 @@ async function doScan(folder: string) {
     items.value = result.items
     const matched = result.lyricMatched ?? result.items.filter((i) => i.lyricText).length
     const deduped = result.deduped || 0
+    const shortFiltered = result.shortFiltered || 0
     const parts = [`扫描完成：${result.total} 首`]
     if (matched) parts.push(`已匹配歌词 ${matched} 首`)
     if (deduped) parts.push(`已过滤重复 ${deduped} 首`)
+    if (shortFiltered) parts.push(`已过滤过短（<30秒）${shortFiltered} 首`)
     ElMessage.success(parts.join('，'))
   } catch (e) {
     console.error('[scan]', e)
@@ -634,11 +665,13 @@ function playAll() {
 async function uploadOne(item: LocalAudioItem) {
   uploadingId.value = item.id
   try {
+    assertUploadDuration(item)
     const result = await uploadLocalItem(item, applyUploadDefaults(item))
     triggerRef(items)
     ElMessage.success(result.message || `「${item.name}」上传成功`)
   } catch (e) {
     console.error(e)
+    ElMessage.error(e instanceof Error ? e.message : '上传失败')
   } finally {
     uploadingId.value = ''
   }
@@ -660,6 +693,7 @@ async function uploadSelected() {
   for (const item of list) {
     progressText.value = `正在上传：${item.name}`
     try {
+      assertUploadDuration(item)
       await uploadLocalItem(item, applyUploadDefaults(item))
       okCount += 1
     } catch (e: unknown) {
@@ -687,6 +721,7 @@ function openRetryDialog() {
 }
 
 async function doUploadItem(item: LocalAudioItem) {
+  assertUploadDuration(item)
   await uploadLocalItem(item, applyUploadDefaults(item))
 }
 
@@ -750,10 +785,17 @@ function triggerWebFile() {
   webFileInput.value?.click()
 }
 
-function onWebFileChange(e: Event) {
+async function onWebFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+
+  const durationMs = await probeBrowserAudioDuration(file)
+  if (isTooShortAudio(durationMs)) {
+    input.value = ''
+    ElMessage.warning('音频时长过短（需至少 30 秒），已忽略')
+    return
+  }
 
   revokeWebPreview()
   singleItem.value = null
@@ -780,9 +822,11 @@ async function pickSingleFile() {
       ElMessage.info('已取消选择')
       return
     }
-    const parsed = await window.wyAPI!.parseFiles(paths)
+    const { items: parsed, shortFiltered } = await window.wyAPI!.parseFiles(paths)
     if (!parsed.length) {
-      ElMessage.warning('未识别到有效音频')
+      ElMessage.warning(
+        shortFiltered ? '音频时长过短（需至少 30 秒），已忽略' : '未识别到有效音频',
+      )
       return
     }
     revokeWebPreview()
@@ -836,6 +880,7 @@ async function submitSingle() {
   singleUploading.value = true
   try {
     if (isDesktop && singleItem.value) {
+      assertUploadDuration(singleItem.value)
       setRowArtists(singleItem.value, artists)
       singleItem.value.name = singleForm.name || singleItem.value.name
       singleItem.value.album = album
@@ -850,6 +895,11 @@ async function submitSingle() {
     }
 
     if (webFile.value) {
+      const durationMs = await probeBrowserAudioDuration(webFile.value)
+      if (isTooShortAudio(durationMs)) {
+        ElMessage.warning('音频时长过短（需至少 30 秒），已忽略')
+        return
+      }
       const result = await uploadBrowserFile(webFile.value, {
         name: singleForm.name,
         artists,

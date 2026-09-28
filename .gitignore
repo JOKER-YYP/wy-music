@@ -1,31 +1,44 @@
+# Dependencies & build
 node_modules
 dist
 dist-electron
 out
 .release
 *.log
+*.tsbuildinfo
+
+# Env / secrets
 .env
-.env.local
+.env.*
+!.env.example
+
+# OS / IDE
 .DS_Store
 Thumbs.db
-
-# IDE
 .idea
 .vscode/*
 !.vscode/extensions.json
 
-# Electron
+# Electron artifacts
 *.exe
 *.dmg
 *.AppImage
 
-# 本地 SQLite（不提交；克隆后执行 pnpm db:push / db:seed）
-apps/server/prisma/*.db
-apps/server/prisma/*.db-journal
-apps/server/prisma/*.db-wal
-apps/server/prisma/*.db-shm
+# ---------- 本地数据 / 数据库（不提交，只保留代码） ----------
+# SQLite / 任意本地库文件
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
 
-# 本地上传媒体（保留 samples 示例曲）
+# Prisma 生成产物（克隆后执行 pnpm db:generate）
+apps/server/src/generated/
+**/query_engine*
+**/*.node.tmp*
+
+# 本地上传与运行时媒体（保留目录占位与示例曲）
 apps/server/storage/**
 !apps/server/storage/.gitkeep
 !apps/server/storage/audio/
@@ -34,9 +47,7 @@ apps/server/storage/**
 !apps/server/storage/covers/.gitkeep
 !apps/server/storage/lyrics/
 !apps/server/storage/lyrics/.gitkeep
-!apps/server/storage/samples/
-!apps/server/storage/samples/**
 !apps/server/storage/avatars/
 !apps/server/storage/avatars/.gitkeep
-
-*.tsbuildinfo
+!apps/server/storage/samples/
+!apps/server/storage/samples/**

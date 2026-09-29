@@ -64,14 +64,17 @@
 
       <div class="controls">
         <button class="icon-btn" type="button" :title="modeTitle" @click="player.cycleMode()">
-          <el-icon :size="18">
-            <RefreshRight v-if="player.mode === 'loop'" />
-            <RefreshLeft v-else-if="player.mode === 'single'" />
-            <Sort v-else />
-          </el-icon>
+          <i
+            class="iconfont"
+            :class="{
+              'icon-list': player.mode === 'loop',
+              'icon-single': player.mode === 'single',
+              'icon-random': player.mode === 'shuffle',
+            }"
+          />
         </button>
         <button class="icon-btn" type="button" title="上一首" @click="player.prev()">
-          <el-icon :size="20"><DArrowLeft /></el-icon>
+          <i class="iconfont icon-next icon-prev" />
         </button>
         <button
           class="play-btn"
@@ -79,14 +82,15 @@
           :disabled="!track || player.loading"
           @click="player.toggle()"
         >
-          <el-icon v-if="!player.loading" :size="22">
-            <VideoPause v-if="player.playing" />
-            <VideoPlay v-else />
-          </el-icon>
+          <i
+            v-if="!player.loading"
+            class="iconfont play-ico"
+            :class="player.playing ? 'icon-stop' : 'icon-play'"
+          />
           <span v-else class="play-loading" />
         </button>
         <button class="icon-btn" type="button" title="下一首" @click="player.next()">
-          <el-icon :size="20"><DArrowRight /></el-icon>
+          <i class="iconfont icon-next" />
         </button>
         <el-popover
           placement="top"
@@ -96,7 +100,7 @@
         >
           <template #reference>
             <button class="icon-btn" type="button" title="播放列表" :disabled="!player.queue.length">
-              <el-icon :size="18"><Expand /></el-icon>
+              <i class="iconfont icon-playlist" />
             </button>
           </template>
           <div class="queue-pop">
@@ -146,7 +150,10 @@
         <el-popover placement="top" :width="140" trigger="click">
           <template #reference>
             <button class="icon-btn" type="button" title="音量">
-              <el-icon :size="18"><Headset /></el-icon>
+              <i
+                class="iconfont"
+                :class="player.volume <= 0 ? 'icon-volume-off' : 'icon-volume-on'"
+              />
             </button>
           </template>
           <div class="vol-pop">
@@ -590,16 +597,21 @@ onMounted(() => {
   height: 32px;
   border: none;
   background: transparent;
-  color: #666;
+  color: #333;
   border-radius: 50%;
   cursor: pointer;
   display: grid;
   place-items: center;
   padding: 0;
   font-size: 13px;
+  .iconfont {
+    font-size: 20px;
+    color: inherit;
+    line-height: 1;
+  }
   &:hover:not(:disabled) {
-    color: #333;
-    background: rgba(0, 0, 0, 0.04);
+    color: #ec4141;
+    background: rgba(236, 65, 65, 0.08);
   }
   &:disabled {
     opacity: 0.35;
@@ -609,6 +621,10 @@ onMounted(() => {
     color: #ec4141;
     font-weight: 700;
   }
+}
+.icon-prev {
+  transform: scaleX(-1);
+  display: inline-block;
 }
 .lyric-btn {
   font-weight: 600;
@@ -628,6 +644,15 @@ onMounted(() => {
   padding: 0;
   box-shadow: 0 4px 12px rgba(236, 65, 65, 0.35);
   transition: transform 0.12s, background 0.12s;
+  .play-ico {
+    font-size: 22px;
+    color: #fff;
+    line-height: 1;
+  }
+  .icon-play {
+    /* 三角视觉略偏左，微调居中 */
+    transform: translateX(1px);
+  }
   &:hover:not(:disabled) {
     background: #e03333;
     transform: scale(1.05);

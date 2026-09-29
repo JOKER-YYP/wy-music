@@ -97,10 +97,10 @@ export async function notifyArtistNewTrack(track: {
   await createNotifications(
     [...byUser.entries()].map(([userId, artistName]) => ({
       userId,
-      channel: 'notice',
+      channel: 'dm',
       type: 'artist_new_track',
       title: artistName,
-      body: `发布了新歌《${track.name}》`,
+      body: `我的新歌《${track.name}》正式发布啦！快来听听吧～`,
       trackId: track.id,
       trackName: track.name,
       actorNickname: artistName,

@@ -61,23 +61,7 @@
         <div class="section-head">
           <h3>最新音乐</h3>
         </div>
-        <div class="latest-grid">
-          <div
-            v-for="(item, idx) in latest"
-            :key="item.id"
-            class="latest-item"
-            @dblclick="playFromLatest(idx)"
-          >
-            <div class="latest-cover" :style="coverStyle(item)" />
-            <div class="latest-meta">
-              <div class="latest-name">{{ item.name }}</div>
-              <div class="latest-artist">{{ item.artists?.join(' / ') }}</div>
-            </div>
-            <button class="latest-play" type="button" @click="playFromLatest(idx)">
-              <el-icon><VideoPlay /></el-icon>
-            </button>
-          </div>
-        </div>
+        <SongGrid :tracks="latest" :columns="3" @refresh="reload" />
       </section>
 
       <section v-if="hot.length" class="section">
@@ -85,23 +69,7 @@
           <h3>热门歌曲</h3>
           <span class="more" @click="activeTab = '排行榜'">排行榜</span>
         </div>
-        <div class="latest-grid">
-          <div
-            v-for="(item, idx) in hot"
-            :key="item.id"
-            class="latest-item"
-            @dblclick="playFromHot(idx)"
-          >
-            <div class="latest-cover" :style="coverStyle(item)" />
-            <div class="latest-meta">
-              <div class="latest-name">{{ item.name }}</div>
-              <div class="latest-artist">{{ item.artists?.join(' / ') }}</div>
-            </div>
-            <button class="latest-play" type="button" @click="playFromHot(idx)">
-              <el-icon><VideoPlay /></el-icon>
-            </button>
-          </div>
-        </div>
+        <SongGrid :tracks="hot" :columns="3" @refresh="reload" />
       </section>
     </template>
 
@@ -122,6 +90,7 @@ import { useUserStore } from '../stores/user'
 import PlaylistPlazaPanel from '../components/discover/PlaylistPlazaPanel.vue'
 import ChartsPanel from '../components/discover/ChartsPanel.vue'
 import ArtistsPanel from '../components/discover/ArtistsPanel.vue'
+import SongGrid from '../components/SongGrid.vue'
 
 const router = useRouter()
 const tabs = ['精选', '歌单', '排行榜', '歌手']
@@ -188,25 +157,20 @@ function playTrack(item: TrackDto) {
   player.playTrack(item, latest.value.length ? latest.value : [item])
 }
 
-function playFromLatest(idx: number) {
-  if (!ensureLogin()) return
-  player.setQueue(latest.value, idx)
-}
-
-function playFromHot(idx: number) {
-  if (!ensureLogin()) return
-  player.setQueue(hot.value, idx)
-}
-
-onMounted(async () => {
-  loading.value = true
+async function reload() {
   try {
     const { data } = await http.get('/api/discover')
     latest.value = data.data.latest || []
     hot.value = data.data.hot || []
   } catch {
-    latest.value = []
-    hot.value = []
+    // keep current
+  }
+}
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    await reload()
   } finally {
     loading.value = false
   }
@@ -358,65 +322,11 @@ onMounted(async () => {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.latest-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px 28px;
-}
-.latest-item {
-  display: grid;
-  grid-template-columns: 56px 1fr 32px;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  &:hover {
-    background: #f7f7f7;
-    .latest-play {
-      opacity: 1;
-    }
-  }
-}
-.latest-cover {
-  width: 56px;
-  height: 56px;
-  border-radius: 6px;
-  background-size: cover;
-  background-position: center;
-}
-.latest-name {
-  font-size: 14px;
-  color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.latest-artist {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #999;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.latest-play {
-  border: none;
-  background: transparent;
-  color: #ec4141;
-  cursor: pointer;
-  opacity: 0;
-  display: grid;
-  place-items: center;
-}
 @media (max-width: 1100px) {
   .playlist-row {
     grid-template-columns: repeat(4, 1fr);
   }
   .banners {
-    grid-template-columns: 1fr;
-  }
-  .latest-grid {
     grid-template-columns: 1fr;
   }
 }

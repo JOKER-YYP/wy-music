@@ -146,4 +146,32 @@ router.post('/read', requireAuth, async (req: AuthedRequest, res) => {
   }
 })
 
+/** 私信回复（存为自己发出的消息，会话按 peer 聚合） */
+router.post('/dm', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const peer = String(req.body.peer || req.body.actorNickname || '').trim()
+    const content = String(req.body.content || '').trim()
+    if (!peer) return fail(res, 40001, '缺少会话对象')
+    if (!content) return fail(res, 40001, '消息不能为空')
+    if (content.length > 1000) return fail(res, 40001, '消息最多 1000 字')
+
+    const row = await prisma.userNotification.create({
+      data: {
+        userId: req.user!.id,
+        channel: 'dm',
+        type: 'dm_out',
+        title: peer,
+        body: content,
+        actorNickname: peer,
+        actorAvatarUrl: req.body.actorAvatarUrl ? String(req.body.actorAvatarUrl) : null,
+        read: true,
+      },
+    })
+    return ok(res, toDto(row), '已发送')
+  } catch (e) {
+    console.warn('[notifications/dm]', e)
+    return fail(res, 50001, '发送失败', 500)
+  }
+})
+
 export default router

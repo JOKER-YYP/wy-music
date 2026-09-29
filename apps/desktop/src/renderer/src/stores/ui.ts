@@ -11,6 +11,7 @@ export const useUiStore = defineStore('ui', {
     nowPlayingVisible: false,
     collectModalVisible: false,
     collectTrack: null as TrackDto | null,
+    collectTracks: [] as TrackDto[],
     commentsVisible: false,
     commentsMode: 'page' as CommentsMode,
     commentsTrack: null as TrackDto | null,
@@ -35,11 +36,18 @@ export const useUiStore = defineStore('ui', {
     },
     openCollect(track: TrackDto) {
       this.collectTrack = track
+      this.collectTracks = [track]
+      this.collectModalVisible = true
+    },
+    openCollectMany(tracks: TrackDto[]) {
+      this.collectTracks = tracks.filter(Boolean)
+      this.collectTrack = this.collectTracks[0] || null
       this.collectModalVisible = true
     },
     closeCollect() {
       this.collectModalVisible = false
       this.collectTrack = null
+      this.collectTracks = []
     },
     /** 其他入口：浅色评论页 */
     openPageComments(track: TrackDto) {

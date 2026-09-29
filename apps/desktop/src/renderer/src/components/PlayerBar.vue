@@ -85,32 +85,16 @@
         <button class="icon-btn" type="button" title="下一首" @click="player.next()">
           <i class="iconfont icon-next" />
         </button>
-        <el-popover
-          placement="top"
-          :width="280"
-          trigger="click"
+        <button
+          class="icon-btn"
+          type="button"
+          title="播放列表"
+          :class="{ on: queueOpen }"
           :disabled="!player.queue.length"
+          @click="toggleQueue"
         >
-          <template #reference>
-            <button class="icon-btn" type="button" title="播放列表" :disabled="!player.queue.length">
-              <i class="iconfont icon-playlist" />
-            </button>
-          </template>
-          <div class="queue-pop">
-            <div class="queue-head">播放列表 · {{ player.queue.length }}</div>
-            <div
-              v-for="(q, i) in player.queue"
-              :key="q.id"
-              class="queue-row"
-              :class="{ active: i === player.currentIndex }"
-              @dblclick="player.playAt(i)"
-              @click="player.playAt(i)"
-            >
-              <span class="q-idx">{{ i + 1 }}</span>
-              <span class="q-name">{{ q.name }}</span>
-            </div>
-          </div>
-        </el-popover>
+          <i class="iconfont icon-playlist" />
+        </button>
       </div>
 
       <div class="right">
@@ -189,11 +173,13 @@
         </el-dropdown>
       </div>
     </div>
+
+    <PlayQueuePanel v-model:visible="queueOpen" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '../stores/player'
@@ -201,6 +187,7 @@ import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
 import { http, mediaUrl } from '../services/http'
 import { isElectronApp } from '../services/localUpload'
+import PlayQueuePanel from './PlayQueuePanel.vue'
 
 const router = useRouter()
 const player = usePlayerStore()
@@ -215,6 +202,27 @@ const displayTime = ref(0)
 const commentCount = ref(0)
 const barHovered = ref(false)
 const progressHovered = ref(false)
+const queueOpen = ref(false)
+
+function toggleQueue() {
+  if (!player.queue.length) return
+  queueOpen.value = !queueOpen.value
+}
+
+function onDocClick(e: MouseEvent) {
+  if (!queueOpen.value) return
+  const t = e.target as HTMLElement | null
+  if (!t) return
+  if (t.closest('.queue-panel') || t.closest('.icon-btn[title="播放列表"]')) return
+  queueOpen.value = false
+}
+
+watch(
+  () => player.queue.length,
+  (n) => {
+    if (n === 0) queueOpen.value = false
+  },
+)
 
 watch(
   () => player.currentTime,
@@ -385,6 +393,11 @@ async function toggleDesktopLyric() {
 
 onMounted(() => {
   void refreshDesktopLyricState()
+  document.addEventListener('mousedown', onDocClick)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocClick)
 })
 </script>
 
@@ -696,42 +709,5 @@ onMounted(() => {
   width: 100%;
   accent-color: #ec4141;
   cursor: pointer;
-}
-.queue-pop {
-  max-height: 280px;
-  overflow: auto;
-}
-.queue-head {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: #333;
-}
-.queue-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  height: 32px;
-  padding: 0 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  &:hover {
-    background: #f5f5f5;
-  }
-  &.active {
-    color: #ec4141;
-  }
-}
-.q-idx {
-  width: 20px;
-  color: #bbb;
-  font-size: 12px;
-  text-align: center;
-}
-.q-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

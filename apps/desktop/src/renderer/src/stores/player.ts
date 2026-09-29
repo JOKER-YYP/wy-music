@@ -318,6 +318,19 @@ export const usePlayerStore = defineStore('player', {
       this.playTrack({ ...track }, [track])
     },
 
+    /** 清空播放列表并停止 */
+    clearQueue() {
+      const audio = this.ensureAudio()
+      this.revokeObjectUrl()
+      this.resetAudioElement(audio)
+      this.queue = []
+      this.currentIndex = -1
+      this.playing = false
+      this.currentTime = 0
+      this.duration = 0
+      this.playToken++
+    },
+
     /** 下一首播放：插入到当前曲目之后 */
     playNext(track: QueueTrack) {
       if (!this.queue.length || this.currentIndex < 0) {

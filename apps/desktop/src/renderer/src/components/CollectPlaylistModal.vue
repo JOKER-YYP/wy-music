@@ -64,7 +64,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { PlaylistDto } from '@wy-music/shared'
+import type { PlaylistDto, TrackDto } from '@wy-music/shared'
 import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
 import { usePlaylistStore } from '../stores/playlist'
@@ -119,10 +119,14 @@ async function onCreate() {
       inputPlaceholder: '例如：我的收藏',
     })
     const created = await playlistStore.create(value.trim())
-    const track = ui.collectTrack
-    if (track && !track.id.startsWith('local:') && !track.id.startsWith('webfile:')) {
+    const tracks = (ui.collectTracks.length ? ui.collectTracks : ui.collectTrack ? [ui.collectTrack] : []).filter(
+      (t) => t && !t.id.startsWith('local:') && !t.id.startsWith('webfile:'),
+    )
+    for (const track of tracks) {
       await playlistStore.addTrack(created.id, track.id)
-      ElMessage.success(`已创建并加入「${created.name}」`)
+    }
+    if (tracks.length) {
+      ElMessage.success(`已创建并加入「${created.name}」${tracks.length > 1 ? `（${tracks.length} 首）` : ''}`)
     } else {
       ElMessage.success('歌单已创建')
     }
@@ -133,14 +137,21 @@ async function onCreate() {
 }
 
 async function onSelect(p: PlaylistDto) {
-  const track = ui.collectTrack
-  if (!track) return
-  if (track.id.startsWith('local:') || track.id.startsWith('webfile:')) {
+  const tracks = (ui.collectTracks.length ? ui.collectTracks : ui.collectTrack ? [ui.collectTrack] : []).filter(
+    Boolean,
+  ) as TrackDto[]
+  if (!tracks.length) return
+  const valid = tracks.filter((t) => !t.id.startsWith('local:') && !t.id.startsWith('webfile:'))
+  if (!valid.length) {
     ElMessage.warning('请先上传后再收藏')
     return
   }
-  await playlistStore.addTrack(p.id, track.id)
-  ElMessage.success(`已收藏到「${p.name}」`)
+  for (const track of valid) {
+    await playlistStore.addTrack(p.id, track.id)
+  }
+  ElMessage.success(
+    valid.length > 1 ? `已将 ${valid.length} 首收藏到「${p.name}」` : `已收藏到「${p.name}」`,
+  )
   ui.closeCollect()
 }
 </script>

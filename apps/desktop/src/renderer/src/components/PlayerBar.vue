@@ -128,37 +128,8 @@
         <el-popover placement="top" :width="140" trigger="click" :teleported="true">
           <template #reference>
             <button class="icon-btn vol-btn" type="button" title="音量">
-              <svg
-                class="vol-svg"
-                viewBox="0 0 24 24"
-                width="20"
-                height="20"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <!-- 喇叭主体 -->
-                <path
-                  fill="currentColor"
-                  d="M3 9.5v5h3.2L12 19V5L6.2 9.5H3z"
-                />
-                <!-- 音量波纹 / 静音叉 -->
-                <path
-                  v-if="player.volume > 0.001"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  d="M15.2 9.2a4.2 4.2 0 0 1 0 5.6M18 7a7 7 0 0 1 0 10"
-                />
-                <path
-                  v-else
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  d="M15 9.5l5 5M20 9.5l-5 5"
-                />
-              </svg>
+              <!-- 直接用字符渲染，避免 ::before 与正文字符叠成双图标 -->
+              <span class="iconfont vol-ico" aria-hidden="true">{{ volumeGlyph }}</span>
             </button>
           </template>
           <div class="vol-pop">
@@ -303,6 +274,8 @@ const modeIconClass = computed(() => {
   if (player.mode === 'shuffle') return 'icon-random'
   return 'icon-list'
 })
+/** iconfont: volume-on \e61f / volume-off \e61e */
+const volumeGlyph = computed(() => (player.volume > 0.001 ? '\ue61f' : '\ue61e'))
 const sliderMax = computed(() => {
   if (player.duration > 0 && Number.isFinite(player.duration)) return player.duration
   const ms = track.value?.durationMs || 0
@@ -650,9 +623,15 @@ onBeforeUnmount(() => {
     color: inherit;
     line-height: 1;
   }
-  .vol-svg {
-    display: block;
-    color: inherit;
+  .vol-ico {
+    font-size: 20px;
+    line-height: 1;
+    /* 走正文字符，关掉伪元素，防止叠两个喇叭 */
+    &::before,
+    &::after {
+      content: none !important;
+      display: none !important;
+    }
   }
   &:hover:not(:disabled) {
     color: #ec4141;

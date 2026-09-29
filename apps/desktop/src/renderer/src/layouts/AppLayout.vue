@@ -560,8 +560,9 @@ function onLogout() {
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   flex-shrink: 0;
+  height: 54px;
   padding-right: 4px;
   -webkit-app-region: no-drag;
   app-region: no-drag;
@@ -748,30 +749,34 @@ function onLogout() {
   }
 }
 .user-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  height: 28px;
   border: none;
   background: transparent;
   cursor: pointer;
-  padding: 3px 8px 3px 3px;
-  border-radius: 16px;
+  padding: 0 8px 0 2px;
+  border-radius: 14px;
   color: #fff;
+  line-height: 1;
   &:hover {
     background: rgba(0, 0, 0, 0.12);
   }
 }
 .avatar {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.25);
   color: #fff;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
+  line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.35);
 }
 .avatar-img {
@@ -786,6 +791,7 @@ function onLogout() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1;
 }
 .icon-btn,
 .text-btn {
@@ -793,24 +799,39 @@ function onLogout() {
   background: transparent;
   color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
-  padding: 6px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   border-radius: 6px;
   &:hover {
     background: rgba(0, 0, 0, 0.12);
     color: #fff;
   }
 }
+.icon-btn {
+  width: 28px;
+  padding: 0;
+  :deep(.el-icon) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+  }
+  :deep(svg) {
+    display: block;
+  }
+}
 .msg-btn {
   position: relative;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
 }
 .msg-badge {
   position: absolute;
-  top: 0;
-  right: -2px;
+  top: -2px;
+  right: -4px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -825,7 +846,8 @@ function onLogout() {
 }
 .text-btn {
   font-size: 12px;
-  padding: 6px 8px;
+  padding: 0 8px;
+  white-space: nowrap;
 }
 .sidebar {
   grid-column: 1;

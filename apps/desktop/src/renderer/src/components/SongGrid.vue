@@ -52,12 +52,12 @@
       @contextmenu.prevent="closeMenu"
     >
       <div class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
-        <button type="button" @click="onPlay(menu.track!)">播放</button>
-        <button type="button" @click="onNext(menu.track!)">下一首播放</button>
-        <button type="button" @click="onLike(menu.track!)">
+        <button type="button" @click="menu.track && onPlay(menu.track)">播放</button>
+        <button type="button" @click="menu.track && onNext(menu.track)">下一首播放</button>
+        <button type="button" @click="menu.track && onLike(menu.track)">
           {{ menu.track?.liked ? '取消喜欢' : '喜欢' }}
         </button>
-        <button type="button" class="danger" @click="onDelete(menu.track!)">删除</button>
+        <button type="button" class="danger" @click="menu.track && onDelete(menu.track)">删除</button>
       </div>
     </div>
   </Teleport>
@@ -67,14 +67,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, MoreFilled, Star, StarFilled, VideoPlay } from '@element-plus/icons-vue'
-import type { Track } from '@wy/shared'
-import { api } from '../api'
+import type { TrackDto } from '@wy-music/shared'
+import { http, mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
-import { coverUrl } from '../utils/cover'
+import { useUiStore } from '../stores/ui'
+import { useUserStore } from '../stores/user'
 
 const props = withDefaults(
   defineProps<{
-    tracks: Track[]
+    tracks: TrackDto[]
     /** 固定列数；adaptive 时忽略 */
     columns?: number
     /** 按容器宽度自动计算列数，并按行数截取展示数量 */
@@ -94,6 +95,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{ refresh: [] }>()
 const player = usePlayerStore()
+const user = useUserStore()
+const ui = useUiStore()
 
 const rootEl = ref<HTMLElement | null>(null)
 const measuredCols = ref(props.columns)
@@ -146,7 +149,7 @@ const menu = reactive<{
   visible: boolean
   x: number
   y: number
-  track: Track | null
+  track: TrackDto | null
 }>({
   visible: false,
   x: 0,
@@ -154,52 +157,54 @@ const menu = reactive<{
   track: null
 })
 
-function coverStyle(t: Track) {
-  const u = coverUrl(t)
+function coverStyle(t: TrackDto) {
+  const u = mediaUrl(t.coverUrl)
   return u
     ? { backgroundImage: `url(${u})` }
     : { background: 'linear-gradient(135deg,#f3c4c4,#ec4141)' }
 }
 
-function qualityTag(t: Track): string | null {
-  const b = Number(t.bitrate || 0)
-  if (b >= 900) return 'Hi-Res'
-  if (b >= 320) return 'SQ'
-  if (b >= 192) return 'HQ'
+function qualityTag(t: TrackDto): string | null {
+  // 无码率字段时按体积粗略判断
+  const size = Number(t.fileSize || 0)
+  const dur = Number(t.durationMs || 0)
+  if (size > 0 && dur > 0) {
+    const kbps = (size * 8) / (dur / 1000) / 1000
+    if (kbps >= 900) return 'Hi-Res'
+    if (kbps >= 300) return 'SQ'
+    if (kbps >= 180) return 'HQ'
+  }
   return null
 }
 
-function onPlay(t: Track) {
+function onPlay(t: TrackDto) {
   closeMenu()
   const list = displayTracks.value.length ? displayTracks.value : props.tracks
-  const idx = list.findIndex((x) => x.id === t.id)
-  player.playList(list, idx >= 0 ? idx : 0)
+  player.playTrack(t, list)
 }
 
-function onNext(t: Track) {
+function onNext(t: TrackDto) {
   closeMenu()
   player.playNext(t)
   ElMessage.success('已添加到下一首播放')
 }
 
-async function onLike(t: Track) {
+async function onLike(t: TrackDto) {
   closeMenu()
+  if (!user.accessToken) {
+    ui.openLogin('login')
+    return
+  }
   try {
-    if (t.liked) {
-      await api.delete(`/likes/${t.id}`)
-      t.liked = false
-      ElMessage.success('已取消喜欢')
-    } else {
-      await api.post(`/likes/${t.id}`)
-      t.liked = true
-      ElMessage.success('已添加到我喜欢')
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '操作失败')
+    const { data } = await http.post(`/api/likes/${t.id}`)
+    t.liked = data.data.liked
+    ElMessage.success(t.liked ? '已添加到我喜欢' : '已取消喜欢')
+  } catch {
+    /* http 拦截器已提示 */
   }
 }
 
-async function onDelete(t: Track) {
+async function onDelete(t: TrackDto) {
   closeMenu()
   try {
     await ElMessageBox.confirm(`确定删除「${t.name}」？此操作不可恢复。`, '删除歌曲', {
@@ -207,16 +212,15 @@ async function onDelete(t: Track) {
       confirmButtonText: '删除',
       cancelButtonText: '取消'
     })
-    await api.delete(`/tracks/${t.id}`)
+    await http.delete(`/api/tracks/${t.id}`)
     ElMessage.success('已删除')
     emit('refresh')
   } catch (e: any) {
     if (e === 'cancel' || e === 'close') return
-    ElMessage.error(e?.response?.data?.message || '删除失败')
   }
 }
 
-function openMenu(e: MouseEvent, t: Track) {
+function openMenu(e: MouseEvent, t: TrackDto) {
   menu.track = t
   menu.x = Math.min(e.clientX, window.innerWidth - 180)
   menu.y = Math.min(e.clientY, window.innerHeight - 180)

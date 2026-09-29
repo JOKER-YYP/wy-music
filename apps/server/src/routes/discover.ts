@@ -27,13 +27,13 @@ router.get('/', optionalAuth, async (_req, res) => {
       where: { status: 'published' },
       include: { uploader: { select: { nickname: true } } },
       orderBy: { createdAt: 'desc' },
-      take: 12,
+      take: 24,
     }),
     prisma.track.findMany({
       where: { status: 'published' },
       include: { uploader: { select: { nickname: true } } },
       orderBy: { playCount: 'desc' },
-      take: 12,
+      take: 24,
     }),
   ])
   return ok(res, {

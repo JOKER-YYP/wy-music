@@ -61,7 +61,7 @@
         <div class="section-head">
           <h3>最新音乐</h3>
         </div>
-        <SongGrid :tracks="latest" :columns="3" @refresh="reload" />
+        <SongGrid adaptive :tracks="latest" :rows="3" :min-item-width="250" @refresh="reload" />
       </section>
 
       <section v-if="hot.length" class="section">
@@ -69,7 +69,7 @@
           <h3>热门歌曲</h3>
           <span class="more" @click="activeTab = '排行榜'">排行榜</span>
         </div>
-        <SongGrid :tracks="hot" :columns="3" @refresh="reload" />
+        <SongGrid adaptive :tracks="hot" :rows="3" :min-item-width="250" @refresh="reload" />
       </section>
     </template>
 
@@ -179,7 +179,8 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .home {
-  max-width: 1100px;
+  width: 100%;
+  max-width: none;
 }
 .subnav {
   display: flex;

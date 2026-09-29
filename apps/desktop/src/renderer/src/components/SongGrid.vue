@@ -1,7 +1,7 @@
 <template>
-  <div class="song-grid" :class="[`cols-${columns}`]">
+  <div ref="rootEl" class="song-grid" :style="gridStyle">
     <div
-      v-for="track in tracks"
+      v-for="track in displayTracks"
       :key="track.id"
       class="song-row"
       @dblclick="onPlay(track)"
@@ -41,7 +41,7 @@
       </div>
     </div>
 
-    <el-empty v-if="!tracks.length" description="暂无歌曲" :image-size="72" />
+    <el-empty v-if="!displayTracks.length" description="暂无歌曲" :image-size="72" />
   </div>
 
   <Teleport to="body">
@@ -51,137 +51,175 @@
       @click="closeMenu"
       @contextmenu.prevent="closeMenu"
     >
-      <ul
-        class="ctx-menu"
-        :style="{ left: menu.x + 'px', top: menu.y + 'px' }"
-        @click.stop
-      >
-        <li @click="run('play')">
-          <el-icon><VideoPlay /></el-icon>
-          <span>播放</span>
-        </li>
-        <li @click="run('next')">
-          <el-icon><Plus /></el-icon>
-          <span>下一首播放</span>
-        </li>
-        <li @click="run('comments')">
-          <el-icon><ChatDotRound /></el-icon>
-          <span>查看评论</span>
-        </li>
-        <li class="sep" />
-        <li @click="run('collect')">
-          <el-icon><FolderAdd /></el-icon>
-          <span>收藏</span>
-        </li>
-        <li @click="run('like')">
-          <el-icon><Star /></el-icon>
-          <span>{{ menu.track?.liked ? '取消喜欢' : '喜欢' }}</span>
-        </li>
-        <li class="disabled">
-          <el-icon><Download /></el-icon>
-          <span>下载</span>
-        </li>
-        <li @click="run('copy')">
-          <el-icon><Link /></el-icon>
-          <span>复制链接</span>
-        </li>
-        <li class="sep" />
-        <li class="disabled">
-          <el-icon><RemoveFilled /></el-icon>
-          <span>减少推荐</span>
-        </li>
-      </ul>
+      <div class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
+        <button type="button" @click="onPlay(menu.track!)">播放</button>
+        <button type="button" @click="onNext(menu.track!)">下一首播放</button>
+        <button type="button" @click="onLike(menu.track!)">
+          {{ menu.track?.liked ? '取消喜欢' : '喜欢' }}
+        </button>
+        <button type="button" class="danger" @click="onDelete(menu.track!)">删除</button>
+      </div>
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import {
-  ChatDotRound,
-  Download,
-  FolderAdd,
-  Link,
-  MoreFilled,
-  Plus,
-  RemoveFilled,
-  Star,
-  StarFilled,
-  VideoPlay,
-} from '@element-plus/icons-vue'
-import type { TrackDto } from '@wy-music/shared'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download, MoreFilled, Star, StarFilled, VideoPlay } from '@element-plus/icons-vue'
+import type { Track } from '@wy/shared'
+import { api } from '../api'
 import { usePlayerStore } from '../stores/player'
-import { useUserStore } from '../stores/user'
-import { useUiStore } from '../stores/ui'
-import { http, mediaUrl, streamUrl } from '../services/http'
+import { coverUrl } from '../utils/cover'
 
 const props = withDefaults(
   defineProps<{
-    tracks: TrackDto[]
-    columns?: 1 | 2 | 3
+    tracks: Track[]
+    /** 固定列数；adaptive 时忽略 */
+    columns?: number
+    /** 按容器宽度自动计算列数，并按行数截取展示数量 */
+    adaptive?: boolean
+    /** adaptive 时固定行数（网易云风格约 3~4 行） */
+    rows?: number
+    /** 单项最小宽度，决定能排几列 */
+    minItemWidth?: number
   }>(),
-  { columns: 2 },
+  {
+    columns: 3,
+    adaptive: false,
+    rows: 3,
+    minItemWidth: 240
+  }
 )
 
 const emit = defineEmits<{ refresh: [] }>()
-
-const router = useRouter()
 const player = usePlayerStore()
-const user = useUserStore()
-const ui = useUiStore()
 
-const menu = reactive({
+const rootEl = ref<HTMLElement | null>(null)
+const measuredCols = ref(props.columns)
+let ro: ResizeObserver | null = null
+
+function recomputeCols() {
+  if (!props.adaptive) {
+    measuredCols.value = props.columns
+    return
+  }
+  const w = rootEl.value?.clientWidth || 0
+  if (w <= 0) return
+  const gap = 28
+  const minW = props.minItemWidth
+  const cols = Math.max(1, Math.min(6, Math.floor((w + gap) / (minW + gap))))
+  measuredCols.value = cols
+}
+
+const gridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${measuredCols.value}, minmax(0, 1fr))`
+}))
+
+const displayTracks = computed(() => {
+  if (!props.adaptive) return props.tracks
+  const limit = measuredCols.value * props.rows
+  return props.tracks.slice(0, limit)
+})
+
+onMounted(async () => {
+  await nextTick()
+  recomputeCols()
+  if (typeof ResizeObserver !== 'undefined' && rootEl.value) {
+    ro = new ResizeObserver(() => recomputeCols())
+    ro.observe(rootEl.value)
+  }
+  window.addEventListener('resize', recomputeCols)
+})
+
+onBeforeUnmount(() => {
+  ro?.disconnect()
+  window.removeEventListener('resize', recomputeCols)
+})
+
+watch(
+  () => [props.adaptive, props.columns, props.minItemWidth, props.rows] as const,
+  () => nextTick(recomputeCols)
+)
+
+const menu = reactive<{
+  visible: boolean
+  x: number
+  y: number
+  track: Track | null
+}>({
   visible: false,
   x: 0,
   y: 0,
-  track: null as TrackDto | null,
+  track: null
 })
 
-function coverStyle(track: TrackDto) {
-  const url = mediaUrl(track.coverUrl)
-  return url
-    ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+function coverStyle(t: Track) {
+  const u = coverUrl(t)
+  return u
+    ? { backgroundImage: `url(${u})` }
+    : { background: 'linear-gradient(135deg,#f3c4c4,#ec4141)' }
 }
 
-function qualityTag(track: TrackDto) {
-  const mime = (track.mimeType || '').toLowerCase()
-  if (mime.includes('flac') || mime.includes('wav')) return '超清母带'
-  if (mime.includes('aac') || mime.includes('mp4')) return 'HQ'
-  return ''
+function qualityTag(t: Track): string | null {
+  const b = Number(t.bitrate || 0)
+  if (b >= 900) return 'Hi-Res'
+  if (b >= 320) return 'SQ'
+  if (b >= 192) return 'HQ'
+  return null
 }
 
-function onPlay(track: TrackDto) {
-  player.playTrack(track, props.tracks)
+function onPlay(t: Track) {
+  closeMenu()
+  const list = displayTracks.value.length ? displayTracks.value : props.tracks
+  const idx = list.findIndex((x) => x.id === t.id)
+  player.playList(list, idx >= 0 ? idx : 0)
 }
 
-function onCollect(track: TrackDto) {
-  if (!user.accessToken) {
-    ui.openLogin('login')
-    return
+function onNext(t: Track) {
+  closeMenu()
+  player.playNext(t)
+  ElMessage.success('已添加到下一首播放')
+}
+
+async function onLike(t: Track) {
+  closeMenu()
+  try {
+    if (t.liked) {
+      await api.delete(`/likes/${t.id}`)
+      t.liked = false
+      ElMessage.success('已取消喜欢')
+    } else {
+      await api.post(`/likes/${t.id}`)
+      t.liked = true
+      ElMessage.success('已添加到我喜欢')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '操作失败')
   }
-  ui.openCollect(track)
 }
 
-async function onLike(track: TrackDto) {
-  if (!user.accessToken) {
-    ui.openLogin('login')
-    return
+async function onDelete(t: Track) {
+  closeMenu()
+  try {
+    await ElMessageBox.confirm(`确定删除「${t.name}」？此操作不可恢复。`, '删除歌曲', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+    await api.delete(`/tracks/${t.id}`)
+    ElMessage.success('已删除')
+    emit('refresh')
+  } catch (e: any) {
+    if (e === 'cancel' || e === 'close') return
+    ElMessage.error(e?.response?.data?.message || '删除失败')
   }
-  const { data } = await http.post(`/api/likes/${track.id}`)
-  track.liked = data.data.liked
-  emit('refresh')
 }
 
-function openMenu(e: MouseEvent, track: TrackDto) {
-  menu.track = track
-  const pad = 8
-  const mw = 190
-  const mh = 340
-  menu.x = Math.min(e.clientX, window.innerWidth - mw - pad)
-  menu.y = Math.min(e.clientY, window.innerHeight - mh - pad)
+function openMenu(e: MouseEvent, t: Track) {
+  menu.track = t
+  menu.x = Math.min(e.clientX, window.innerWidth - 180)
+  menu.y = Math.min(e.clientY, window.innerHeight - 180)
   menu.visible = true
 }
 
@@ -189,242 +227,193 @@ function closeMenu() {
   menu.visible = false
   menu.track = null
 }
-
-async function run(action: string) {
-  const track = menu.track
-  closeMenu()
-  if (!track) return
-
-  switch (action) {
-    case 'play':
-      onPlay(track)
-      break
-    case 'next':
-      player.playNext(track)
-      ElMessage.success('已添加到下一首播放')
-      break
-    case 'collect':
-      onCollect(track)
-      break
-    case 'comments':
-      ui.openPageComments(track)
-      router.push(`/comment/${track.id}`)
-      break
-    case 'like':
-      await onLike(track)
-      break
-    case 'copy': {
-      const url = streamUrl(track.id)
-      try {
-        await navigator.clipboard.writeText(url)
-        ElMessage.success('链接已复制')
-      } catch {
-        ElMessage.info(url)
-      }
-      break
-    }
-    default:
-      break
-  }
-}
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .song-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  &.cols-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2px 20px;
-  }
-  &.cols-3 {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2px 16px;
-  }
-}
-.song-row {
   display: grid;
-  grid-template-columns: 48px 1fr auto;
+  gap: 6px 28px;
+  width: 100%;
+}
+
+.song-row {
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 8px;
+  gap: 12px;
+  min-width: 0;
+  padding: 6px 8px;
   border-radius: 8px;
   cursor: default;
-  min-width: 0;
-  &:hover {
-    background: #fff;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-    .cover-play {
-      opacity: 1;
-    }
-    .hover-actions {
-      opacity: 1;
-      pointer-events: auto;
-    }
-  }
+  transition: background 0.15s;
 }
+
+.song-row:hover {
+  background: #f5f5f5;
+}
+
 .cover-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 6px;
+  position: relative;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
   border: none;
+  border-radius: 6px;
   padding: 0;
   background-size: cover;
   background-position: center;
-  position: relative;
   cursor: pointer;
   overflow: hidden;
-  flex-shrink: 0;
 }
+
 .cover-play {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: rgba(0, 0, 0, 0.35);
   color: #fff;
+  font-size: 22px;
   opacity: 0;
   transition: opacity 0.15s;
 }
+
+.song-row:hover .cover-play {
+  opacity: 1;
+}
+
 .meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.name-line {
   min-width: 0;
 }
-.name-line {
+
+.name {
+  display: block;
+  font-size: 14px;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-.name {
-  font-size: 14px;
-  color: #222;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sub {
-  margin-top: 5px;
   font-size: 12px;
   color: #999;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  overflow: hidden;
 }
+
 .heart {
   color: #ec4141;
   font-size: 12px;
-  flex-shrink: 0;
   line-height: 1;
+  flex-shrink: 0;
 }
+
 .badge {
   flex-shrink: 0;
   font-size: 10px;
   line-height: 1;
-  padding: 2px 3px;
+  padding: 2px 4px;
   border-radius: 2px;
-  border: 1px solid currentColor;
-  transform: scale(0.92);
-  transform-origin: left center;
+  font-weight: 600;
 }
+
 .badge-sq {
-  color: #c9a227;
+  color: #c8a45c;
+  border: 1px solid rgba(200, 164, 92, 0.55);
+  background: rgba(200, 164, 92, 0.08);
 }
+
 .badge-origin {
   color: #ec4141;
+  border: 1px solid rgba(236, 65, 65, 0.45);
+  background: rgba(236, 65, 65, 0.06);
 }
+
 .artists {
+  min-width: 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
 }
+
 .hover-actions {
-  display: flex;
-  gap: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s;
-  button {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: transparent;
-    border-radius: 50%;
-    color: #888;
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-    &:hover:not(.disabled-act) {
-      background: rgba(0, 0, 0, 0.06);
-      color: #ec4141;
-    }
-    &.disabled-act {
-      opacity: 0.45;
-      cursor: default;
-    }
-  }
+  display: none;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
+
+.song-row:hover .hover-actions {
+  display: flex;
+}
+
+.hover-actions button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hover-actions button:hover {
+  background: #ebebeb;
+  color: #333;
+}
+
+.disabled-act {
+  opacity: 0.35;
+  cursor: not-allowed !important;
+}
+
 .ctx-mask {
   position: fixed;
   inset: 0;
-  z-index: 2200;
-}
-.ctx-menu {
-  position: fixed;
-  margin: 0;
-  padding: 6px 0;
-  list-style: none;
-  min-width: 176px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
-  border: 1px solid #eee;
-  li {
-    padding: 9px 16px;
-    font-size: 13px;
-    color: #333;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    .el-icon {
-      color: #888;
-      font-size: 15px;
-    }
-    &:hover:not(.sep):not(.disabled) {
-      background: #f5f5f5;
-    }
-    &.sep {
-      height: 1px;
-      padding: 0;
-      margin: 6px 0;
-      background: #eee;
-      cursor: default;
-    }
-    &.disabled {
-      color: #bbb;
-      cursor: default;
-      .el-icon {
-        color: #ccc;
-      }
-    }
-  }
+  z-index: 9999;
 }
 
-@media (max-width: 1100px) {
-  .song-grid.cols-3 {
-    grid-template-columns: 1fr 1fr;
-  }
+.ctx-menu {
+  position: fixed;
+  min-width: 148px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
 }
-@media (max-width: 780px) {
-  .song-grid.cols-2,
-  .song-grid.cols-3 {
-    grid-template-columns: 1fr;
-  }
+
+.ctx-menu button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.ctx-menu button:hover {
+  background: #f5f5f5;
+}
+
+.ctx-menu button.danger {
+  color: #ec4141;
 }
 </style>

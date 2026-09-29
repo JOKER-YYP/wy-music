@@ -64,10 +64,10 @@
 
       <div class="controls">
         <button class="icon-btn" type="button" :title="modeTitle" @click="player.cycleMode()">
-          <i class="iconfont" :class="modeIconClass" />
+          <span class="iconfont" :class="modeIconClass" aria-hidden="true" />
         </button>
         <button class="icon-btn" type="button" title="上一首" @click="player.prev()">
-          <i class="iconfont icon-next icon-prev" />
+          <span class="iconfont icon-next icon-prev" aria-hidden="true" />
         </button>
         <button
           class="play-btn"
@@ -75,15 +75,16 @@
           :disabled="!track || player.loading"
           @click="player.toggle()"
         >
-          <i
+          <span
             v-if="!player.loading"
             class="iconfont play-ico"
             :class="player.playing ? 'icon-stop' : 'icon-play'"
+            aria-hidden="true"
           />
           <span v-else class="play-loading" />
         </button>
         <button class="icon-btn" type="button" title="下一首" @click="player.next()">
-          <i class="iconfont icon-next" />
+          <span class="iconfont icon-next" aria-hidden="true" />
         </button>
         <button
           class="icon-btn"
@@ -93,7 +94,7 @@
           :disabled="!player.queue.length"
           @click="toggleQueue"
         >
-          <i class="iconfont icon-playlist" />
+          <span class="iconfont icon-playlist" aria-hidden="true" />
         </button>
       </div>
 
@@ -124,10 +125,40 @@
         <button class="icon-btn" type="button" title="桌面小组件" @click="toggleMini">
           <el-icon :size="18"><Monitor /></el-icon>
         </button>
-        <el-popover placement="top" :width="140" trigger="click">
+        <el-popover placement="top" :width="140" trigger="click" :teleported="true">
           <template #reference>
             <button class="icon-btn vol-btn" type="button" title="音量">
-              <i class="iconfont" :class="volumeIconClass" />
+              <svg
+                class="vol-svg"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <!-- 喇叭主体 -->
+                <path
+                  fill="currentColor"
+                  d="M3 9.5v5h3.2L12 19V5L6.2 9.5H3z"
+                />
+                <!-- 音量波纹 / 静音叉 -->
+                <path
+                  v-if="player.volume > 0.001"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  d="M15.2 9.2a4.2 4.2 0 0 1 0 5.6M18 7a7 7 0 0 1 0 10"
+                />
+                <path
+                  v-else
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  d="M15 9.5l5 5M20 9.5l-5 5"
+                />
+              </svg>
             </button>
           </template>
           <div class="vol-pop">
@@ -272,9 +303,6 @@ const modeIconClass = computed(() => {
   if (player.mode === 'shuffle') return 'icon-random'
   return 'icon-list'
 })
-const volumeIconClass = computed(() =>
-  player.volume <= 0.001 ? 'icon-volume-off' : 'icon-volume-on',
-)
 const sliderMax = computed(() => {
   if (player.duration > 0 && Number.isFinite(player.duration)) return player.duration
   const ms = track.value?.durationMs || 0
@@ -621,6 +649,10 @@ onBeforeUnmount(() => {
     font-size: 20px;
     color: inherit;
     line-height: 1;
+  }
+  .vol-svg {
+    display: block;
+    color: inherit;
   }
   &:hover:not(:disabled) {
     color: #ec4141;

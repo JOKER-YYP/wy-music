@@ -17,41 +17,46 @@
   vertical-align: middle;
 }
 
-/* 伪元素必须强制走 iconfont，否则会叠一层系统「缺字方块」 */
 .iconfont::before {
   font-family: 'iconfont' !important;
   font-style: normal;
-  font-weight: normal;
+  font-weight: normal !important;
   line-height: 1;
 }
 
-.icon-single:before {
+/* 禁止任何 after 叠字 */
+.iconfont::after {
+  content: none !important;
+  display: none !important;
+}
+
+.icon-single::before {
   content: '\e61b';
 }
-.icon-sequence:before {
+.icon-sequence::before {
   content: '\e61a';
 }
-.icon-random:before {
+.icon-random::before {
   content: '\e619';
 }
-.icon-volume-on:before {
+.icon-volume-on::before {
   content: '\e61f';
 }
-.icon-volume-off:before {
+.icon-volume-off::before {
   content: '\e61e';
 }
-.icon-playlist:before {
+.icon-playlist::before {
   content: '\e61d';
 }
-.icon-list:before {
+.icon-list::before {
   content: '\e61c';
 }
-.icon-stop:before {
+.icon-stop::before {
   content: '\e618';
 }
-.icon-play:before {
+.icon-play::before {
   content: '\e617';
 }
-.icon-next:before {
+.icon-next::before {
   content: '\e616';
 }

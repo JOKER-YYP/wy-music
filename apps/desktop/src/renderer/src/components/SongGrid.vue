@@ -84,12 +84,15 @@ const props = withDefaults(
     rows?: number
     /** 单项最小宽度，决定能排几列 */
     minItemWidth?: number
+    /** 一行最多几首 */
+    maxColumns?: number
   }>(),
   {
     columns: 3,
     adaptive: false,
     rows: 3,
-    minItemWidth: 240
+    minItemWidth: 280,
+    maxColumns: 3
   }
 )
 
@@ -104,14 +107,15 @@ let ro: ResizeObserver | null = null
 
 function recomputeCols() {
   if (!props.adaptive) {
-    measuredCols.value = props.columns
+    measuredCols.value = Math.min(props.columns, props.maxColumns)
     return
   }
   const w = rootEl.value?.clientWidth || 0
   if (w <= 0) return
-  const gap = 28
+  const gap = 20
   const minW = props.minItemWidth
-  const cols = Math.max(1, Math.min(6, Math.floor((w + gap) / (minW + gap))))
+  const maxCols = Math.max(1, props.maxColumns)
+  const cols = Math.max(1, Math.min(maxCols, Math.floor((w + gap) / (minW + gap))))
   measuredCols.value = cols
 }
 
@@ -141,7 +145,8 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.adaptive, props.columns, props.minItemWidth, props.rows] as const,
+  () =>
+    [props.adaptive, props.columns, props.minItemWidth, props.rows, props.maxColumns] as const,
   () => nextTick(recomputeCols)
 )
 
@@ -236,7 +241,7 @@ function closeMenu() {
 <style scoped>
 .song-grid {
   display: grid;
-  gap: 6px 28px;
+  gap: 4px 20px;
   width: 100%;
 }
 
@@ -244,8 +249,10 @@ function closeMenu() {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
   min-width: 0;
-  padding: 6px 8px;
+  box-sizing: border-box;
+  padding: 8px 10px;
   border-radius: 8px;
   cursor: default;
   transition: background 0.15s;

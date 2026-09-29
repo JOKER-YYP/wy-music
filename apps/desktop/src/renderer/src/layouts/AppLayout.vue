@@ -78,6 +78,23 @@
         <button v-if="user.accessToken" class="text-btn" type="button" @click="onLogout">
           退出
         </button>
+
+        <div class="win-controls" aria-label="窗口控制">
+          <button type="button" class="win-btn" title="最小化" @click="minimizeWindow">
+            <span class="win-icon win-min" />
+          </button>
+          <button
+            type="button"
+            class="win-btn"
+            :title="isMaximized ? '还原' : '最大化'"
+            @click="maximizeWindow"
+          >
+            <span class="win-icon" :class="isMaximized ? 'win-restore' : 'win-max'" />
+          </button>
+          <button type="button" class="win-btn win-close" title="关闭" @click="closeWindow">
+            <span class="win-icon win-x" />
+          </button>
+        </div>
       </div>
     </header>
 
@@ -231,6 +248,27 @@ const searchDropdownRef = ref<{ pushHistory: (kw: string) => void } | null>(null
 const searchPanelStyle = ref<Record<string, string>>({})
 const messageOpen = ref(false)
 const unreadTotal = ref(0)
+const isMaximized = ref(false)
+let unsubMaximized: (() => void) | null = null
+
+async function refreshMaximized() {
+  if (!window.wyAPI?.isWindowMaximized) return
+  isMaximized.value = await window.wyAPI.isWindowMaximized()
+}
+
+function minimizeWindow() {
+  void window.wyAPI?.minimizeWindow?.()
+}
+
+function maximizeWindow() {
+  void window.wyAPI?.maximizeWindow?.().then((maximized) => {
+    if (typeof maximized === 'boolean') isMaximized.value = maximized
+  })
+}
+
+function closeWindow() {
+  void window.wyAPI?.closeWindow?.()
+}
 
 function updateSearchPanelPos() {
   const el = searchAnchorRef.value
@@ -266,6 +304,10 @@ const avatarSrc = computed(() => mediaUrl(user.user?.avatarUrl) || '')
 onMounted(() => {
   myModules.restore()
   user.restore()
+  void refreshMaximized()
+  unsubMaximized = window.wyAPI?.onWindowMaximized?.((v) => {
+    isMaximized.value = v
+  }) || null
   if (!user.accessToken) {
     ui.openLogin('login')
   } else {
@@ -278,6 +320,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  unsubMaximized?.()
+  unsubMaximized = null
   document.removeEventListener('mousedown', onDocPointerDown)
   window.removeEventListener('resize', updateSearchPanelPos)
 })
@@ -497,11 +541,14 @@ function onLogout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px 0 14px;
+  padding: 0 0 0 14px;
   gap: 16px;
   position: relative;
   z-index: 30;
   color: #fff;
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
 }
 .topbar-left {
   display: flex;
@@ -515,6 +562,89 @@ function onLogout() {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  padding-right: 4px;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.topbar-left .brand,
+.topbar-left .hist-nav,
+.topbar-left .search-anchor {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.win-controls {
+  display: flex;
+  align-items: stretch;
+  height: 54px;
+  margin-left: 8px;
+}
+.win-btn {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: background 0.12s;
+  &:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+  &.win-close:hover {
+    background: #e81123;
+  }
+}
+.win-icon {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+}
+.win-min {
+  width: 10px;
+  height: 1px;
+  background: currentColor;
+}
+.win-max {
+  width: 10px;
+  height: 10px;
+  border: 1px solid currentColor;
+}
+.win-restore {
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+  &::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 9px;
+    height: 9px;
+    border: 1px solid currentColor;
+    background: #ec4141;
+  }
+}
+.win-x {
+  width: 10px;
+  height: 10px;
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 12px;
+    height: 1px;
+    background: currentColor;
+  }
+  &::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  &::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
+  }
 }
 .brand {
   display: flex;

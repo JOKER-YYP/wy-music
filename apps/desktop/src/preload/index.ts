@@ -44,6 +44,15 @@ function toBase64Url(text: string) {
 
 const wyAPI = {
   getVersion: () => ipcRenderer.invoke('app:getVersion') as Promise<string>,
+  minimizeWindow: () => ipcRenderer.invoke('window:minimize') as Promise<boolean>,
+  maximizeWindow: () => ipcRenderer.invoke('window:maximize') as Promise<boolean>,
+  closeWindow: () => ipcRenderer.invoke('window:close') as Promise<boolean>,
+  isWindowMaximized: () => ipcRenderer.invoke('window:isMaximized') as Promise<boolean>,
+  onWindowMaximized: (handler: (maximized: boolean) => void) => {
+    const listener = (_: unknown, maximized: boolean) => handler(Boolean(maximized))
+    ipcRenderer.on('window:maximized', listener)
+    return () => ipcRenderer.removeListener('window:maximized', listener)
+  },
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder') as Promise<string | null>,
   selectAudioFiles: (multi = false) =>
     ipcRenderer.invoke('dialog:selectAudioFiles', multi) as Promise<string[]>,

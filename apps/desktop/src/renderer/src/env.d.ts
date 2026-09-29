@@ -33,6 +33,11 @@ declare global {
   interface Window {
     wyAPI?: {
       getVersion: () => Promise<string>
+      minimizeWindow?: () => Promise<boolean>
+      maximizeWindow?: () => Promise<boolean>
+      closeWindow?: () => Promise<boolean>
+      isWindowMaximized?: () => Promise<boolean>
+      onWindowMaximized?: (handler: (maximized: boolean) => void) => () => void
       selectFolder: () => Promise<string | null>
       selectAudioFiles: (multi?: boolean) => Promise<string[]>
       selectLrcFile?: () => Promise<{

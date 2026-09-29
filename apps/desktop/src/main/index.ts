@@ -8,6 +8,7 @@ import {
   dialog,
   nativeImage,
   screen,
+  Menu,
 } from 'electron'
 import { join, extname, basename, dirname } from 'path'
 import { pathToFileURL } from 'url'
@@ -329,6 +330,10 @@ function createWindow() {
     title: 'WY Music',
     icon: appIcon,
     show: false,
+    frame: false,
+    titleBarStyle: 'hidden',
+    autoHideMenuBar: true,
+    backgroundColor: '#ec4141',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -338,10 +343,19 @@ function createWindow() {
     },
   })
   mainWindow = win
+  Menu.setApplicationMenu(null)
 
   win.once('ready-to-show', () => {
     win.show()
   })
+
+  const emitMaximized = () => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('window:maximized', win.isMaximized())
+    }
+  }
+  win.on('maximize', emitMaximized)
+  win.on('unmaximize', emitMaximized)
 
   win.webContents.on('before-input-event', (event, input) => {
     if (
@@ -695,6 +709,28 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  ipcMain.handle('window:minimize', () => {
+    const win = mainWindow
+    if (win && !win.isDestroyed()) win.minimize()
+    return true
+  })
+  ipcMain.handle('window:maximize', () => {
+    const win = mainWindow
+    if (!win || win.isDestroyed()) return false
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+    return win.isMaximized()
+  })
+  ipcMain.handle('window:close', () => {
+    const win = mainWindow
+    if (win && !win.isDestroyed()) win.close()
+    return true
+  })
+  ipcMain.handle('window:isMaximized', () => {
+    const win = mainWindow
+    return Boolean(win && !win.isDestroyed() && win.isMaximized())
+  })
 
   ipcMain.handle('mini:toggle', () => toggleMiniPlayer())
   ipcMain.handle('mini:close', () => {

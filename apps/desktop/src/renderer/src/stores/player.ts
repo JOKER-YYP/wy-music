@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import type { TrackDto } from '@wy-music/shared'
 import { http, streamUrl } from '../services/http'
 
-type PlayMode = 'loop' | 'single' | 'shuffle'
+type PlayMode = 'order' | 'loop' | 'single' | 'shuffle'
 
 export type QueueTrack = TrackDto & {
   localPath?: string
@@ -58,7 +58,7 @@ export const usePlayerStore = defineStore('player', {
     currentTime: 0,
     duration: 0,
     volume: Number(localStorage.getItem('volume') ?? 0.8),
-    mode: 'loop' as PlayMode,
+    mode: 'order' as PlayMode,
     audio: null as HTMLAudioElement | null,
     objectUrl: '' as string,
     loading: false,
@@ -369,6 +369,16 @@ export const usePlayerStore = defineStore('player', {
       if (!this.queue.length) return
       if (this.mode === 'shuffle') {
         this.currentIndex = Math.floor(Math.random() * this.queue.length)
+      } else if (this.mode === 'order') {
+        if (this.currentIndex >= this.queue.length - 1) {
+          this.playing = false
+          const audio = this.ensureAudio()
+          audio.pause()
+          audio.currentTime = 0
+          this.currentTime = 0
+          return
+        }
+        this.currentIndex += 1
       } else {
         this.currentIndex = (this.currentIndex + 1) % this.queue.length
       }
@@ -377,7 +387,11 @@ export const usePlayerStore = defineStore('player', {
 
     prev() {
       if (!this.queue.length) return
-      this.currentIndex = (this.currentIndex - 1 + this.queue.length) % this.queue.length
+      if (this.mode === 'order') {
+        this.currentIndex = Math.max(0, this.currentIndex - 1)
+      } else {
+        this.currentIndex = (this.currentIndex - 1 + this.queue.length) % this.queue.length
+      }
       void this.playCurrent()
     },
 
@@ -390,7 +404,7 @@ export const usePlayerStore = defineStore('player', {
     },
 
     cycleMode() {
-      const modes: PlayMode[] = ['loop', 'single', 'shuffle']
+      const modes: PlayMode[] = ['order', 'loop', 'single', 'shuffle']
       const i = modes.indexOf(this.mode)
       this.mode = modes[(i + 1) % modes.length]
     },

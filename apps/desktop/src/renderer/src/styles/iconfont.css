@@ -14,6 +14,15 @@
   text-transform: none;
   line-height: 1;
   display: inline-block;
+  vertical-align: middle;
+}
+
+/* 伪元素必须强制走 iconfont，否则会叠一层系统「缺字方块」 */
+.iconfont::before {
+  font-family: 'iconfont' !important;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
 }
 
 .icon-single:before {

@@ -64,14 +64,7 @@
 
       <div class="controls">
         <button class="icon-btn" type="button" :title="modeTitle" @click="player.cycleMode()">
-          <i
-            class="iconfont"
-            :class="{
-              'icon-list': player.mode === 'loop',
-              'icon-single': player.mode === 'single',
-              'icon-random': player.mode === 'shuffle',
-            }"
-          />
+          <i class="iconfont" :class="modeIconClass" />
         </button>
         <button class="icon-btn" type="button" title="上一首" @click="player.prev()">
           <i class="iconfont icon-next icon-prev" />
@@ -149,11 +142,8 @@
         </button>
         <el-popover placement="top" :width="140" trigger="click">
           <template #reference>
-            <button class="icon-btn" type="button" title="音量">
-              <i
-                class="iconfont"
-                :class="player.volume <= 0 ? 'icon-volume-off' : 'icon-volume-on'"
-              />
+            <button class="icon-btn vol-btn" type="button" title="音量">
+              <i class="iconfont" :class="volumeIconClass" />
             </button>
           </template>
           <div class="vol-pop">
@@ -263,10 +253,20 @@ const coverStyle = computed(() => {
   return url ? `url(${url})` : 'linear-gradient(135deg,#ec4141,#ff8a80)'
 })
 const modeTitle = computed(() => {
+  if (player.mode === 'order') return '顺序播放'
   if (player.mode === 'single') return '单曲循环'
   if (player.mode === 'shuffle') return '随机播放'
   return '列表循环'
 })
+const modeIconClass = computed(() => {
+  if (player.mode === 'order') return 'icon-sequence'
+  if (player.mode === 'single') return 'icon-single'
+  if (player.mode === 'shuffle') return 'icon-random'
+  return 'icon-list'
+})
+const volumeIconClass = computed(() =>
+  player.volume <= 0.001 ? 'icon-volume-off' : 'icon-volume-on',
+)
 const sliderMax = computed(() => {
   if (player.duration > 0 && Number.isFinite(player.duration)) return player.duration
   const ms = track.value?.durationMs || 0
@@ -650,8 +650,7 @@ onMounted(() => {
     line-height: 1;
   }
   .icon-play {
-    /* 三角视觉略偏左，微调居中 */
-    transform: translateX(1px);
+    transform: translateX(-2px);
   }
   &:hover:not(:disabled) {
     background: #e03333;

@@ -33,7 +33,7 @@
             >
               <span class="cover" :style="coverStyle(item)">
                 <span v-if="index === player.currentIndex && player.playing" class="cover-play">
-                  <span class="wy-ico icon-play" aria-hidden="true"></span>
+                  <i class="iconfont icon-play" />
                 </span>
               </span>
               <span class="meta">
@@ -375,7 +375,7 @@ async function clearAll() {
   place-items: center;
   background: rgba(0, 0, 0, 0.35);
   color: #fff;
-  .wy-ico {
+  .iconfont {
     font-size: 18px;
     color: #fff;
     transform: translateX(1px);

@@ -64,10 +64,10 @@
 
       <div class="controls">
         <button class="icon-btn" type="button" :title="modeTitle" @click="player.cycleMode()">
-          <span class="wy-ico" :class="modeIconClass" aria-hidden="true"></span>
+          <span class="iconfont" :class="modeIconClass" aria-hidden="true" />
         </button>
         <button class="icon-btn" type="button" title="上一首" @click="player.prev()">
-          <span class="wy-ico icon-next icon-prev" aria-hidden="true"></span>
+          <span class="iconfont icon-next icon-prev" aria-hidden="true" />
         </button>
         <button
           class="play-btn"
@@ -77,14 +77,14 @@
         >
           <span
             v-if="!player.loading"
-            class="wy-ico play-ico"
+            class="iconfont play-ico"
             :class="player.playing ? 'icon-stop' : 'icon-play'"
             aria-hidden="true"
-          ></span>
+          />
           <span v-else class="play-loading" />
         </button>
         <button class="icon-btn" type="button" title="下一首" @click="player.next()">
-          <span class="wy-ico icon-next" aria-hidden="true"></span>
+          <span class="iconfont icon-next" aria-hidden="true" />
         </button>
         <button
           class="icon-btn"
@@ -94,7 +94,7 @@
           :disabled="!player.queue.length"
           @click="toggleQueue"
         >
-          <span class="wy-ico icon-playlist" aria-hidden="true"></span>
+          <span class="iconfont icon-playlist" aria-hidden="true" />
         </button>
       </div>
 
@@ -125,20 +125,14 @@
         <button class="icon-btn" type="button" title="桌面小组件" @click="toggleMini">
           <el-icon :size="18"><Monitor /></el-icon>
         </button>
-        <div class="vol-wrap">
-          <button
-            class="icon-btn vol-btn"
-            type="button"
-            title="音量"
-            @click.stop="volOpen = !volOpen"
-          >
-            <span
-              class="wy-ico"
-              :class="player.volume > 0.001 ? 'icon-volume-on' : 'icon-volume-off'"
-              aria-hidden="true"
-            ></span>
-          </button>
-          <div v-if="volOpen" class="vol-pop" @click.stop>
+        <el-popover placement="top" :width="140" trigger="click" :teleported="true">
+          <template #reference>
+            <button class="icon-btn vol-btn" type="button" title="音量">
+              <!-- 直接用字符渲染，避免 ::before 与正文字符叠成双图标 -->
+              <span class="iconfont vol-ico" aria-hidden="true">{{ volumeGlyph }}</span>
+            </button>
+          </template>
+          <div class="vol-pop">
             <input
               class="vol"
               type="range"
@@ -149,7 +143,7 @@
               @input="onVolume"
             />
           </div>
-        </div>
+        </el-popover>
         <el-dropdown trigger="click" :disabled="!track">
           <button class="icon-btn" type="button" title="更多">
             <el-icon :size="18"><MoreFilled /></el-icon>
@@ -211,27 +205,18 @@ const commentCount = ref(0)
 const barHovered = ref(false)
 const progressHovered = ref(false)
 const queueOpen = ref(false)
-const volOpen = ref(false)
 
 function toggleQueue() {
   if (!player.queue.length) return
-  volOpen.value = false
   queueOpen.value = !queueOpen.value
 }
 
 function onDocClick(e: MouseEvent) {
+  if (!queueOpen.value) return
   const t = e.target as HTMLElement | null
   if (!t) return
-  if (queueOpen.value) {
-    if (!t.closest('.queue-panel') && !t.closest('.icon-btn[title="播放列表"]')) {
-      queueOpen.value = false
-    }
-  }
-  if (volOpen.value) {
-    if (!t.closest('.vol-wrap')) {
-      volOpen.value = false
-    }
-  }
+  if (t.closest('.queue-panel') || t.closest('.icon-btn[title="播放列表"]')) return
+  queueOpen.value = false
 }
 
 watch(
@@ -289,6 +274,8 @@ const modeIconClass = computed(() => {
   if (player.mode === 'shuffle') return 'icon-random'
   return 'icon-list'
 })
+/** iconfont: volume-on \e61f / volume-off \e61e */
+const volumeGlyph = computed(() => (player.volume > 0.001 ? '\ue61f' : '\ue61e'))
 const sliderMax = computed(() => {
   if (player.duration > 0 && Number.isFinite(player.duration)) return player.duration
   const ms = track.value?.durationMs || 0
@@ -631,10 +618,20 @@ onBeforeUnmount(() => {
   place-items: center;
   padding: 0;
   font-size: 13px;
-  .wy-ico {
+  .iconfont {
     font-size: 20px;
     color: inherit;
     line-height: 1;
+  }
+  .vol-ico {
+    font-size: 20px;
+    line-height: 1;
+    /* 走正文字符，关掉伪元素，防止叠两个喇叭 */
+    &::before,
+    &::after {
+      content: none !important;
+      display: none !important;
+    }
   }
   &:hover:not(:disabled) {
     color: #ec4141;
@@ -716,22 +713,8 @@ onBeforeUnmount(() => {
   line-height: 1;
   user-select: none;
 }
-.vol-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
 .vol-pop {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
-  transform: translateX(-50%);
-  width: 140px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
-  z-index: 30;
+  padding: 4px 2px;
 }
 .vol {
   width: 100%;

@@ -1,66 +1,62 @@
 @font-face {
-  font-family: 'wy-player-icons';
+  font-family: 'iconfont';
   src: url('data:application/x-font-woff2;charset=utf-8;base64,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')
     format('woff2');
-  font-display: block;
 }
 
-/* 使用独立字体名，避免与页面/扩展里同名 iconfont 抢字形导致叠黑块 */
-.wy-ico {
-  font-family: 'wy-player-icons' !important;
+.iconfont {
+  font-family: 'iconfont' !important;
   font-style: normal;
-  font-weight: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  speak: never;
   font-variant: normal;
   text-transform: none;
   line-height: 1;
   display: inline-block;
   vertical-align: middle;
-  speak: never;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  /* 清空可能被注入的文本节点视觉 */
-  text-indent: 0;
 }
 
-.wy-ico::before {
-  font-family: 'wy-player-icons' !important;
-  font-style: normal !important;
+.iconfont::before {
+  font-family: 'iconfont' !important;
+  font-style: normal;
   font-weight: normal !important;
   line-height: 1;
 }
 
-.wy-ico::after {
+/* 禁止任何 after 叠字 */
+.iconfont::after {
   content: none !important;
   display: none !important;
 }
 
-.wy-ico.icon-single::before {
+.icon-single::before {
   content: '\e61b';
 }
-.wy-ico.icon-sequence::before {
+.icon-sequence::before {
   content: '\e61a';
 }
-.wy-ico.icon-random::before {
+.icon-random::before {
   content: '\e619';
 }
-.wy-ico.icon-volume-on::before {
+.icon-volume-on::before {
   content: '\e61f';
 }
-.wy-ico.icon-volume-off::before {
+.icon-volume-off::before {
   content: '\e61e';
 }
-.wy-ico.icon-playlist::before {
+.icon-playlist::before {
   content: '\e61d';
 }
-.wy-ico.icon-list::before {
+.icon-list::before {
   content: '\e61c';
 }
-.wy-ico.icon-stop::before {
+.icon-stop::before {
   content: '\e618';
 }
-.wy-ico.icon-play::before {
+.icon-play::before {
   content: '\e617';
 }
-.wy-ico.icon-next::before {
+.icon-next::before {
   content: '\e616';
 }

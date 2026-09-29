@@ -422,9 +422,6 @@ onUnmounted(() => {
     .iconfont {
       font-size: 18px;
     }
-    .icon-play {
-      transform: translateX(1px);
-    }
     &:hover {
       background: #e03333;
       color: #fff;

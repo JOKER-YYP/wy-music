@@ -865,9 +865,6 @@ watch(
   &:hover {
     background: #e03535;
   }
-  .icon-play {
-    transform: translateX(1px);
-  }
 }
 .np-right-tools {
   display: flex;

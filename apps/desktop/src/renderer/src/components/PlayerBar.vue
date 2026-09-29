@@ -660,9 +660,6 @@ onBeforeUnmount(() => {
     color: #fff;
     line-height: 1;
   }
-  .icon-play {
-    transform: translateX(-1px);
-  }
   &:hover:not(:disabled) {
     background: #e03333;
     transform: scale(1.05);

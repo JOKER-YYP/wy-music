@@ -53,6 +53,12 @@
   content: '\e617';
 }
 
+/* 播放三角视觉偏右，统一轻微左移（与底栏播放键一致） */
+.iconfont.icon-play {
+  display: inline-block;
+  transform: translateX(-2px);
+}
+
 .icon-next:before {
   content: '\e616';
 }

@@ -378,7 +378,6 @@ async function clearAll() {
   .iconfont {
     font-size: 18px;
     color: #fff;
-    transform: translateX(1px);
   }
 }
 

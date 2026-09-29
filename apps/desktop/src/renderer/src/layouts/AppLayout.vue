@@ -97,11 +97,16 @@
           </router-link>
         </div>
 
-        <div class="nav-title">我的音乐</div>
+        <div class="nav-title mine-head">
+          <span>我的</span>
+          <button class="edit-btn" type="button" title="编辑我的模块" @click="openMyModulesEdit">
+            <el-icon :size="14"><EditPen /></el-icon>
+          </button>
+        </div>
         <div class="nav-group">
           <router-link
-            v-for="item in myNav"
-            :key="item.to"
+            v-for="item in myModules.sidebarModules"
+            :key="item.id"
             :to="item.to"
             class="nav-item"
             :class="{ active: isActive(item.to) }"
@@ -110,6 +115,18 @@
             <el-icon><component :is="item.icon" /></el-icon>
             <span>{{ item.label }}</span>
           </router-link>
+          <button
+            v-if="myModules.foldedModules.length"
+            type="button"
+            class="fold-toggle"
+            @click="myModules.toggleFoldedExpanded()"
+          >
+            <span>{{ myModules.foldedExpanded ? '收起' : '展开' }}</span>
+            <el-icon :size="12">
+              <ArrowUp v-if="myModules.foldedExpanded" />
+              <ArrowDown v-else />
+            </el-icon>
+          </button>
         </div>
 
         <div class="nav-title playlist-head">
@@ -140,18 +157,6 @@
             点击 + 创建歌单
           </div>
         </div>
-
-        <div class="nav-group" style="margin-top: 8px">
-          <router-link
-            to="/mine"
-            class="nav-item"
-            :class="{ active: isActive('/mine') }"
-            @click="onNavClick({ to: '/mine', auth: true }, $event)"
-          >
-            <el-icon><FolderOpened /></el-icon>
-            <span>我的上传</span>
-          </router-link>
-        </div>
       </nav>
     </aside>
 
@@ -172,6 +177,7 @@
       @close="messageOpen = false"
       @changed="refreshUnreadCount"
     />
+    <EditMyModulesModal />
   </div>
 </template>
 
@@ -180,25 +186,25 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  ArrowDown,
   ArrowLeft,
   ArrowRight,
-  Calendar,
+  ArrowUp,
   CircleClose,
-  Clock,
-  FolderOpened,
+  EditPen,
   Headset,
   Message,
   Microphone,
   Plus,
   Search,
   Setting,
-  Star,
   Upload,
 } from '@element-plus/icons-vue'
 import type { PlaylistDto } from '@wy-music/shared'
 import { useUserStore } from '../stores/user'
 import { useUiStore } from '../stores/ui'
 import { usePlaylistStore } from '../stores/playlist'
+import { useMyModulesStore } from '../stores/myModules'
 import { http, mediaUrl } from '../services/http'
 import PlayerBar from '../components/PlayerBar.vue'
 import PlayerIpcBridge from '../components/PlayerIpcBridge.vue'
@@ -208,6 +214,7 @@ import CollectPlaylistModal from '../components/CollectPlaylistModal.vue'
 import CommentsPanel from '../components/CommentsPanel.vue'
 import SearchDropdown from '../components/SearchDropdown.vue'
 import MessagePanel from '../components/MessagePanel.vue'
+import EditMyModulesModal from '../components/EditMyModulesModal.vue'
 import logoUrl from '../assets/logo.png'
 
 const route = useRoute()
@@ -215,6 +222,7 @@ const router = useRouter()
 const user = useUserStore()
 const ui = useUiStore()
 const playlistStore = usePlaylistStore()
+const myModules = useMyModulesStore()
 const keyword = ref('')
 const searchOpen = ref(false)
 const searchAnchorRef = ref<HTMLElement | null>(null)
@@ -244,11 +252,9 @@ const primaryNav = [
   { to: '/upload', label: '上传', icon: Upload, auth: true },
 ]
 
-const myNav = [
-  { to: '/recommend/daily', label: '每日推荐', icon: Calendar, auth: true },
-  { to: '/liked', label: '我喜欢的音乐', icon: Star, auth: true },
-  { to: '/recent', label: '最近播放', icon: Clock, auth: true },
-]
+function openMyModulesEdit() {
+  myModules.openEdit()
+}
 
 const avatarText = computed(() => {
   const n = user.user?.nickname || '未'
@@ -258,6 +264,7 @@ const avatarText = computed(() => {
 const avatarSrc = computed(() => mediaUrl(user.user?.avatarUrl) || '')
 
 onMounted(() => {
+  myModules.restore()
   user.restore()
   if (!user.accessToken) {
     ui.openLogin('login')
@@ -712,6 +719,46 @@ function onLogout() {
   margin: 14px 10px 6px;
   font-size: 12px;
   color: #999;
+}
+.mine-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.edit-btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #aaa;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  &:hover {
+    color: #666;
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+.fold-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 4px 8px 0;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #999;
+  font-size: 12px;
+  cursor: pointer;
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: #666;
+  }
 }
 .playlist-head {
   display: flex;

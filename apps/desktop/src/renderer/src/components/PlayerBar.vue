@@ -650,7 +650,7 @@ onMounted(() => {
     line-height: 1;
   }
   .icon-play {
-    transform: translateX(-2px);
+    transform: translateX(-1px);
   }
   &:hover:not(:disabled) {
     background: #e03333;

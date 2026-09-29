@@ -46,19 +46,19 @@
                 <span class="x">×</span>
               </button>
               <el-popover
-                :visible="tagPickerOpen"
+                v-model:visible="tagPickerOpen"
                 placement="bottom-start"
                 :width="360"
                 trigger="click"
-                @update:visible="tagPickerOpen = $event"
+                :teleported="true"
               >
                 <template #reference>
-                  <button type="button" class="tag-select" @click="tagPickerOpen = !tagPickerOpen">
+                  <button type="button" class="tag-select">
                     {{ selectedTags.length ? '添加标签' : '选择...' }}
                     <el-icon :size="12"><ArrowDown /></el-icon>
                   </button>
                 </template>
-                <div class="tag-panel">
+                <div class="tag-panel" @mousedown.stop @click.stop>
                   <div class="tag-tip">最多选择 3 个标签</div>
                   <div class="tag-grid">
                     <button
@@ -66,7 +66,10 @@
                       :key="t"
                       type="button"
                       class="tag-opt"
-                      :class="{ on: selectedTags.includes(t), disabled: !selectedTags.includes(t) && selectedTags.length >= 3 }"
+                      :class="{
+                        on: selectedTags.includes(t),
+                        disabled: !selectedTags.includes(t) && selectedTags.length >= 3,
+                      }"
                       :disabled="!selectedTags.includes(t) && selectedTags.length >= 3"
                       @click="toggleTag(t)"
                     >

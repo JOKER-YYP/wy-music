@@ -20,16 +20,17 @@
         -0.5s
       </button>
       <button class="tool" type="button" title="上一首" @click.stop="send({ type: 'prev' })">
-        <el-icon :size="15"><DArrowLeft /></el-icon>
+        <span class="iconfont icon-prev" aria-hidden="true" />
       </button>
       <button class="tool" type="button" title="播放/暂停" @click.stop="send({ type: 'toggle' })">
-        <el-icon :size="16">
-          <VideoPause v-if="state.playing" />
-          <VideoPlay v-else />
-        </el-icon>
+        <span
+          class="iconfont"
+          :class="state.playing ? 'icon-stop' : 'icon-play'"
+          aria-hidden="true"
+        />
       </button>
       <button class="tool" type="button" title="下一首" @click.stop="send({ type: 'next' })">
-        <el-icon :size="15"><DArrowRight /></el-icon>
+        <span class="iconfont icon-next" aria-hidden="true" />
       </button>
 
       <button
@@ -362,6 +363,11 @@ watch(
   }
   .note {
     font-size: 15px;
+  }
+  .iconfont {
+    font-size: 15px;
+    line-height: 1;
+    color: inherit;
   }
 }
 

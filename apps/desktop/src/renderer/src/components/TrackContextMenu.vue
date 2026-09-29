@@ -12,11 +12,11 @@
         @click.stop
       >
         <li @click="emitAction('play')">
-          <el-icon><VideoPlay /></el-icon>
+          <span class="iconfont icon-play ctx-ico" aria-hidden="true" />
           <span>播放</span>
         </li>
         <li @click="emitAction('next')">
-          <el-icon><DArrowRight /></el-icon>
+          <span class="iconfont icon-next ctx-ico" aria-hidden="true" />
           <span>下一首播放</span>
         </li>
         <li @click="emitAction('comments')">
@@ -60,7 +60,6 @@
 <script setup lang="ts">
 import {
   ChatDotRound,
-  DArrowRight,
   Delete,
   Download,
   FolderAdd,
@@ -68,7 +67,6 @@ import {
   Remove,
   Star,
   StarFilled,
-  VideoPlay,
 } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
 
@@ -117,9 +115,12 @@ function emitAction(action: string) {
     font-size: 13px;
     color: #333;
     cursor: pointer;
-    .el-icon {
+    .el-icon,
+    .ctx-ico {
       font-size: 16px;
       color: #666;
+      width: 16px;
+      text-align: center;
     }
     &:hover:not(.sep):not(.disabled) {
       background: #f5f5f5;

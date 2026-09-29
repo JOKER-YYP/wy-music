@@ -191,7 +191,7 @@ async function clearAll() {
   right: 0;
   bottom: var(--wy-player-h);
   width: min(420px, 100vw);
-  z-index: 40;
+  z-index: 2600;
   background: #fff;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
   border-left: 1px solid #eee;

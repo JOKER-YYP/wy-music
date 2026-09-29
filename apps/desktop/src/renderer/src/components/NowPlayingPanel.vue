@@ -72,7 +72,7 @@
                   :title="`从此处播放 ${formatTime(line.time)}`"
                   @click.stop="playFromLine(line)"
                 >
-                  <el-icon :size="12"><VideoPlay /></el-icon>
+                  <span class="iconfont icon-play lyric-play-ico" aria-hidden="true" />
                   <span>{{ formatTime(line.time) }}</span>
                 </button>
               </div>
@@ -135,19 +135,22 @@
             </div>
 
             <div class="np-controls">
-              <el-button text @click="player.cycleMode()">{{ modeLabel }}</el-button>
-              <el-button circle @click="player.prev()">
-                <el-icon><DArrowLeft /></el-icon>
-              </el-button>
-              <el-button type="danger" circle size="large" @click="player.toggle()">
-                <el-icon :size="22">
-                  <VideoPause v-if="player.playing" />
-                  <VideoPlay v-else />
-                </el-icon>
-              </el-button>
-              <el-button circle @click="player.next()">
-                <el-icon><DArrowRight /></el-icon>
-              </el-button>
+              <button class="np-mode" type="button" :title="modeLabel" @click="player.cycleMode()">
+                {{ modeLabel }}
+              </button>
+              <button class="np-ico" type="button" title="上一首" @click="player.prev()">
+                <span class="iconfont icon-prev" aria-hidden="true" />
+              </button>
+              <button class="np-play" type="button" title="播放/暂停" @click="player.toggle()">
+                <span
+                  class="iconfont"
+                  :class="player.playing ? 'icon-stop' : 'icon-play'"
+                  aria-hidden="true"
+                />
+              </button>
+              <button class="np-ico" type="button" title="下一首" @click="player.next()">
+                <span class="iconfont icon-next" aria-hidden="true" />
+              </button>
             </div>
 
             <div class="np-right-tools">
@@ -688,6 +691,10 @@ watch(
   &:hover {
     background: rgba(255, 255, 255, 0.28);
   }
+  .lyric-play-ico {
+    font-size: 12px;
+    line-height: 1;
+  }
 }
 .lyric-line.near {
   color: rgba(255, 255, 255, 0.52);
@@ -809,8 +816,57 @@ watch(
   justify-content: center;
   align-items: center;
   gap: 14px;
-  :deep(.el-button) {
+}
+.np-mode {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  &:hover {
     color: #fff;
+  }
+}
+.np-ico {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  .iconfont {
+    font-size: 18px;
+    line-height: 1;
+  }
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+.np-play {
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: #ec4141;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  .iconfont {
+    font-size: 22px;
+    line-height: 1;
+  }
+  &:hover {
+    background: #e03535;
+  }
+  .icon-play {
+    transform: translateX(1px);
   }
 }
 .np-right-tools {

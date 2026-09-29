@@ -1,7 +1,7 @@
 <template>
   <div>
     <h2>我喜欢的音乐</h2>
-    <TrackTable :tracks="list" @refresh="load" />
+    <TrackTable :tracks="list" :allow-delete="false" @refresh="load" />
   </div>
 </template>
 

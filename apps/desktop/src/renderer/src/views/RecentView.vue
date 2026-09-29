@@ -4,7 +4,7 @@
       <h2>最近播放</h2>
       <el-button @click="clear">清空</el-button>
     </div>
-    <TrackTable :tracks="list" />
+    <TrackTable :tracks="list" :allow-delete="false" />
   </div>
 </template>
 

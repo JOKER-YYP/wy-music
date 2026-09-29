@@ -346,6 +346,20 @@ export const usePlayerStore = defineStore('player', {
       this.queue.splice(this.currentIndex + 1, 0, track)
     },
 
+    /** 追加到播放列表末尾（不自动播放） */
+    appendToQueue(tracks: QueueTrack[]) {
+      if (!tracks.length) return 0
+      let added = 0
+      for (const t of tracks) {
+        if (this.queue.some((q) => q.id === t.id)) continue
+        this.queue.push({ ...t })
+        added += 1
+      }
+      if (!this.queue.length) return 0
+      if (this.currentIndex < 0) this.currentIndex = 0
+      return added
+    },
+
     seek(time: number) {
       const audio = this.ensureAudio()
       if (!Number.isFinite(time) || time < 0 || !audio.src) return

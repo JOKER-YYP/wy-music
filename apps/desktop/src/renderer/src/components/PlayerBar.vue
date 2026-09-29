@@ -67,7 +67,7 @@
           <span class="iconfont" :class="modeIconClass" aria-hidden="true" />
         </button>
         <button class="icon-btn" type="button" title="上一首" @click="player.prev()">
-          <span class="iconfont icon-next icon-prev" aria-hidden="true" />
+          <span class="iconfont icon-prev" aria-hidden="true" />
         </button>
         <button
           class="play-btn"
@@ -636,10 +636,6 @@ onBeforeUnmount(() => {
     color: #ec4141;
     font-weight: 700;
   }
-}
-.icon-prev {
-  transform: scaleX(-1);
-  display: inline-block;
 }
 .lyric-btn {
   font-weight: 600;

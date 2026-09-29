@@ -56,3 +56,13 @@
 .icon-next:before {
   content: '\e616';
 }
+
+/* 上一首：复用下一首字形并水平翻转 */
+.icon-prev:before {
+  content: '\e616';
+}
+
+.iconfont.icon-prev {
+  display: inline-block;
+  transform: scaleX(-1);
+}

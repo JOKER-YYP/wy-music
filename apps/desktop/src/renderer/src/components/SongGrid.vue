@@ -9,7 +9,7 @@
     >
       <button class="cover-btn" type="button" :style="coverStyle(track)" @click="onPlay(track)">
         <span class="cover-play">
-          <el-icon><VideoPlay /></el-icon>
+          <span class="iconfont icon-play" aria-hidden="true" />
         </span>
       </button>
 
@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, MoreFilled, Star, StarFilled, VideoPlay } from '@element-plus/icons-vue'
+import { Download, MoreFilled, Star, StarFilled } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'

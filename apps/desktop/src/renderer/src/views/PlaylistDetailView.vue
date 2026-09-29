@@ -1,7 +1,7 @@
 <template>
-  <div v-loading="loading" ref="rootRef" class="playlist-page">
+  <div v-loading="loading" class="playlist-page">
     <template v-if="detail">
-      <div class="header">
+      <div v-show="!batchMode" class="header">
         <div class="cover" :style="coverStyle" />
         <div class="meta">
           <div class="title-row">
@@ -30,14 +30,19 @@
               <el-icon><Download /></el-icon>
               下载
             </el-button>
-            <el-dropdown v-if="!detail.isSystem" trigger="click" @command="onMoreCommand">
+            <el-dropdown trigger="click" @command="onMoreCommand">
               <el-button round circle>
                 <el-icon><MoreFilled /></el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="rename">重命名</el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>删除歌单</el-dropdown-item>
+                  <el-dropdown-item command="share" disabled>分享...</el-dropdown-item>
+                  <el-dropdown-item command="batch">批量操作</el-dropdown-item>
+                  <el-dropdown-item command="addAll">添加全部至播放列表</el-dropdown-item>
+                  <template v-if="!detail.isSystem">
+                    <el-dropdown-item command="rename" divided>重命名</el-dropdown-item>
+                    <el-dropdown-item command="delete">删除歌单</el-dropdown-item>
+                  </template>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -45,7 +50,7 @@
         </div>
       </div>
 
-      <div class="tabs">
+      <div v-show="!batchMode" class="tabs">
         <button
           type="button"
           class="tab"
@@ -76,139 +81,53 @@
         </div>
       </div>
 
-      <div v-show="activeTab === 'songs'" class="song-panel">
-        <div class="table-head">
-          <span class="col-idx">#</span>
-          <span class="col-title">标题</span>
-          <span class="col-album">专辑</span>
-          <span class="col-like">喜欢</span>
-          <span class="col-dur">时长</span>
-        </div>
-
-        <div
-          v-for="(row, idx) in filteredTracks"
-          :key="row.id"
-          class="song-row"
-          :data-track-id="row.id"
-          :class="{ playing: isPlaying(row), active: isCurrent(row) }"
-          @dblclick="playOne(row)"
-          @contextmenu.prevent="openMenu($event, row)"
-        >
-          <div class="col-idx">
-            <span v-if="isPlaying(row)" class="eq">
-              <i /><i /><i />
-            </span>
-            <button v-else class="idx-play" type="button" @click="playOne(row)">
-              <span class="num">{{ String(idx + 1).padStart(2, '0') }}</span>
-              <el-icon class="play-ico"><VideoPlay /></el-icon>
-            </button>
-          </div>
-
-          <div class="col-title">
-            <div class="thumb" :style="trackCover(row)" @click="playOne(row)" />
-            <div class="title-meta">
-              <div class="name-line">
-                <span class="name" :title="row.name">{{ row.name }}</span>
-                <div class="row-actions">
-                  <button type="button" title="下载" class="disabled-act" @click.stop>
-                    <el-icon><Download /></el-icon>
-                  </button>
-                  <button type="button" title="收藏到歌单" @click.stop="onCollect(row)">
-                    <el-icon><FolderAdd /></el-icon>
-                  </button>
-                  <button type="button" title="评论" @click.stop="goComments(row)">
-                    <el-icon><ChatDotRound /></el-icon>
-                  </button>
-                  <button type="button" title="更多" @click.stop="openMenu($event, row)">
-                    <el-icon><MoreFilled /></el-icon>
-                  </button>
-                </div>
-              </div>
-              <div class="artists">{{ row.artists?.join(' / ') || '未知歌手' }}</div>
-            </div>
-          </div>
-
-          <div class="col-album" :title="row.album || ''">{{ row.album || '-' }}</div>
-
-          <div class="col-like">
-            <button class="like-btn" type="button" @click.stop="toggleLike(row)">
-              <el-icon :size="16" :color="row.liked ? '#ec4141' : '#bbb'">
-                <StarFilled v-if="row.liked" />
-                <Star v-else />
-              </el-icon>
-            </button>
-          </div>
-
-          <div class="col-dur">{{ formatDuration(row.durationMs) }}</div>
-        </div>
-
-        <el-empty
-          v-if="!filteredTracks.length"
-          :description="emptySongsText"
+      <div v-show="activeTab === 'songs' || batchMode" class="song-panel">
+        <div v-if="batchMode" class="batch-title">{{ detail.name }}</div>
+        <SongListTable
+          v-model:batch-mode="batchMode"
+          :tracks="filteredTracks"
+          :allow-delete="false"
+          :allow-remove="Boolean(detail && !detail.isSystem)"
+          :playlist-id="detail.id"
+          :empty-text="emptySongsText"
+          @refresh="onTracksRefresh"
         />
       </div>
 
-      <div v-show="activeTab === 'comments'" class="placeholder">
+      <div v-show="!batchMode && activeTab === 'comments'" class="placeholder">
         <el-empty description="评论功能暂未开放" :image-size="72" />
       </div>
-      <div v-show="activeTab === 'collectors'" class="placeholder">
+      <div v-show="!batchMode && activeTab === 'collectors'" class="placeholder">
         <el-empty description="收藏者列表暂未开放" :image-size="72" />
       </div>
     </template>
 
     <el-empty v-else-if="!loading" description="歌单不存在或无权访问" />
-
-    <TrackContextMenu
-      :visible="menu.visible"
-      :x="menu.x"
-      :y="menu.y"
-      :track="menu.track"
-      :allow-remove="Boolean(detail && !detail.isSystem)"
-      @close="closeMenu"
-      @action="runMenu"
-    />
-
-    <PlayingLocateFab :visible="showLocate && activeTab === 'songs'" @click="locateCurrent" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { TrackDto } from '@wy-music/shared'
-import { http, mediaUrl, streamUrl } from '../services/http'
+import { Download, Edit, MoreFilled, Search, VideoPlay } from '@element-plus/icons-vue'
+import { http, mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
 import { usePlaylistStore, type PlaylistDetail } from '../stores/playlist'
-import { useUiStore } from '../stores/ui'
-import { useUserStore } from '../stores/user'
-import { formatDuration } from '../services/localUpload'
-import { usePlayingLocate } from '../composables/usePlayingLocate'
-import TrackContextMenu from '../components/TrackContextMenu.vue'
-import PlayingLocateFab from '../components/PlayingLocateFab.vue'
+import SongListTable from '../components/SongListTable.vue'
 
 const route = useRoute()
 const router = useRouter()
 const player = usePlayerStore()
 const playlistStore = usePlaylistStore()
-const ui = useUiStore()
-const user = useUserStore()
 
 const loading = ref(false)
 const detail = ref<PlaylistDetail | null>(null)
 const activeTab = ref<'songs' | 'comments' | 'collectors'>('songs')
 const keyword = ref('')
-const rootRef = ref<HTMLElement | null>(null)
-
-const menu = reactive({
-  visible: false,
-  x: 0,
-  y: 0,
-  track: null as TrackDto | null,
-})
+const batchMode = ref(false)
 
 const coverStyle = computed(() => {
-  // 优先展示歌单第一首歌封面
   const first = detail.value?.tracks?.[0]?.coverUrl || detail.value?.coverUrl
   const url = mediaUrl(first)
   if (url) return { backgroundImage: `url(${url})` }
@@ -239,47 +158,13 @@ const emptySongsText = computed(() => {
   return '暂无歌曲'
 })
 
-const currentInList = computed(() => {
-  const id = player.currentTrack?.id
-  if (!id || activeTab.value !== 'songs') return false
-  return filteredTracks.value.some((t) => t.id === id)
-})
-
-const { showLocate, locateCurrent } = usePlayingLocate({
-  rootRef,
-  hasCurrent: () => currentInList.value,
-  getActiveEl: () => {
-    const id = player.currentTrack?.id
-    if (!id || !rootRef.value) return null
-    return rootRef.value.querySelector(
-      `.song-row[data-track-id="${CSS.escape(id)}"]`,
-    ) as HTMLElement | null
-  },
-  deps: () =>
-    [player.currentTrack?.id, filteredTracks.value.length, activeTab.value, keyword.value] as const,
-})
-
-function trackCover(row: TrackDto) {
-  const url = mediaUrl(row.coverUrl)
-  return url
-    ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,#ff8a80,#ec4141)' }
-}
-
-function isCurrent(row: TrackDto) {
-  return player.currentTrack?.id === row.id
-}
-
-function isPlaying(row: TrackDto) {
-  return isCurrent(row) && player.playing
-}
-
-async function load() {
+async function load(opts?: { keepBatch?: boolean }) {
   const id = String(route.params.id || '')
   if (!id) return
   loading.value = true
   activeTab.value = 'songs'
   keyword.value = ''
+  if (!opts?.keepBatch) batchMode.value = false
   try {
     detail.value = await playlistStore.fetchDetail(id)
   } catch {
@@ -289,44 +174,24 @@ async function load() {
   }
 }
 
+async function onTracksRefresh() {
+  await load({ keepBatch: batchMode.value })
+  await playlistStore.fetchMine()
+}
+
 function playAll() {
   if (!detail.value?.tracks?.length) return
   player.setQueue(detail.value.tracks, 0)
 }
 
-function playOne(row: TrackDto) {
-  if (!detail.value?.tracks) return
-  player.playTrack(row, detail.value.tracks)
-}
-
-async function toggleLike(row: TrackDto) {
-  if (!user.accessToken) {
-    ui.openLogin('login')
+function addAllToQueue() {
+  const list = detail.value?.tracks || []
+  if (!list.length) {
+    ElMessage.info('歌单为空')
     return
   }
-  const { data } = await http.post(`/api/likes/${row.id}`)
-  row.liked = data.data.liked
-}
-
-function onCollect(row: TrackDto) {
-  if (!user.accessToken) {
-    ui.openLogin('login')
-    return
-  }
-  ui.openCollect(row)
-}
-
-function goComments(row: TrackDto) {
-  ui.openPageComments(row)
-  router.push(`/comment/${row.id}`)
-}
-
-async function removeTrack(trackId: string) {
-  if (!detail.value) return
-  await http.delete(`/api/playlists/${detail.value.id}/tracks/${trackId}`)
-  ElMessage.success('已移除')
-  await load()
-  await playlistStore.fetchMine()
+  const added = player.appendToQueue(list)
+  ElMessage.success(added ? `已添加 ${added} 首到播放列表` : '全部歌曲已在播放列表中')
 }
 
 async function onRename() {
@@ -357,49 +222,22 @@ async function onDelete() {
 }
 
 function onMoreCommand(cmd: string) {
-  if (cmd === 'rename') void onRename()
-  if (cmd === 'delete') void onDelete()
+  if (cmd === 'batch') {
+    activeTab.value = 'songs'
+    batchMode.value = true
+  } else if (cmd === 'addAll') addAllToQueue()
+  else if (cmd === 'rename') void onRename()
+  else if (cmd === 'delete') void onDelete()
+  else if (cmd === 'share') ElMessage.info('分享功能暂未开放')
 }
 
-function openMenu(e: MouseEvent, track: TrackDto) {
-  menu.track = track
-  const pad = 8
-  menu.x = Math.min(e.clientX, window.innerWidth - 200 - pad)
-  menu.y = Math.min(e.clientY, window.innerHeight - 400 - pad)
-  menu.visible = true
-}
-
-function closeMenu() {
-  menu.visible = false
-  menu.track = null
-}
-
-async function runMenu(action: string) {
-  const track = menu.track
-  closeMenu()
-  if (!track) return
-  if (action === 'play') playOne(track)
-  else if (action === 'next') {
-    player.playNext(track)
-    ElMessage.success('已添加到下一首播放')
-  } else if (action === 'comments') {
-    ui.openPageComments(track)
-    router.push(`/comment/${track.id}`)
-  } else if (action === 'collect') onCollect(track)
-  else if (action === 'like') await toggleLike(track)
-  else if (action === 'remove') await removeTrack(track.id)
-  else if (action === 'copy') {
-    try {
-      await navigator.clipboard.writeText(streamUrl(track.id))
-      ElMessage.success('链接已复制')
-    } catch {
-      ElMessage.info(streamUrl(track.id))
-    }
-  }
-}
-
-onMounted(load)
-watch(() => route.params.id, load)
+onMounted(() => void load())
+watch(
+  () => route.params.id,
+  () => {
+    void load()
+  },
+)
 </script>
 
 <style scoped lang="scss">
@@ -490,29 +328,31 @@ watch(() => route.params.id, load)
 .tabs {
   display: flex;
   align-items: center;
-  gap: 28px;
-  border-bottom: 1px solid #eee;
-  margin: 18px 0 0;
+  gap: 4px;
+  border-bottom: 1px solid #f0f0f0;
+  margin: 18px 0 8px;
+  position: relative;
 }
 .tab {
   border: none;
   background: transparent;
-  padding: 12px 2px 14px;
+  padding: 10px 14px;
   font-size: 14px;
   color: #666;
   cursor: pointer;
   position: relative;
   &.active {
-    color: #ec4141;
+    color: #222;
     font-weight: 600;
     &::after {
       content: '';
       position: absolute;
-      left: 0;
-      right: 0;
+      left: 14px;
+      right: 14px;
       bottom: 0;
       height: 2px;
       background: #ec4141;
+      border-radius: 1px;
     }
   }
 }
@@ -521,246 +361,46 @@ watch(() => route.params.id, load)
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 15px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
   background: #f5f5f5;
-  border: 1px solid #ececec;
-  color: #bbb;
+  .tab-search-icon {
+    color: #bbb;
+    font-size: 14px;
+  }
   input {
     border: none;
-    outline: none;
     background: transparent;
-    width: 88px;
+    outline: none;
+    width: 120px;
     font-size: 12px;
     color: #333;
-    &::placeholder {
-      color: #bbb;
-    }
   }
 }
-.tab-search-icon {
-  font-size: 14px;
+.batch-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #222;
+  margin: 4px 0 12px;
 }
 .song-panel {
   margin-top: 4px;
 }
-.table-head,
-.song-row {
-  display: grid;
-  grid-template-columns: 56px minmax(220px, 1.6fr) minmax(120px, 1fr) 56px 64px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-}
-.table-head {
-  height: 40px;
-  color: #999;
-  font-size: 12px;
-  border-bottom: 1px solid #f0f0f0;
-}
-.song-row {
-  height: 64px;
-  border-radius: 6px;
-  cursor: default;
-  transition: background 0.12s;
-  &:hover {
-    background: #f5f5f5;
-    .idx-play .num {
-      display: none;
-    }
-    .idx-play .play-ico {
-      display: inline-flex;
-    }
-    .row-actions {
-      opacity: 1;
-      pointer-events: auto;
-    }
-  }
-  &.active {
-    .name {
-      color: #ec4141;
-    }
-    .artists {
-      color: #f08080;
-    }
-  }
-  &.playing {
-    background: #fafafa;
-  }
-}
-.col-idx {
-  display: grid;
-  place-items: center;
-  color: #bbb;
-  font-size: 13px;
-}
-.idx-play {
-  border: none;
-  background: transparent;
-  width: 28px;
-  height: 28px;
-  color: #bbb;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  .play-ico {
-    display: none;
-    color: #666;
-  }
-}
-.eq {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 14px;
-  i {
-    display: block;
-    width: 3px;
-    background: #ec4141;
-    border-radius: 1px;
-    animation: eq 0.8s ease-in-out infinite;
-    &:nth-child(1) {
-      height: 6px;
-      animation-delay: 0s;
-    }
-    &:nth-child(2) {
-      height: 12px;
-      animation-delay: 0.15s;
-    }
-    &:nth-child(3) {
-      height: 8px;
-      animation-delay: 0.3s;
-    }
-  }
-}
-@keyframes eq {
-  0%,
-  100% {
-    transform: scaleY(0.5);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-.col-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.thumb {
-  width: 40px;
-  height: 40px;
-  border-radius: 4px;
-  background-size: cover;
-  background-position: center;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-.title-meta {
-  min-width: 0;
-  flex: 1;
-}
-.name-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.name {
-  font-size: 14px;
-  color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.row-actions {
-  display: flex;
-  gap: 2px;
-  opacity: 0;
-  pointer-events: none;
-  flex-shrink: 0;
-  transition: opacity 0.12s;
-  button {
-    width: 26px;
-    height: 26px;
-    border: none;
-    background: transparent;
-    border-radius: 50%;
-    color: #888;
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-    &:hover {
-      background: rgba(0, 0, 0, 0.06);
-      color: #ec4141;
-    }
-    &.disabled-act {
-      opacity: 0.35;
-      cursor: not-allowed;
-      &:hover {
-        background: transparent;
-        color: #888;
-      }
-    }
-  }
-}
-.artists {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #999;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.col-album {
-  font-size: 13px;
-  color: #888;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.col-like {
-  display: grid;
-  place-items: center;
-}
-.like-btn {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  &:hover {
-    background: rgba(236, 65, 65, 0.08);
-  }
-}
-.col-dur {
-  font-size: 13px;
-  color: #999;
-  text-align: right;
-}
 .placeholder {
   padding: 48px 0;
 }
-@media (max-width: 900px) {
+@media (max-width: 720px) {
   .header {
     flex-direction: column;
+    gap: 16px;
   }
   .cover {
-    width: 160px;
-    height: 160px;
+    width: 140px;
+    height: 140px;
   }
-  .table-head,
-  .song-row {
-    grid-template-columns: 48px 1fr 48px 56px;
-  }
-  .col-album {
-    display: none;
+  .title-row h1 {
+    font-size: 26px;
   }
 }
 </style>

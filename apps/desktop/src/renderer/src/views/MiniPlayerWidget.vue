@@ -10,16 +10,17 @@
         </div>
         <div class="controls">
           <button class="btn" type="button" title="上一首" @click.stop="send({ type: 'prev' })">
-            <el-icon :size="16"><DArrowLeft /></el-icon>
+            <span class="iconfont icon-prev" aria-hidden="true" />
           </button>
           <button class="btn play" type="button" title="播放/暂停" @click.stop="send({ type: 'toggle' })">
-            <el-icon :size="18">
-              <VideoPause v-if="state.playing" />
-              <VideoPlay v-else />
-            </el-icon>
+            <span
+              class="iconfont"
+              :class="state.playing ? 'icon-stop' : 'icon-play'"
+              aria-hidden="true"
+            />
           </button>
           <button class="btn" type="button" title="下一首" @click.stop="send({ type: 'next' })">
-            <el-icon :size="16"><DArrowRight /></el-icon>
+            <span class="iconfont icon-next" aria-hidden="true" />
           </button>
         </div>
         <input
@@ -48,16 +49,17 @@
           <div class="artists">{{ state.artists || ' ' }}</div>
           <div class="controls">
             <button class="btn" type="button" title="上一首" @click.stop="send({ type: 'prev' })">
-              <el-icon :size="16"><DArrowLeft /></el-icon>
+              <span class="iconfont icon-prev" aria-hidden="true" />
             </button>
             <button class="btn play" type="button" title="播放/暂停" @click.stop="send({ type: 'toggle' })">
-              <el-icon :size="18">
-                <VideoPause v-if="state.playing" />
-                <VideoPlay v-else />
-              </el-icon>
+              <span
+                class="iconfont"
+                :class="state.playing ? 'icon-stop' : 'icon-play'"
+                aria-hidden="true"
+              />
             </button>
             <button class="btn" type="button" title="下一首" @click.stop="send({ type: 'next' })">
-              <el-icon :size="16"><DArrowRight /></el-icon>
+              <span class="iconfont icon-next" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -404,6 +406,10 @@ onUnmounted(() => {
   place-items: center;
   cursor: pointer;
   padding: 0;
+  .iconfont {
+    font-size: 16px;
+    line-height: 1;
+  }
   &:hover {
     background: #f3f3f3;
     color: #333;
@@ -413,6 +419,12 @@ onUnmounted(() => {
     height: 30px;
     background: #ec4141;
     color: #fff;
+    .iconfont {
+      font-size: 18px;
+    }
+    .icon-play {
+      transform: translateX(1px);
+    }
     &:hover {
       background: #e03333;
       color: #fff;

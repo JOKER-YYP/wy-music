@@ -43,6 +43,14 @@ export const usePlaylistStore = defineStore('playlist', {
       const { data } = await http.get(`/api/playlists/${id}`)
       return data.data as PlaylistDetail
     },
+    async update(
+      id: string,
+      payload: { name: string; description?: string; tags?: string; isPublic?: boolean },
+    ) {
+      const { data } = await http.put(`/api/playlists/${id}`, payload)
+      await this.fetchMine()
+      return data.data as PlaylistDto
+    },
     async addTrack(playlistId: string, trackId: string) {
       await http.post(`/api/playlists/${playlistId}/tracks`, { trackId })
       await this.fetchMine()

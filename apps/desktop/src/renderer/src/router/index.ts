@@ -83,6 +83,12 @@ const router = createRouter({
           meta: { auth: true },
         },
         {
+          path: 'playlist/:id/edit',
+          name: 'playlist-edit',
+          component: () => import('../views/EditPlaylistView.vue'),
+          meta: { auth: true },
+        },
+        {
           path: 'chart/:id',
           name: 'chart',
           component: () => import('../views/ChartDetailView.vue'),

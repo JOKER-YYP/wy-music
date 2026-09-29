@@ -1,34 +1,61 @@
 import { Router } from 'express'
+import multer from 'multer'
+import path from 'node:path'
+import fs from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { prisma } from '../db.js'
 import { fail, ok } from '../utils/response.js'
 import { toTrackDto } from '../utils/mapper.js'
-import { toPublicUrl } from '../utils/storage.js'
+import { audioAbsolutePath, toPublicUrl } from '../utils/storage.js'
+import { config } from '../config.js'
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js'
 
 const router = Router()
 
-function toPlaylistDto(
-  p: {
-    id: string
-    name: string
-    coverUrl: string | null
-    description: string | null
-    isSystem: boolean
-    isPublic: boolean
-    ownerId: string
-    createdAt: Date
-    _count?: { tracks: number }
-    tracks?: { track: { coverUrl: string | null } }[]
+const coverUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const dir = path.join(config.storageRoot, 'playlist-covers')
+      fs.mkdirSync(dir, { recursive: true })
+      cb(null, dir)
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg'
+      cb(null, `${Date.now()}-${randomUUID().slice(0, 8)}${ext}`)
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('仅支持图片文件'))
+      return
+    }
+    cb(null, true)
   },
-) {
+})
+
+function toPlaylistDto(p: {
+  id: string
+  name: string
+  coverUrl: string | null
+  description: string | null
+  tags?: string | null
+  isSystem: boolean
+  isPublic: boolean
+  ownerId: string
+  createdAt: Date
+  _count?: { tracks: number }
+  tracks?: { track: { coverUrl: string | null } }[]
+}) {
   const coverFromTrack = p.tracks?.[0]?.track?.coverUrl
   return {
     id: p.id,
     name: p.name,
-    // 优先用歌单内第一首歌封面（转成可访问的公开 URL）
-    coverUrl: toPublicUrl(coverFromTrack || p.coverUrl),
+    // 自定义封面优先，否则用歌单内第一首歌封面
+    coverUrl: toPublicUrl(p.coverUrl || coverFromTrack),
     description: p.description,
+    tags: p.tags ?? null,
     isSystem: p.isSystem,
     isPublic: p.isPublic,
     ownerId: p.ownerId,
@@ -57,7 +84,7 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = z
     .object({
       name: z.string().min(1).max(40),
-      description: z.string().max(200).optional(),
+      description: z.string().max(1000).optional(),
       isPublic: z.boolean().optional(),
     })
     .safeParse(req.body)
@@ -124,17 +151,33 @@ router.put('/:id', requireAuth, async (req: AuthedRequest, res) => {
   const playlist = await prisma.playlist.findUnique({ where: { id: req.params.id } })
   if (!playlist) return fail(res, 40401, '歌单不存在', 404)
   if (playlist.ownerId !== req.user!.id) return fail(res, 40301, '无权修改', 403)
-  if (playlist.isSystem) return fail(res, 40002, '系统歌单不可重命名')
+  if (playlist.isSystem) return fail(res, 40002, '系统歌单不可编辑')
 
-  const name = String(req.body.name || '').trim()
-  if (!name) return fail(res, 40001, '名称不能为空')
+  const parsed = z
+    .object({
+      name: z.string().min(1).max(40),
+      description: z.string().max(1000).optional().nullable(),
+      tags: z.string().max(200).optional().nullable(),
+      isPublic: z.boolean().optional(),
+    })
+    .safeParse(req.body)
+  if (!parsed.success) {
+    return fail(res, 40001, '名称不能为空或参数无效')
+  }
 
   const updated = await prisma.playlist.update({
     where: { id: playlist.id },
     data: {
-      name,
+      name: parsed.data.name.trim(),
       description:
-        req.body.description !== undefined ? String(req.body.description || '') || null : undefined,
+        parsed.data.description !== undefined
+          ? String(parsed.data.description || '').trim() || null
+          : undefined,
+      tags:
+        parsed.data.tags !== undefined
+          ? String(parsed.data.tags || '').trim() || null
+          : undefined,
+      isPublic: parsed.data.isPublic,
     },
     include: {
       _count: { select: { tracks: true } },
@@ -145,7 +188,77 @@ router.put('/:id', requireAuth, async (req: AuthedRequest, res) => {
       },
     },
   })
-  return ok(res, toPlaylistDto(updated))
+  return ok(res, toPlaylistDto(updated), '已保存')
+})
+
+router.post('/:id/cover', requireAuth, (req: AuthedRequest, res) => {
+  coverUpload.single('cover')(req, res, async (err) => {
+    if (err) {
+      return fail(res, 40001, err instanceof Error ? err.message : '上传失败')
+    }
+    if (!req.file) {
+      return fail(res, 40001, '请选择封面图片')
+    }
+    const relative = path.relative(config.storageRoot, req.file.path).replace(/\\/g, '/')
+    try {
+      const playlist = await prisma.playlist.findUnique({ where: { id: req.params.id } })
+      if (!playlist) {
+        try {
+          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path)
+        } catch {
+          /* ignore */
+        }
+        return fail(res, 40401, '歌单不存在', 404)
+      }
+      if (playlist.ownerId !== req.user!.id) {
+        try {
+          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path)
+        } catch {
+          /* ignore */
+        }
+        return fail(res, 40301, '无权修改', 403)
+      }
+      if (playlist.isSystem) {
+        try {
+          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path)
+        } catch {
+          /* ignore */
+        }
+        return fail(res, 40002, '系统歌单不可编辑', 400)
+      }
+
+      const updated = await prisma.playlist.update({
+        where: { id: playlist.id },
+        data: { coverUrl: relative },
+        include: {
+          _count: { select: { tracks: true } },
+          tracks: {
+            orderBy: { position: 'asc' },
+            take: 1,
+            include: { track: { select: { coverUrl: true } } },
+          },
+        },
+      })
+
+      if (playlist.coverUrl && playlist.coverUrl !== relative && playlist.coverUrl.startsWith('playlist-covers/')) {
+        try {
+          const oldAbs = audioAbsolutePath(playlist.coverUrl)
+          if (fs.existsSync(oldAbs)) fs.unlinkSync(oldAbs)
+        } catch {
+          /* ignore */
+        }
+      }
+
+      return ok(res, toPlaylistDto(updated), '封面已更新')
+    } catch (e) {
+      try {
+        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path)
+      } catch {
+        /* ignore */
+      }
+      return fail(res, 50001, e instanceof Error ? e.message : '保存失败', 500)
+    }
+  })
 })
 
 router.delete('/:id', requireAuth, async (req: AuthedRequest, res) => {

@@ -70,6 +70,7 @@ model Playlist {
   name        String
   coverUrl    String?
   description String?
+  tags        String?
   isSystem    Boolean  @default(false)
   isPublic    Boolean  @default(false)
   ownerId     String

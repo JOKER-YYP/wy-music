@@ -67,6 +67,7 @@ export interface PlaylistDto {
   name: string
   coverUrl?: string | null
   description?: string | null
+  tags?: string | null
   isSystem: boolean
   isPublic: boolean
   ownerId: string

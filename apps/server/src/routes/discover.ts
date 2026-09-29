@@ -67,7 +67,7 @@ router.get('/playlists', optionalAuth, async (_req, res) => {
     .map((p) => ({
       id: p.id,
       name: p.name,
-      coverUrl: toPublicUrl(p.tracks[0]?.track?.coverUrl || p.coverUrl),
+      coverUrl: toPublicUrl(p.coverUrl || p.tracks[0]?.track?.coverUrl),
       trackCount: p._count.tracks,
       playCount: p.tracks.reduce((s, t) => s + (t.track.playCount || 0), 0),
       ownerNickname: p.owner.nickname,

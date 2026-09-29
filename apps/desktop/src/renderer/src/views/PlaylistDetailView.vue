@@ -10,11 +10,15 @@
               v-if="!detail.isSystem"
               class="icon-btn"
               type="button"
-              title="重命名"
-              @click="onRename"
+              title="编辑歌单信息"
+              @click="goEdit"
             >
               <el-icon :size="16"><Edit /></el-icon>
             </button>
+          </div>
+          <div v-if="detail.description" class="desc">{{ detail.description }}</div>
+          <div v-if="tagList.length" class="tag-list">
+            <span v-for="t in tagList" :key="t" class="tag">{{ t }}</span>
           </div>
           <div class="owner">
             <span class="avatar">{{ (detail.ownerNickname || '用').slice(0, 1) }}</span>
@@ -40,7 +44,7 @@
                   <el-dropdown-item command="batch">批量操作</el-dropdown-item>
                   <el-dropdown-item command="addAll">添加全部至播放列表</el-dropdown-item>
                   <template v-if="!detail.isSystem">
-                    <el-dropdown-item command="rename" divided>重命名</el-dropdown-item>
+                    <el-dropdown-item command="edit" divided>编辑歌单信息</el-dropdown-item>
                     <el-dropdown-item command="delete">删除歌单</el-dropdown-item>
                   </template>
                 </el-dropdown-menu>
@@ -111,7 +115,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Edit, MoreFilled, Search, VideoPlay } from '@element-plus/icons-vue'
-import { http, mediaUrl } from '../services/http'
+import { mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
 import { usePlaylistStore, type PlaylistDetail } from '../stores/playlist'
 import SongListTable from '../components/SongListTable.vue'
@@ -128,8 +132,7 @@ const keyword = ref('')
 const batchMode = ref(false)
 
 const coverStyle = computed(() => {
-  const first = detail.value?.tracks?.[0]?.coverUrl || detail.value?.coverUrl
-  const url = mediaUrl(first)
+  const url = mediaUrl(detail.value?.coverUrl || detail.value?.tracks?.[0]?.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
   return { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
 })
@@ -138,6 +141,15 @@ const createdText = computed(() => {
   const raw = detail.value?.createdAt
   if (!raw) return ''
   return raw.slice(0, 10)
+})
+
+const tagList = computed(() => {
+  const raw = detail.value?.tags
+  if (!raw) return []
+  return raw
+    .split(/[,，]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
 })
 
 const filteredTracks = computed(() => {
@@ -194,23 +206,9 @@ function addAllToQueue() {
   ElMessage.success(added ? `已添加 ${added} 首到播放列表` : '全部歌曲已在播放列表中')
 }
 
-async function onRename() {
+function goEdit() {
   if (!detail.value || detail.value.isSystem) return
-  try {
-    const { value } = await ElMessageBox.prompt('请输入新的歌单名称', '重命名', {
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      inputValue: detail.value.name,
-      inputPattern: /\S+/,
-      inputErrorMessage: '名称不能为空',
-    })
-    await http.put(`/api/playlists/${detail.value.id}`, { name: value.trim() })
-    ElMessage.success('已重命名')
-    await load()
-    await playlistStore.fetchMine()
-  } catch {
-    // cancel
-  }
+  router.push(`/playlist/${detail.value.id}/edit`)
 }
 
 async function onDelete() {
@@ -226,7 +224,7 @@ function onMoreCommand(cmd: string) {
     activeTab.value = 'songs'
     batchMode.value = true
   } else if (cmd === 'addAll') addAllToQueue()
-  else if (cmd === 'rename') void onRename()
+  else if (cmd === 'edit') goEdit()
   else if (cmd === 'delete') void onDelete()
   else if (cmd === 'share') ElMessage.info('分享功能暂未开放')
 }
@@ -277,6 +275,34 @@ watch(
     color: #222;
     line-height: 1.2;
   }
+}
+.desc {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+  max-width: 520px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.tag {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  border: 1px solid #e8e8e8;
+  background: #fafafa;
+  color: #666;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
 }
 .icon-btn {
   border: none;

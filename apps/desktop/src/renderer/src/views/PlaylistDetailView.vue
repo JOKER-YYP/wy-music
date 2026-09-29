@@ -1,5 +1,5 @@
 <template>
-  <div v-loading="loading" class="playlist-page">
+  <div v-loading="loading" ref="rootRef" class="playlist-page">
     <template v-if="detail">
       <div class="header">
         <div class="cover" :style="coverStyle" />
@@ -89,6 +89,7 @@
           v-for="(row, idx) in filteredTracks"
           :key="row.id"
           class="song-row"
+          :data-track-id="row.id"
           :class="{ playing: isPlaying(row), active: isCurrent(row) }"
           @dblclick="playOne(row)"
           @contextmenu.prevent="openMenu($event, row)"
@@ -109,19 +110,17 @@
               <div class="name-line">
                 <span class="name" :title="row.name">{{ row.name }}</span>
                 <div class="row-actions">
+                  <button type="button" title="下载" class="disabled-act" @click.stop>
+                    <el-icon><Download /></el-icon>
+                  </button>
                   <button type="button" title="收藏到歌单" @click.stop="onCollect(row)">
                     <el-icon><FolderAdd /></el-icon>
                   </button>
+                  <button type="button" title="评论" @click.stop="goComments(row)">
+                    <el-icon><ChatDotRound /></el-icon>
+                  </button>
                   <button type="button" title="更多" @click.stop="openMenu($event, row)">
                     <el-icon><MoreFilled /></el-icon>
-                  </button>
-                  <button
-                    v-if="!detail.isSystem"
-                    type="button"
-                    title="从歌单移除"
-                    @click.stop="removeTrack(row.id)"
-                  >
-                    <el-icon><Delete /></el-icon>
                   </button>
                 </div>
               </div>
@@ -159,26 +158,17 @@
 
     <el-empty v-else-if="!loading" description="歌单不存在或无权访问" />
 
-    <!-- 更多菜单：不含购买单曲 -->
-    <Teleport to="body">
-      <div
-        v-if="menu.visible"
-        class="ctx-mask"
-        @click="closeMenu"
-        @contextmenu.prevent="closeMenu"
-      >
-        <ul class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
-          <li @click="runMenu('play')">播放</li>
-          <li @click="runMenu('next')">下一首播放</li>
-          <li @click="runMenu('comments')">查看评论</li>
-          <li class="sep" />
-          <li @click="runMenu('collect')">收藏到歌单</li>
-          <li @click="runMenu('like')">{{ menu.track?.liked ? '取消喜欢' : '喜欢' }}</li>
-          <li v-if="detail && !detail.isSystem" @click="runMenu('remove')">从歌单移除</li>
-          <li @click="runMenu('copy')">复制链接</li>
-        </ul>
-      </div>
-    </Teleport>
+    <TrackContextMenu
+      :visible="menu.visible"
+      :x="menu.x"
+      :y="menu.y"
+      :track="menu.track"
+      :allow-remove="Boolean(detail && !detail.isSystem)"
+      @close="closeMenu"
+      @action="runMenu"
+    />
+
+    <PlayingLocateFab :visible="showLocate && activeTab === 'songs'" @click="locateCurrent" />
   </div>
 </template>
 
@@ -193,6 +183,9 @@ import { usePlaylistStore, type PlaylistDetail } from '../stores/playlist'
 import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
 import { formatDuration } from '../services/localUpload'
+import { usePlayingLocate } from '../composables/usePlayingLocate'
+import TrackContextMenu from '../components/TrackContextMenu.vue'
+import PlayingLocateFab from '../components/PlayingLocateFab.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -205,6 +198,7 @@ const loading = ref(false)
 const detail = ref<PlaylistDetail | null>(null)
 const activeTab = ref<'songs' | 'comments' | 'collectors'>('songs')
 const keyword = ref('')
+const rootRef = ref<HTMLElement | null>(null)
 
 const menu = reactive({
   visible: false,
@@ -243,6 +237,26 @@ const emptySongsText = computed(() => {
   if (!detail.value?.tracks?.length) return '歌单还是空的，去曲库添加歌曲吧'
   if (keyword.value.trim()) return '未找到相关歌曲'
   return '暂无歌曲'
+})
+
+const currentInList = computed(() => {
+  const id = player.currentTrack?.id
+  if (!id || activeTab.value !== 'songs') return false
+  return filteredTracks.value.some((t) => t.id === id)
+})
+
+const { showLocate, locateCurrent } = usePlayingLocate({
+  rootRef,
+  hasCurrent: () => currentInList.value,
+  getActiveEl: () => {
+    const id = player.currentTrack?.id
+    if (!id || !rootRef.value) return null
+    return rootRef.value.querySelector(
+      `.song-row[data-track-id="${CSS.escape(id)}"]`,
+    ) as HTMLElement | null
+  },
+  deps: () =>
+    [player.currentTrack?.id, filteredTracks.value.length, activeTab.value, keyword.value] as const,
 })
 
 function trackCover(row: TrackDto) {
@@ -302,6 +316,11 @@ function onCollect(row: TrackDto) {
   ui.openCollect(row)
 }
 
+function goComments(row: TrackDto) {
+  ui.openPageComments(row)
+  router.push(`/comment/${row.id}`)
+}
+
 async function removeTrack(trackId: string) {
   if (!detail.value) return
   await http.delete(`/api/playlists/${detail.value.id}/tracks/${trackId}`)
@@ -345,8 +364,8 @@ function onMoreCommand(cmd: string) {
 function openMenu(e: MouseEvent, track: TrackDto) {
   menu.track = track
   const pad = 8
-  menu.x = Math.min(e.clientX, window.innerWidth - 180 - pad)
-  menu.y = Math.min(e.clientY, window.innerHeight - 260 - pad)
+  menu.x = Math.min(e.clientX, window.innerWidth - 200 - pad)
+  menu.y = Math.min(e.clientY, window.innerHeight - 400 - pad)
   menu.visible = true
 }
 
@@ -678,6 +697,14 @@ watch(() => route.params.id, load)
       background: rgba(0, 0, 0, 0.06);
       color: #ec4141;
     }
+    &.disabled-act {
+      opacity: 0.35;
+      cursor: not-allowed;
+      &:hover {
+        background: transparent;
+        color: #888;
+      }
+    }
   }
 }
 .artists {
@@ -719,38 +746,6 @@ watch(() => route.params.id, load)
 }
 .placeholder {
   padding: 48px 0;
-}
-.ctx-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 2200;
-}
-.ctx-menu {
-  position: fixed;
-  margin: 0;
-  padding: 6px 0;
-  list-style: none;
-  min-width: 160px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
-  border: 1px solid #eee;
-  li {
-    padding: 9px 18px;
-    font-size: 13px;
-    color: #333;
-    cursor: pointer;
-    &:hover:not(.sep) {
-      background: #f5f5f5;
-    }
-    &.sep {
-      height: 1px;
-      padding: 0;
-      margin: 6px 0;
-      background: #eee;
-      cursor: default;
-    }
-  }
 }
 @media (max-width: 900px) {
   .header {

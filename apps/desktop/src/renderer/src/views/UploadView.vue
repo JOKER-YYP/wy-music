@@ -54,84 +54,90 @@
           </span>
         </div>
 
-        <el-table
-          v-loading="scanning"
-          :data="filteredItems"
-          stripe
-          height="calc(100vh - 320px)"
-          @selection-change="onSelectionChange"
-          @row-dblclick="playOne"
-        >
-          <el-table-column type="selection" width="48" />
-          <el-table-column type="index" width="50" label="#" />
-          <el-table-column prop="name" label="歌曲" min-width="160" show-overflow-tooltip>
-            <template #default="{ row }">
-              <UploadEditCell
-                :model-value="row.name || ''"
-                @update:model-value="(v) => onNameCommit(row, v)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="互换" width="64" align="center">
-            <template #default="{ row }">
-              <el-button
-                link
-                type="primary"
-                title="互换歌名与歌手"
-                @click.stop="swapRow(row)"
-              >
-                ⇄
-              </el-button>
-            </template>
-          </el-table-column>
-          <el-table-column label="歌手" min-width="140">
-            <template #default="{ row }">
-              <UploadEditCell
-                :model-value="row.artists?.join(' / ') || ''"
-                placeholder="可留空，默认未知歌手"
-                empty-text="未知歌手"
-                @update:model-value="(v) => onArtistsCommit(row, v)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="专辑" min-width="120" show-overflow-tooltip>
-            <template #default="{ row }">
-              <UploadEditCell
-                :model-value="row.album || ''"
-                empty-text="未知专辑"
-                placeholder="可留空，默认未知专辑"
-                @update:model-value="(v) => onAlbumCommit(row, v)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="歌词" width="100">
-            <template #default="{ row }">
-              <span v-if="row.lyricFileName" class="lrc-ok" :title="row.lyricFileName">已匹配</span>
-              <span v-else class="lrc-miss">无</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="时长" width="80">
-            <template #default="{ row }">{{ formatDuration(row.durationMs) }}</template>
-          </el-table-column>
-          <el-table-column label="大小" width="90">
-            <template #default="{ row }">{{ formatBytes(row.size) }}</template>
-          </el-table-column>
-          <el-table-column prop="fileName" label="文件名" min-width="140" show-overflow-tooltip />
-          <el-table-column label="操作" width="220" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" @click="playOne(row)">播放</el-button>
-              <el-button
-                link
-                type="danger"
-                :loading="uploadingId === row.id"
-                @click="uploadOne(row)"
-              >
-                上传
-              </el-button>
-              <el-button link type="info" @click="removeOne(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <div ref="tableWrapRef" class="upload-table-wrap">
+          <el-table
+            v-loading="scanning"
+            :data="filteredItems"
+            :row-key="uploadRowKey"
+            :row-class-name="uploadRowClass"
+            stripe
+            height="calc(100vh - 320px)"
+            @selection-change="onSelectionChange"
+            @row-dblclick="playOne"
+          >
+            <el-table-column type="selection" width="48" />
+            <el-table-column type="index" width="50" label="#" />
+            <el-table-column prop="name" label="歌曲" min-width="160" show-overflow-tooltip>
+              <template #default="{ row }">
+                <UploadEditCell
+                  :model-value="row.name || ''"
+                  @update:model-value="(v) => onNameCommit(row, v)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="互换" width="64" align="center">
+              <template #default="{ row }">
+                <el-button
+                  link
+                  type="primary"
+                  title="互换歌名与歌手"
+                  @click.stop="swapRow(row)"
+                >
+                  ⇄
+                </el-button>
+              </template>
+            </el-table-column>
+            <el-table-column label="歌手" min-width="140">
+              <template #default="{ row }">
+                <UploadEditCell
+                  :model-value="row.artists?.join(' / ') || ''"
+                  placeholder="可留空，默认未知歌手"
+                  empty-text="未知歌手"
+                  @update:model-value="(v) => onArtistsCommit(row, v)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="专辑" min-width="120" show-overflow-tooltip>
+              <template #default="{ row }">
+                <UploadEditCell
+                  :model-value="row.album || ''"
+                  empty-text="未知专辑"
+                  placeholder="可留空，默认未知专辑"
+                  @update:model-value="(v) => onAlbumCommit(row, v)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="歌词" width="100">
+              <template #default="{ row }">
+                <span v-if="row.lyricFileName" class="lrc-ok" :title="row.lyricFileName">已匹配</span>
+                <span v-else class="lrc-miss">无</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="时长" width="80">
+              <template #default="{ row }">{{ formatDuration(row.durationMs) }}</template>
+            </el-table-column>
+            <el-table-column label="大小" width="90">
+              <template #default="{ row }">{{ formatBytes(row.size) }}</template>
+            </el-table-column>
+            <el-table-column prop="fileName" label="文件名" min-width="140" show-overflow-tooltip />
+            <el-table-column label="操作" width="220" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="playOne(row)">播放</el-button>
+                <el-button
+                  link
+                  type="danger"
+                  :loading="uploadingId === row.id"
+                  @click="uploadOne(row)"
+                >
+                  上传
+                </el-button>
+                <el-button link type="info" @click="removeOne(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <PlayingLocateFab :visible="showLocate && tab === 'folder'" @click="locateCurrent" />
+        </div>
 
         <el-empty
           v-if="!scanning && items.length && !filteredItems.length"
@@ -306,6 +312,8 @@ import { decodeLyricBytes, parseAudioFilename, swapNameAndArtists } from '@wy-mu
 import type { LocalAudioItem } from '../types/local'
 import { usePlayerStore } from '../stores/player'
 import UploadEditCell from '../components/UploadEditCell.vue'
+import PlayingLocateFab from '../components/PlayingLocateFab.vue'
+import { usePlayingLocate } from '../composables/usePlayingLocate'
 import {
   browserFileToQueueTrack,
   formatBytes,
@@ -374,6 +382,34 @@ const retryUploading = ref(false)
 const retryingId = ref('')
 
 const player = usePlayerStore()
+const tableWrapRef = ref<HTMLElement | null>(null)
+
+const currentInUploadList = computed(() => {
+  if (tab.value !== 'folder') return false
+  const id = player.currentTrack?.id
+  if (!id?.startsWith('local:')) return false
+  const localId = id.slice('local:'.length)
+  return filteredItems.value.some((i) => i.id === localId)
+})
+
+const { showLocate, locateCurrent } = usePlayingLocate({
+  rootRef: tableWrapRef,
+  hasCurrent: () => currentInUploadList.value,
+  getActiveEl: () =>
+    tableWrapRef.value?.querySelector(
+      '.el-table__body tr.is-playing-row',
+    ) as HTMLElement | null,
+  deps: () =>
+    [player.currentTrack?.id, filteredItems.value.length, tab.value, listQuery.value] as const,
+})
+
+function uploadRowKey(row: LocalAudioItem) {
+  return row.id
+}
+
+function uploadRowClass({ row }: { row: LocalAudioItem }) {
+  return player.currentTrack?.id === `local:${row.id}` ? 'is-playing-row' : ''
+}
 
 const progressPercent = computed(() => {
   if (!progressTotal.value) return 0
@@ -934,6 +970,14 @@ async function submitSingle() {
 .upload-page {
   h2 {
     margin: 0 0 8px;
+  }
+}
+.upload-table-wrap {
+  position: relative;
+}
+:deep(.el-table .is-playing-row) {
+  td {
+    color: #ec4141;
   }
 }
 .tip {

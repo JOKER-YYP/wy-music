@@ -16,7 +16,7 @@
       </el-input>
     </div>
 
-    <TrackTable :tracks="list" />
+    <TrackTable :tracks="list" @refresh="load" />
 
     <div class="pager">
       <el-pagination

@@ -1,13 +1,19 @@
 <template>
   <div>
-    <SongGrid :tracks="tracks" :columns="1" @refresh="emit('refresh')" />
+    <SongListTable :tracks="tracks" :allow-delete="allowDelete" @refresh="emit('refresh')" />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { TrackDto } from '@wy-music/shared'
-import SongGrid from './SongGrid.vue'
+import SongListTable from './SongListTable.vue'
 
-defineProps<{ tracks: TrackDto[] }>()
+withDefaults(
+  defineProps<{
+    tracks: TrackDto[]
+    allowDelete?: boolean
+  }>(),
+  { allowDelete: true },
+)
 const emit = defineEmits<{ refresh: [] }>()
 </script>

@@ -128,8 +128,11 @@
         <el-popover placement="top" :width="140" trigger="click" :teleported="true">
           <template #reference>
             <button class="icon-btn vol-btn" type="button" title="音量">
-              <!-- 直接用字符渲染，避免 ::before 与正文字符叠成双图标 -->
-              <span class="iconfont vol-ico" aria-hidden="true">{{ volumeGlyph }}</span>
+              <span
+                class="iconfont"
+                :class="player.volume > 0.001 ? 'icon-volume-on' : 'icon-volume-off'"
+                aria-hidden="true"
+              ></span>
             </button>
           </template>
           <div class="vol-pop">
@@ -274,8 +277,6 @@ const modeIconClass = computed(() => {
   if (player.mode === 'shuffle') return 'icon-random'
   return 'icon-list'
 })
-/** iconfont: volume-on \e61f / volume-off \e61e */
-const volumeGlyph = computed(() => (player.volume > 0.001 ? '\ue61f' : '\ue61e'))
 const sliderMax = computed(() => {
   if (player.duration > 0 && Number.isFinite(player.duration)) return player.duration
   const ms = track.value?.durationMs || 0
@@ -622,16 +623,6 @@ onBeforeUnmount(() => {
     font-size: 20px;
     color: inherit;
     line-height: 1;
-  }
-  .vol-ico {
-    font-size: 20px;
-    line-height: 1;
-    /* 走正文字符，关掉伪元素，防止叠两个喇叭 */
-    &::before,
-    &::after {
-      content: none !important;
-      display: none !important;
-    }
   }
   &:hover:not(:disabled) {
     color: #ec4141;

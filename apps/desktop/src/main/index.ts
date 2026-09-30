@@ -55,6 +55,8 @@ let lastPlayerState: {
 let focusingMainFromTaskbar = false
 /** 收起/还原过渡期抑制预览窗 focus，避免主窗闪一下又被藏掉 */
 let suppressTaskbarFocusRestore = false
+/** 缩略图工具栏按钮点击时，短暂抑制 focus→开主窗 */
+let thumbarClickGuard = false
 /** 主窗是否被用户收起（比 isVisible 更稳，避免过渡态误判） */
 let mainWindowCollapsed = false
 
@@ -639,6 +641,9 @@ function resolveAppIcon() {
 }
 
 const thumbarIconCache = new Map<string, Electron.NativeImage>()
+let lastThumbarKey = ''
+let lastSentPreviewCover = ''
+let lastSentPreviewHasTrack = false
 
 function flipNativeImageHorizontal(img: Electron.NativeImage) {
   try {
@@ -646,7 +651,7 @@ function flipNativeImageHorizontal(img: Electron.NativeImage) {
       return img.flipHorizontally()
     }
   } catch {
-    // fall through to bitmap flip
+    // fall through
   }
   const { width, height } = img.getSize()
   const src = img.toBitmap()
@@ -664,75 +669,71 @@ function flipNativeImageHorizontal(img: Electron.NativeImage) {
   return nativeImage.createFromBitmap(dst, { width, height })
 }
 
-/** Windows 缩略图按钮：先抠纯黑底再缩到 16×16，避免灰心形被当黑底抹掉 */
+/** 抠纯黑底后缩到 16×16 */
 function normalizeThumbarIcon(img: Electron.NativeImage) {
   const { width, height } = img.getSize()
   const buf = Buffer.from(img.toBitmap())
-  let opaque = 0
   for (let i = 0; i < buf.length; i += 4) {
     const b = buf[i]
     const g = buf[i + 1]
     const r = buf[i + 2]
-    // 只去接近纯黑的背景；灰线/红心必须保留
-    if (r + g + b <= 24) {
-      buf[i + 3] = 0
-    } else if (buf[i + 3] > 16) {
-      opaque++
-    }
+    if (r <= 10 && g <= 10 && b <= 10) buf[i + 3] = 0
   }
   let out = nativeImage.createFromBitmap(buf, { width, height })
   if (width !== 16 || height !== 16) {
     out = out.resize({ width: 16, height: 16, quality: 'best' })
   }
-  // 有效像素过少时视为失败（细线被缩没）
-  if (opaque < 12) return nativeImage.createEmpty()
   return nativeImage.createFromBuffer(out.toPNG())
 }
 
-/** 程序绘制喜欢图标，避免资源图缩略后在任务栏不可见 */
+/** 16×16 像素心爱心（避免数学公式画成「黑桃」） */
 function createHeartThumbarIcon(filled: boolean) {
+  // 1=实心像素；描边模式只取边缘
+  const mask = [
+    '001100011000',
+    '011110111100',
+    '111111111110',
+    '111111111110',
+    '111111111110',
+    '011111111100',
+    '001111111000',
+    '000111110000',
+    '000011100000',
+    '000001000000',
+  ]
   const w = 16
   const h = 16
   const buf = Buffer.alloc(w * h * 4, 0)
-  const set = (x: number, y: number, r: number, g: number, b: number, a = 255) => {
+  const ox = 2
+  const oy = 3
+  const solid = new Set<string>()
+  for (let y = 0; y < mask.length; y++) {
+    for (let x = 0; x < mask[y].length; x++) {
+      if (mask[y][x] === '1') solid.add(`${x + ox},${y + oy}`)
+    }
+  }
+  const isSolid = (x: number, y: number) => solid.has(`${x},${y}`)
+  const put = (x: number, y: number, r: number, g: number, b: number) => {
     if (x < 0 || y < 0 || x >= w || y >= h) return
     const i = (y * w + x) * 4
     buf[i] = b
     buf[i + 1] = g
     buf[i + 2] = r
-    buf[i + 3] = a
+    buf[i + 3] = 255
   }
-  // 简易心形采样
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const nx = (x - 7.5) / 6.2
-      const ny = (y - 8.2) / 6.2
-      const a = nx * nx + ny * ny - 1
-      const inside = a * a * a - nx * nx * ny * ny * ny < 0
-      if (!inside) continue
-      if (filled) {
-        set(x, y, 236, 65, 65)
-      } else {
-        // 描边：邻域有外部时画灰线
-        let edge = false
-        for (const [dx, dy] of [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1],
-        ]) {
-          const xx = x + dx
-          const yy = y + dy
-          const nnx = (xx - 7.5) / 6.2
-          const nny = (yy - 8.2) / 6.2
-          const aa = nnx * nnx + nny * nny - 1
-          if (aa * aa * aa - nnx * nnx * nny * nny * nny >= 0) {
-            edge = true
-            break
-          }
-        }
-        if (edge) set(x, y, 120, 120, 120)
-      }
+  for (const key of solid) {
+    const [xs, ys] = key.split(',')
+    const x = Number(xs)
+    const y = Number(ys)
+    if (filled) {
+      put(x, y, 236, 65, 65)
+    } else {
+      const edge =
+        !isSolid(x + 1, y) ||
+        !isSolid(x - 1, y) ||
+        !isSolid(x, y + 1) ||
+        !isSolid(x, y - 1)
+      if (edge) put(x, y, 90, 90, 90)
     }
   }
   return nativeImage.createFromBuffer(
@@ -744,17 +745,14 @@ function resolveThumbarIcon(name: 'play' | 'pause' | 'prev' | 'next' | 'like' | 
   const cached = thumbarIconCache.get(name)
   if (cached && !cached.isEmpty()) return cached
 
+  // 喜欢：优先用程序像素心，资源图缩略后在任务栏常不可见/变形
   if (name === 'like' || name === 'like-off') {
     const drawn = createHeartThumbarIcon(name === 'like')
-    if (!drawn.isEmpty()) {
-      thumbarIconCache.set(name, drawn)
-      return drawn
-    }
+    thumbarIconCache.set(name, drawn)
+    return drawn
   }
 
-  // 用户提供：play / stop(暂停) / next / like / like-off；prev = 水平翻转 next
-  const fileName =
-    name === 'prev' ? 'next' : name === 'pause' ? 'stop' : name
+  const fileName = name === 'prev' ? 'next' : name === 'pause' ? 'stop' : name
   const candidates = [
     join(__dirname, `../../resources/thumbar/${fileName}.png`),
     join(process.cwd(), `resources/thumbar/${fileName}.png`),
@@ -777,7 +775,16 @@ function resolveThumbarIcon(name: 'play' | 'pause' | 'prev' | 'next' | 'like' | 
   return nativeImage.createEmpty()
 }
 
-let lastThumbarKey = ''
+/** 缩略图按钮点击：只发播放指令，不抢主窗焦点 */
+function onThumbarClick(type: 'prev' | 'next' | 'toggle' | 'like') {
+  thumbarClickGuard = true
+  suppressTaskbarFocusRestore = true
+  sendPlayerCommand({ type })
+  setTimeout(() => {
+    thumbarClickGuard = false
+    suppressTaskbarFocusRestore = false
+  }, 500)
+}
 
 function updateThumbarButtons(state: typeof lastPlayerState, force = false) {
   if (process.platform !== 'win32') return
@@ -787,7 +794,6 @@ function updateThumbarButtons(state: typeof lastPlayerState, force = false) {
   const playing = Boolean(state?.playing)
   const liked = Boolean(state?.liked)
   const key = `${enabled ? 1 : 0}|${playing ? 1 : 0}|${liked ? 1 : 0}`
-  // 播放进度会高频 pushState；按钮只在状态变化时重设，否则容易不显示
   if (!force && key === lastThumbarKey) return
 
   const icons = {
@@ -817,25 +823,25 @@ function updateThumbarButtons(state: typeof lastPlayerState, force = false) {
         tooltip: '上一首',
         icon: icons.prev,
         flags: enabled ? ['enabled'] : ['disabled'],
-        click: () => sendPlayerCommand({ type: 'prev' }),
+        click: () => onThumbarClick('prev'),
       },
       {
         tooltip: playing ? '暂停' : '播放',
         icon: icons.playPause,
         flags: enabled ? ['enabled'] : ['disabled'],
-        click: () => sendPlayerCommand({ type: 'toggle' }),
+        click: () => onThumbarClick('toggle'),
       },
       {
         tooltip: '下一首',
         icon: icons.next,
         flags: enabled ? ['enabled'] : ['disabled'],
-        click: () => sendPlayerCommand({ type: 'next' }),
+        click: () => onThumbarClick('next'),
       },
       {
         tooltip: liked ? '取消喜欢' : '喜欢',
         icon: icons.like,
         flags: enabled ? ['enabled'] : ['disabled'],
-        click: () => sendPlayerCommand({ type: 'like' }),
+        click: () => onThumbarClick('like'),
       },
     ])
     if (ok) lastThumbarKey = key
@@ -911,18 +917,27 @@ function applyTaskbarPlayerState(state: typeof lastPlayerState) {
   updateThumbarButtons(state)
 
   const coverAbs = absolutizeMediaUrl(state?.coverUrl)
+  const hasTrack = Boolean(state?.hasTrack)
+  const coverPayload =
+    coverAbs && taskbarCoverCache?.src === coverAbs
+      ? taskbarCoverCache.dataUrl
+      : coverAbs
+
+  // 仅播放/喜欢变化时不要重推封面，避免缩略图被刷白
+  if (coverPayload === lastSentPreviewCover && hasTrack === lastSentPreviewHasTrack) {
+    return
+  }
+
   const base = {
     name: state?.name || '',
     artists: state?.artists || '',
     playing: Boolean(state?.playing),
-    hasTrack: Boolean(state?.hasTrack),
+    hasTrack,
     liked: Boolean(state?.liked),
-    // 优先复用已缓存的 data URL，避免喜欢切换时反复改封面地址导致缩略图闪白
-    coverUrl:
-      coverAbs && taskbarCoverCache?.src === coverAbs
-        ? taskbarCoverCache.dataUrl
-        : coverAbs,
+    coverUrl: coverPayload,
   }
+  lastSentPreviewCover = coverPayload
+  lastSentPreviewHasTrack = hasTrack
   win.webContents.send('player:state', base)
 
   if (!coverAbs || (taskbarCoverCache && taskbarCoverCache.src === coverAbs)) return
@@ -931,6 +946,7 @@ function applyTaskbarPlayerState(state: typeof lastPlayerState) {
     if (seq !== taskbarStateSeq) return
     if (!taskbarPreviewWindow || taskbarPreviewWindow.isDestroyed()) return
     if (!dataUrl || dataUrl === coverAbs) return
+    lastSentPreviewCover = dataUrl
     taskbarPreviewWindow.webContents.send('player:state', {
       ...base,
       coverUrl: dataUrl,
@@ -1021,22 +1037,33 @@ function createTaskbarPreviewWindow() {
   })
 
   win.on('focus', () => {
-    if (focusingMainFromTaskbar || suppressTaskbarFocusRestore) return
-    // 主窗显示时点任务栏 → 收起；已收起时兜底还原（通常走 minimize）
-    if (!isMainWindowCollapsed()) {
-      focusingMainFromTaskbar = true
-      collapseMainWindow()
-      setTimeout(() => {
+    if (focusingMainFromTaskbar || suppressTaskbarFocusRestore || thumbarClickGuard) return
+    // 缩略图按钮点击常先 focus 再 click：延迟判定，避免误开主窗
+    focusingMainFromTaskbar = true
+    setTimeout(() => {
+      if (suppressTaskbarFocusRestore || thumbarClickGuard) {
         focusingMainFromTaskbar = false
-      }, 200)
-    } else {
-      restoreMainFromTaskbar()
-    }
+        return
+      }
+      if (!isMainWindowCollapsed()) {
+        collapseMainWindow()
+        setTimeout(() => {
+          focusingMainFromTaskbar = false
+        }, 200)
+      } else {
+        // restoreMainFromTaskbar 内部会管理 focusingMainFromTaskbar
+        restoreMainFromTaskbar()
+      }
+    }, 120)
   })
 
   // 主窗已收起且预览窗已是前台时再点任务栏，系统会 minimize 预览窗
   win.on('minimize', () => {
-    if (suppressTaskbarFocusRestore) return
+    if (suppressTaskbarFocusRestore || thumbarClickGuard) {
+      win.restore()
+      placeTaskbarPreviewWindow(win)
+      return
+    }
     // restore 会再次 focus 预览窗；必须先抑制，否则主窗刚出来又被 focus 逻辑收起
     suppressTaskbarFocusRestore = true
     focusingMainFromTaskbar = true

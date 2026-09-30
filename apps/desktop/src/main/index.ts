@@ -404,8 +404,8 @@ function createWindow() {
     frame: false,
     titleBarStyle: 'hidden',
     autoHideMenuBar: true,
-    // Windows：主窗进任务栏，缩略图按钮挂在主窗上（独立预览窗会导致按钮点击失效）
-    skipTaskbar: false,
+    // Windows：任务栏入口用封面预览窗；主窗不进任务栏，悬停只显示封面
+    skipTaskbar: process.platform === 'win32',
     backgroundColor: '#ec4141',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -418,13 +418,15 @@ function createWindow() {
   mainWindow = win
   Menu.setApplicationMenu(null)
 
+  if (process.platform === 'win32') {
+    createTaskbarPreviewWindow()
+  }
+
   win.once('ready-to-show', () => {
     win.show()
+    mainWindowCollapsed = false
     updateThumbarButtons(lastPlayerState, true)
-    updateTaskbarThumbnailClip()
   })
-
-  win.on('resize', () => updateTaskbarThumbnailClip())
 
   win.on('closed', () => {
     mainWindow = null
@@ -774,14 +776,21 @@ function resolveThumbarIcon(name: 'play' | 'pause' | 'prev' | 'next' | 'like' | 
   return nativeImage.createEmpty()
 }
 
-/** 缩略图按钮点击：只发播放指令 */
+/** 缩略图按钮：只控制播放，绝不打开/前置主窗 */
 function onThumbarClick(type: 'prev' | 'next' | 'toggle' | 'like') {
+  thumbarClickGuard = true
+  suppressTaskbarFocusRestore = true
   sendPlayerCommand({ type })
+  // 保持预览窗在任务栏，但不把主窗拉到前台
+  setTimeout(() => {
+    thumbarClickGuard = false
+    suppressTaskbarFocusRestore = false
+  }, 800)
 }
 
 function updateThumbarButtons(state: typeof lastPlayerState, force = false) {
   if (process.platform !== 'win32') return
-  const win = mainWindow
+  const win = taskbarPreviewWindow
   if (!win || win.isDestroyed()) return
   const enabled = Boolean(state?.hasTrack)
   const playing = Boolean(state?.playing)
@@ -801,7 +810,7 @@ function updateThumbarButtons(state: typeof lastPlayerState, force = false) {
     icons.next.isEmpty() ||
     icons.like.isEmpty()
   ) {
-    console.warn('[taskbar] thumbar icons empty, skip setThumbarButtons', {
+    console.warn('[taskbar] thumbar icons empty', {
       prev: icons.prev.isEmpty(),
       playPause: icons.playPause.isEmpty(),
       next: icons.next.isEmpty(),
@@ -859,6 +868,23 @@ function focusMainWindow() {
   return true
 }
 
+function collapseMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  mainWindowCollapsed = true
+  suppressTaskbarFocusRestore = true
+  mainWindow.hide()
+  setTimeout(() => {
+    suppressTaskbarFocusRestore = false
+  }, 400)
+  return true
+}
+
+function isMainWindowCollapsed() {
+  if (!mainWindow || mainWindow.isDestroyed()) return true
+  if (mainWindowCollapsed) return true
+  return !mainWindow.isVisible() || mainWindow.isMinimized()
+}
+
 function playerTitle(state: typeof lastPlayerState) {
   if (!state?.hasTrack) return 'WY Music'
   const name = (state.name || '未知歌曲').trim()
@@ -867,47 +893,47 @@ function playerTitle(state: typeof lastPlayerState) {
   return title.slice(0, 80)
 }
 
-/** 任务栏悬停缩略图：裁切到播放栏封面区域 */
-let lastThumbnailClip: { x: number; y: number; width: number; height: number } | null =
-  null
-
-function updateTaskbarThumbnailClip(
-  clip?: { x: number; y: number; width: number; height: number } | null,
-) {
-  if (process.platform !== 'win32') return
-  const win = mainWindow
+async function paintTaskbarCover(state: typeof lastPlayerState) {
+  const win = taskbarPreviewWindow
   if (!win || win.isDestroyed()) return
+  const hasTrack = Boolean(state?.hasTrack)
+  const coverAbs = absolutizeMediaUrl(state?.coverUrl)
+  let coverUrl = ''
+  if (hasTrack && coverAbs) {
+    coverUrl = (await coverToDataUrl(coverAbs)) || coverAbs
+  }
+  const name = JSON.stringify((state?.name || 'WY Music').slice(0, 16))
+  const js = hasTrack
+    ? coverUrl
+      ? `(function(){
+          var c=document.getElementById('cover');
+          var b=document.body;
+          if(!c||!b) return;
+          b.classList.remove('empty');
+          c.style.backgroundImage=${JSON.stringify(`url(${coverUrl})`)};
+        })()`
+      : `(function(){
+          var c=document.getElementById('cover');
+          var e=document.getElementById('empty');
+          var b=document.body;
+          if(!c||!b) return;
+          b.classList.add('empty');
+          c.style.backgroundImage='';
+          if(e) e.textContent=${name};
+        })()`
+    : `(function(){
+        var c=document.getElementById('cover');
+        var e=document.getElementById('empty');
+        var b=document.body;
+        if(!c||!b) return;
+        b.classList.add('empty');
+        c.style.backgroundImage='';
+        if(e) e.textContent='WY Music';
+      })()`
   try {
-    if (clip && clip.width > 0 && clip.height > 0) {
-      lastThumbnailClip = clip
-      win.setThumbnailClip({
-        x: Math.max(0, Math.round(clip.x)),
-        y: Math.max(0, Math.round(clip.y)),
-        width: Math.round(clip.width),
-        height: Math.round(clip.height),
-      })
-      return
-    }
-    if (lastThumbnailClip && lastThumbnailClip.width > 0) {
-      win.setThumbnailClip({
-        x: Math.max(0, Math.round(lastThumbnailClip.x)),
-        y: Math.max(0, Math.round(lastThumbnailClip.y)),
-        width: Math.round(lastThumbnailClip.width),
-        height: Math.round(lastThumbnailClip.height),
-      })
-      return
-    }
-    // 无精确区域时退回左下角播放栏封面近似位置
-    const [, height] = win.getContentSize()
-    const size = 72
-    win.setThumbnailClip({
-      x: 10,
-      y: Math.max(0, height - 70),
-      width: size,
-      height: size,
-    })
+    await win.webContents.executeJavaScript(js, true)
   } catch (e) {
-    console.warn('[taskbar] setThumbnailClip failed', e)
+    console.warn('[taskbar] paint cover failed', e)
   }
 }
 
@@ -918,13 +944,126 @@ function applyTaskbarPlayerState(state: typeof lastPlayerState) {
     mainWindow.setTitle(title)
   }
   if (process.platform !== 'win32') return
+  const win = taskbarPreviewWindow
+  if (!win || win.isDestroyed()) return
+  win.setTitle(title)
   updateThumbarButtons(state)
-  updateTaskbarThumbnailClip()
+  const coverKey = `${Boolean(state?.hasTrack)}|${absolutizeMediaUrl(state?.coverUrl)}`
+  if (coverKey === lastSentPreviewCover) return
+  lastSentPreviewCover = coverKey
+  const seq = ++taskbarStateSeq
+  void paintTaskbarCover(state).then(() => {
+    if (seq !== taskbarStateSeq) return
+  })
 }
 
-/** @deprecated 已改为主窗任务栏 + setThumbnailClip，保留空函数避免旧调用报错 */
 function createTaskbarPreviewWindow() {
-  // no-op
+  if (process.platform !== 'win32') return
+  if (taskbarPreviewWindow && !taskbarPreviewWindow.isDestroyed()) return
+
+  const appIcon = resolveAppIcon()
+  const win = new BrowserWindow({
+    width: TASKBAR_PREVIEW_SIZE,
+    height: TASKBAR_PREVIEW_SIZE,
+    show: false,
+    frame: false,
+    resizable: false,
+    maximizable: false,
+    minimizable: true,
+    fullscreenable: false,
+    skipTaskbar: false,
+    focusable: true,
+    title: 'WY Music',
+    icon: appIcon,
+    backgroundColor: '#1a1a1a',
+    paintWhenInitiallyHidden: true,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      devTools: false,
+      backgroundThrottling: false,
+      webSecurity: false,
+    },
+  })
+  taskbarPreviewWindow = win
+  placeTaskbarPreviewWindow(win)
+  win.setMenuBarVisibility(false)
+
+  const htmlCandidates = [
+    join(__dirname, '../../resources/taskbar-preview.html'),
+    join(process.cwd(), 'resources/taskbar-preview.html'),
+  ]
+  const html = htmlCandidates.find((p) => existsSync(p))
+  if (html) void win.loadFile(html)
+  else {
+    void win.loadURL(
+      'data:text/html;charset=utf-8,' +
+        encodeURIComponent(
+          '<html><body style="margin:0;background:#222;width:100%;height:100%"></body></html>',
+        ),
+    )
+  }
+
+  const reveal = () => {
+    if (win.isDestroyed()) return
+    placeTaskbarPreviewWindow(win)
+    win.showInactive()
+    lastThumbarKey = ''
+    lastSentPreviewCover = ''
+    updateThumbarButtons(lastPlayerState, true)
+    if (lastPlayerState) void paintTaskbarCover(lastPlayerState)
+    setTimeout(() => updateThumbarButtons(lastPlayerState, true), 500)
+    setTimeout(() => updateThumbarButtons(lastPlayerState, true), 1500)
+  }
+
+  win.webContents.once('did-finish-load', reveal)
+  win.once('ready-to-show', () => {
+    if (!win.isDestroyed() && !win.isVisible()) reveal()
+  })
+
+  // 任务栏图标激活：仅当主窗已收起时才还原；主窗已显示时绝不前置（避免点播放按钮却「打开主窗」）
+  win.on('focus', () => {
+    if (focusingMainFromTaskbar || suppressTaskbarFocusRestore || thumbarClickGuard) return
+    focusingMainFromTaskbar = true
+    setTimeout(() => {
+      focusingMainFromTaskbar = false
+      if (suppressTaskbarFocusRestore || thumbarClickGuard) return
+      if (isMainWindowCollapsed()) {
+        focusMainWindow()
+      }
+      // 主窗已可见：什么都不做
+      placeTaskbarPreviewWindow(win)
+    }, 220)
+  })
+
+  // 任务栏二次点击会 minimize 预览窗 → 在此切换主窗显隐
+  win.on('minimize', () => {
+    if (thumbarClickGuard) {
+      win.restore()
+      placeTaskbarPreviewWindow(win)
+      return
+    }
+    suppressTaskbarFocusRestore = true
+    win.restore()
+    placeTaskbarPreviewWindow(win)
+    if (isMainWindowCollapsed()) focusMainWindow()
+    else collapseMainWindow()
+    setTimeout(() => {
+      suppressTaskbarFocusRestore = false
+    }, 400)
+  })
+
+  win.on('close', (e) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      e.preventDefault()
+    }
+  })
+
+  win.on('closed', () => {
+    taskbarPreviewWindow = null
+  })
 }
 
 function normalizeDedupePart(s: string) {
@@ -1087,11 +1226,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
-  ipcMain.handle('window:minimize', () => {
-    const win = mainWindow
-    if (win && !win.isDestroyed()) win.minimize()
-    return true
-  })
+  ipcMain.handle('window:minimize', () => collapseMainWindow())
   ipcMain.handle('window:maximize', () => {
     const win = mainWindow
     if (!win || win.isDestroyed()) return false
@@ -1108,15 +1243,8 @@ app.whenReady().then(() => {
     const win = mainWindow
     return Boolean(win && !win.isDestroyed() && win.isMaximized())
   })
-  ipcMain.on(
-    'window:thumbnailClip',
-    (
-      _e,
-      clip: { x: number; y: number; width: number; height: number } | null,
-    ) => {
-      updateTaskbarThumbnailClip(clip)
-    },
-  )
+  // 兼容旧渲染进程调用；封面预览已改由独立任务栏窗绘制
+  ipcMain.on('window:thumbnailClip', () => {})
 
   ipcMain.handle('mini:toggle', () => toggleMiniPlayer())
   ipcMain.handle('mini:close', () => {

@@ -1035,7 +1035,7 @@ function onLogout() {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 8px 28px 28px;
+  padding: 16px 28px 28px;
   overscroll-behavior: contain;
 }
 </style>

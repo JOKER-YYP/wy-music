@@ -44,7 +44,7 @@
             <div class="cover" :style="playlistCoverStyle(item)">
               <span class="play-count">▷ {{ formatCount(item.playCount) }}</span>
               <button class="play-fab" type="button" @click.stop="playPlaylist(item.id)">
-                <el-icon><VideoPlay /></el-icon>
+                <span class="iconfont icon-play" aria-hidden="true" />
               </button>
             </div>
             <div class="plist-name">{{ item.name }}</div>
@@ -82,7 +82,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { VideoPlay } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
@@ -358,6 +357,10 @@ onMounted(async () => {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;
+  .iconfont {
+    font-size: 14px;
+    color: #fff;
+  }
 }
 .playlist-card:hover .play-fab {
   opacity: 1;

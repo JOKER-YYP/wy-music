@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob: http: https: wy-local:;" />
+    <title>WY Music</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #1a1a1a;
+        user-select: none;
+      }
+      #cover {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        background: linear-gradient(135deg, #ec4141, #ff8a80);
+      }
+      #empty {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.85);
+        font: 600 18px/1.2 "Segoe UI", "Microsoft YaHei", sans-serif;
+        letter-spacing: 0.04em;
+      }
+      body.empty #cover {
+        opacity: 0;
+      }
+      body.empty #empty {
+        display: flex;
+      }
+    </style>
+  </head>
+  <body class="empty">
+    <img id="cover" alt="" draggable="false" />
+    <div id="empty">WY Music</div>
+    <script>
+      const cover = document.getElementById('cover')
+      const empty = document.getElementById('empty')
+
+      function absUrl(u) {
+        if (!u) return ''
+        if (/^(https?:|data:|blob:|wy-local:)/i.test(u)) return u
+        if (u.startsWith('/')) return 'http://127.0.0.1:3001' + u
+        return 'http://127.0.0.1:3001/media/' + String(u).replace(/^\/+/, '')
+      }
+
+      function apply(state) {
+        const url = absUrl(state && state.coverUrl)
+        const has = Boolean(state && state.hasTrack)
+        if (!has) {
+          document.body.classList.add('empty')
+          cover.removeAttribute('src')
+          empty.textContent = 'WY Music'
+          return
+        }
+        document.body.classList.remove('empty')
+        if (url) {
+          if (cover.getAttribute('src') !== url) cover.src = url
+        } else {
+          cover.removeAttribute('src')
+          document.body.classList.add('empty')
+          empty.textContent = (state.name || 'WY Music').slice(0, 12)
+        }
+      }
+
+      if (window.wyAPI && window.wyAPI.onPlayerState) {
+        window.wyAPI.onPlayerState(apply)
+      }
+      document.addEventListener('dblclick', () => {
+        window.wyAPI && window.wyAPI.sendPlayerCommand && window.wyAPI.sendPlayerCommand({ type: 'openMain' })
+      })
+    </script>
+  </body>
+</html>

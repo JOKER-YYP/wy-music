@@ -20,6 +20,7 @@ type MiniPlayerState = {
   hasTrack: boolean
   trackId?: string
   lyricText?: string
+  liked?: boolean
 }
 
 type PlayerCommand =
@@ -27,6 +28,7 @@ type PlayerCommand =
   | { type: 'prev' }
   | { type: 'next' }
   | { type: 'seek'; time: number }
+  | { type: 'like' }
   | { type: 'openMain' }
 
 declare global {

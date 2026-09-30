@@ -6,7 +6,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
-import { http } from '../services/http'
+import { http, mediaUrl } from '../services/http'
 
 const player = usePlayerStore()
 const { currentTrack, playing, currentTime, duration } = storeToRefs(player)
@@ -55,7 +55,7 @@ function pushState() {
   window.wyAPI.pushPlayerState({
     name: t?.name || '',
     artists: t?.artists?.join(' / ') || '',
-    coverUrl: t?.coverUrl || '',
+    coverUrl: t?.coverUrl ? mediaUrl(t.coverUrl) : '',
     playing: playing.value,
     currentTime: currentTime.value,
     duration:
@@ -67,6 +67,7 @@ function pushState() {
     hasTrack: Boolean(t),
     trackId: t?.id || '',
     lyricText,
+    liked: Boolean(t?.liked),
   })
 }
 
@@ -84,11 +85,26 @@ function onCommand(cmd: { type: string; time?: number }) {
     case 'seek':
       if (typeof cmd.time === 'number') player.seek(cmd.time)
       break
+    case 'like':
+      void toggleLikeFromIpc()
+      break
     case 'openMain':
       void window.wyAPI?.focusMainWindow?.()
       break
     default:
       break
+  }
+}
+
+async function toggleLikeFromIpc() {
+  const t = currentTrack.value
+  if (!t || t.id.startsWith('local:') || t.id.startsWith('webfile:')) return
+  try {
+    const { data } = await http.post(`/api/likes/${t.id}`)
+    t.liked = data.data.liked
+    pushState()
+  } catch {
+    // ignore
   }
 }
 
@@ -109,6 +125,8 @@ onUnmounted(() => {
 watch(currentTrack, () => {
   void ensureLyric().then(pushState)
 })
+
+watch(() => currentTrack.value?.liked, pushState)
 
 watch([playing, currentTime, duration, lyricCache], pushState, { deep: true })
 </script>

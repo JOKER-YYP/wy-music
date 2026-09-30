@@ -42,10 +42,22 @@ let mainWindow: BrowserWindow | null = null
 let miniWindow: BrowserWindow | null = null
 let desktopLyricWindow: BrowserWindow | null = null
 let desktopLyricMenuWindow: BrowserWindow | null = null
+/** Windows 任务栏悬停预览：仅展示封面，避免缩略完整页面 */
+let taskbarPreviewWindow: BrowserWindow | null = null
+let lastPlayerState: {
+  name?: string
+  artists?: string
+  coverUrl?: string
+  playing?: boolean
+  hasTrack?: boolean
+  liked?: boolean
+} | null = null
+let focusingMainFromTaskbar = false
 
 const DESKTOP_LYRIC_H = 100
 const DESKTOP_LYRIC_MENU_W = 300
 const DESKTOP_LYRIC_MENU_H = 236
+const TASKBAR_PREVIEW_SIZE = 200
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -336,6 +348,8 @@ function createWindow() {
     frame: false,
     titleBarStyle: 'hidden',
     autoHideMenuBar: true,
+    // Windows：任务栏入口交给封面预览窗，悬停时显示播放器封面而非完整页面
+    skipTaskbar: process.platform === 'win32',
     backgroundColor: '#ec4141',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -348,8 +362,21 @@ function createWindow() {
   mainWindow = win
   Menu.setApplicationMenu(null)
 
+  if (process.platform === 'win32') {
+    createTaskbarPreviewWindow()
+  }
+
   win.once('ready-to-show', () => {
     win.show()
+    updateThumbarButtons(lastPlayerState)
+  })
+
+  win.on('closed', () => {
+    mainWindow = null
+    if (taskbarPreviewWindow && !taskbarPreviewWindow.isDestroyed()) {
+      taskbarPreviewWindow.destroy()
+      taskbarPreviewWindow = null
+    }
   })
 
   const emitMaximized = () => {
@@ -557,6 +584,180 @@ function resolveAppIcon() {
   return undefined
 }
 
+function resolveThumbarIcon(name: 'play' | 'pause' | 'prev' | 'next' | 'like' | 'like-off') {
+  // 用户提供：play / stop(暂停) / next / like / like-off；prev = 翻转 next
+  const fileName =
+    name === 'prev' ? 'next' : name === 'pause' ? 'stop' : name
+  const candidates = [
+    join(__dirname, `../../resources/thumbar/${fileName}.png`),
+    join(process.cwd(), `resources/thumbar/${fileName}.png`),
+  ]
+  for (const p of candidates) {
+    if (!existsSync(p)) continue
+    let img = nativeImage.createFromPath(p)
+    if (img.isEmpty()) continue
+    if (name === 'prev') img = img.flipHorizontally()
+    const size = img.getSize()
+    if (size.width > 24 || size.height > 24) {
+      img = img.resize({ width: 20, height: 20, quality: 'best' })
+    }
+    return img
+  }
+  return nativeImage.createEmpty()
+}
+
+function sendPlayerCommand(cmd: { type: string }) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('player:command', cmd)
+  }
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+  return true
+}
+
+function playerTitle(state: typeof lastPlayerState) {
+  if (!state?.hasTrack) return 'WY Music'
+  const name = (state.name || '未知歌曲').trim()
+  const artists = (state.artists || '').trim()
+  const title = artists ? `${name} - ${artists}` : name
+  return title.slice(0, 80)
+}
+
+function updateThumbarButtons(state: typeof lastPlayerState) {
+  if (process.platform !== 'win32') return
+  const win = taskbarPreviewWindow
+  if (!win || win.isDestroyed()) return
+  const enabled = Boolean(state?.hasTrack)
+  const playing = Boolean(state?.playing)
+  const liked = Boolean(state?.liked)
+  try {
+    win.setThumbarButtons([
+      {
+        tooltip: '上一首',
+        icon: resolveThumbarIcon('prev'),
+        flags: enabled ? ['enabled'] : ['disabled'],
+        click: () => sendPlayerCommand({ type: 'prev' }),
+      },
+      {
+        tooltip: playing ? '暂停' : '播放',
+        icon: resolveThumbarIcon(playing ? 'pause' : 'play'),
+        flags: enabled ? ['enabled'] : ['disabled'],
+        click: () => sendPlayerCommand({ type: 'toggle' }),
+      },
+      {
+        tooltip: '下一首',
+        icon: resolveThumbarIcon('next'),
+        flags: enabled ? ['enabled'] : ['disabled'],
+        click: () => sendPlayerCommand({ type: 'next' }),
+      },
+      {
+        tooltip: liked ? '取消喜欢' : '喜欢',
+        icon: resolveThumbarIcon(liked ? 'like' : 'like-off'),
+        flags: enabled ? ['enabled'] : ['disabled'],
+        click: () => sendPlayerCommand({ type: 'like' }),
+      },
+    ])
+  } catch (e) {
+    console.warn('[taskbar] setThumbarButtons failed', e)
+  }
+}
+
+function applyTaskbarPlayerState(state: typeof lastPlayerState) {
+  lastPlayerState = state
+  const title = playerTitle(state)
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setTitle(title)
+  }
+  if (process.platform !== 'win32') return
+  if (taskbarPreviewWindow && !taskbarPreviewWindow.isDestroyed()) {
+    taskbarPreviewWindow.setTitle(title)
+    taskbarPreviewWindow.webContents.send('player:state', state || {})
+    updateThumbarButtons(state)
+  }
+}
+
+function createTaskbarPreviewWindow() {
+  if (process.platform !== 'win32') return
+  if (taskbarPreviewWindow && !taskbarPreviewWindow.isDestroyed()) return
+
+  const appIcon = resolveAppIcon()
+  const win = new BrowserWindow({
+    width: TASKBAR_PREVIEW_SIZE,
+    height: TASKBAR_PREVIEW_SIZE,
+    x: -20000,
+    y: -20000,
+    show: false,
+    frame: false,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: false,
+    title: 'WY Music',
+    icon: appIcon,
+    backgroundColor: '#1a1a1a',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      devTools: false,
+    },
+  })
+  taskbarPreviewWindow = win
+
+  const htmlCandidates = [
+    join(__dirname, '../../resources/taskbar-preview.html'),
+    join(process.cwd(), 'resources/taskbar-preview.html'),
+  ]
+  const html = htmlCandidates.find((p) => existsSync(p))
+  if (html) {
+    void win.loadFile(html)
+  } else {
+    void win.loadURL(
+      'data:text/html;charset=utf-8,' +
+        encodeURIComponent(
+          '<html><body style="margin:0;background:#1a1a1a;color:#fff;font:16px sans-serif;display:grid;place-items:center;height:100%">WY Music</body></html>',
+        ),
+    )
+  }
+
+  win.once('ready-to-show', () => {
+    // 必须 show 才能作为任务栏缩略图源；放在屏外避免干扰
+    win.showInactive()
+    updateThumbarButtons(lastPlayerState)
+    if (lastPlayerState) {
+      win.webContents.send('player:state', lastPlayerState)
+    }
+  })
+
+  win.on('focus', () => {
+    if (focusingMainFromTaskbar) return
+    focusingMainFromTaskbar = true
+    focusMainWindow()
+    setTimeout(() => {
+      focusingMainFromTaskbar = false
+    }, 200)
+  })
+
+  win.on('close', (e) => {
+    // 任务栏预览窗随主窗生命周期管理，禁止单独关掉导致丢失任务栏入口
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      e.preventDefault()
+      focusMainWindow()
+    }
+  })
+
+  win.on('closed', () => {
+    taskbarPreviewWindow = null
+  })
+}
+
 function normalizeDedupePart(s: string) {
   return (s || '')
     .trim()
@@ -700,6 +901,10 @@ function dedupeLocalTracks(items: LocalAudioItem[]): {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.wy-music.desktop')
+  }
+
   protocol.handle('wy-local', (request) => {
     try {
       const raw = request.url.replace(/^wy-local:\/\/play\//, '').split(/[?#]/)[0]
@@ -757,14 +962,7 @@ app.whenReady().then(() => {
     miniWindow.setPosition(x, nextY)
     return { ok: true, ...size }
   })
-  ipcMain.handle('mini:focusMain', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.show()
-      mainWindow.focus()
-    }
-    return true
-  })
+  ipcMain.handle('mini:focusMain', () => focusMainWindow())
 
   ipcMain.handle('desktopLyric:toggle', () => toggleDesktopLyric())
   ipcMain.handle('desktopLyric:close', () => {
@@ -817,8 +1015,9 @@ app.whenReady().then(() => {
     }
   })
 
-  // 主窗口 → 小组件 / 桌面歌词：播放状态同步
+  // 主窗口 → 小组件 / 桌面歌词 / 任务栏预览：播放状态同步
   ipcMain.on('player:pushState', (_e, state) => {
+    applyTaskbarPlayerState(state || null)
     if (miniWindow && !miniWindow.isDestroyed()) {
       miniWindow.webContents.send('player:state', state)
     }
@@ -827,7 +1026,7 @@ app.whenReady().then(() => {
     }
   })
 
-  // 小组件 → 主窗口：控制指令
+  // 小组件 / 任务栏 → 主窗口：控制指令
   ipcMain.on('player:command', (_e, cmd) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('player:command', cmd)

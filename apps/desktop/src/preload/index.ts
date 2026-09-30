@@ -26,6 +26,7 @@ export type MiniPlayerState = {
   hasTrack: boolean
   trackId?: string
   lyricText?: string
+  liked?: boolean
 }
 
 export type PlayerCommand =
@@ -33,6 +34,7 @@ export type PlayerCommand =
   | { type: 'prev' }
   | { type: 'next' }
   | { type: 'seek'; time: number }
+  | { type: 'like' }
   | { type: 'openMain' }
 
 function toBase64Url(text: string) {

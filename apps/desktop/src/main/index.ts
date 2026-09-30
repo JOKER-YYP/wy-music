@@ -53,8 +53,10 @@ let lastPlayerState: {
   liked?: boolean
 } | null = null
 let focusingMainFromTaskbar = false
-/** 最小化/收起时预览窗会抢焦点，短暂抑制以免立刻又把主窗拉起来 */
+/** 收起/还原过渡期抑制预览窗 focus，避免主窗闪一下又被藏掉 */
 let suppressTaskbarFocusRestore = false
+/** 主窗是否被用户收起（比 isVisible 更稳，避免过渡态误判） */
+let mainWindowCollapsed = false
 
 const DESKTOP_LYRIC_H = 100
 const DESKTOP_LYRIC_MENU_W = 300
@@ -616,6 +618,7 @@ function sendPlayerCommand(cmd: { type: string }) {
 
 function focusMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return false
+  mainWindowCollapsed = false
   if (mainWindow.isMinimized()) mainWindow.restore()
   if (!mainWindow.isVisible()) mainWindow.show()
   mainWindow.focus()
@@ -625,17 +628,30 @@ function focusMainWindow() {
 /** 收起主窗（skipTaskbar 下用 hide，避免最小化后焦点落到预览窗又被拉回） */
 function collapseMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return false
+  mainWindowCollapsed = true
   suppressTaskbarFocusRestore = true
   mainWindow.hide()
   setTimeout(() => {
     suppressTaskbarFocusRestore = false
-  }, 300)
+  }, 400)
   return true
 }
 
 function isMainWindowCollapsed() {
   if (!mainWindow || mainWindow.isDestroyed()) return true
+  if (mainWindowCollapsed) return true
   return !mainWindow.isVisible() || mainWindow.isMinimized()
+}
+
+/** 从任务栏还原主窗，并挡住预览窗 restore 带来的二次 focus */
+function restoreMainFromTaskbar() {
+  suppressTaskbarFocusRestore = true
+  focusingMainFromTaskbar = true
+  focusMainWindow()
+  setTimeout(() => {
+    suppressTaskbarFocusRestore = false
+    focusingMainFromTaskbar = false
+  }, 400)
 }
 
 function playerTitle(state: typeof lastPlayerState) {
@@ -756,30 +772,37 @@ function createTaskbarPreviewWindow() {
 
   win.on('focus', () => {
     if (focusingMainFromTaskbar || suppressTaskbarFocusRestore) return
-    focusingMainFromTaskbar = true
-    // 主窗仍显示时点任务栏 → 收起；已收起时一般会走 minimize，这里兜底还原
+    // 主窗显示时点任务栏 → 收起；已收起时兜底还原（通常走 minimize）
     if (!isMainWindowCollapsed()) {
+      focusingMainFromTaskbar = true
       collapseMainWindow()
+      setTimeout(() => {
+        focusingMainFromTaskbar = false
+      }, 200)
     } else {
-      focusMainWindow()
+      restoreMainFromTaskbar()
     }
-    setTimeout(() => {
-      focusingMainFromTaskbar = false
-    }, 200)
   })
 
-  // 主窗已收起、预览窗已聚焦时再点任务栏，系统会最小化预览窗 → 改为还原主窗
+  // 主窗已收起且预览窗已是前台时再点任务栏，系统会 minimize 预览窗
   win.on('minimize', () => {
     if (suppressTaskbarFocusRestore) return
+    // restore 会再次 focus 预览窗；必须先抑制，否则主窗刚出来又被 focus 逻辑收起
+    suppressTaskbarFocusRestore = true
+    focusingMainFromTaskbar = true
     win.restore()
     focusMainWindow()
+    setTimeout(() => {
+      suppressTaskbarFocusRestore = false
+      focusingMainFromTaskbar = false
+    }, 400)
   })
 
   win.on('close', (e) => {
     // 任务栏预览窗随主窗生命周期管理，禁止单独关掉导致丢失任务栏入口
     if (mainWindow && !mainWindow.isDestroyed()) {
       e.preventDefault()
-      if (isMainWindowCollapsed()) focusMainWindow()
+      if (isMainWindowCollapsed()) restoreMainFromTaskbar()
     }
   })
 

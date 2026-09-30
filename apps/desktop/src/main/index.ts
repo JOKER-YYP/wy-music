@@ -17,7 +17,10 @@ import { readdir, stat, readFile } from 'fs/promises'
 import { createHash, randomUUID } from 'crypto'
 import FormData from 'form-data'
 import axios from 'axios'
-import { decodeLyricBytes, resolveTrackMeta, UPLOAD_MAX_SIZE_MB } from '@wy-music/shared'
+import { decodeLyricBytes, resolveTrackMeta } from '@wy-music/shared'
+
+/** 与服务端默认上限一致；不从 shared 解构常量，避免未 build shared 时主进程起不来 */
+const UPLOAD_MAX_SIZE_MB = 500
 
 /** music-metadata v10 在 CJS(Electron main) 下 require 只有 loadMusicMetadata，需动态 import */
 async function readAudioMetadata(filePath: string) {

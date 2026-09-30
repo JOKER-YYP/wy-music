@@ -4,7 +4,7 @@
   "private": true,
   "description": "仿网易云音乐播放器 — 自建曲库（用户端 + 管理端 + API）",
   "scripts": {
-    "dev:server": "pnpm --filter @wy-music/server dev",
+    "dev:server": "pnpm --filter @wy-music/shared build && pnpm --filter @wy-music/server dev",
     "dev:desktop": "pnpm --filter @wy-music/desktop dev",
     "dev:admin": "pnpm --filter @wy-music/admin dev",
     "build": "pnpm -r --filter=./packages/* build && pnpm -r --filter=./apps/* build",

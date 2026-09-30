@@ -824,25 +824,26 @@ function updateThumbarButtons(state: typeof lastPlayerState, force = false) {
       {
         tooltip: '上一首',
         icon: icons.prev,
-        flags: enabled ? ['enabled'] : ['disabled'],
+        // 注意：Electron 不认 'enabled' 字符串，传入会导致整次 setThumbarButtons 失败
+        flags: enabled ? ['dismissonclick'] : ['disabled'],
         click: () => onThumbarClick('prev'),
       },
       {
         tooltip: playing ? '暂停' : '播放',
         icon: icons.playPause,
-        flags: enabled ? ['enabled'] : ['disabled'],
+        flags: enabled ? ['dismissonclick'] : ['disabled'],
         click: () => onThumbarClick('toggle'),
       },
       {
         tooltip: '下一首',
         icon: icons.next,
-        flags: enabled ? ['enabled'] : ['disabled'],
+        flags: enabled ? ['dismissonclick'] : ['disabled'],
         click: () => onThumbarClick('next'),
       },
       {
         tooltip: liked ? '取消喜欢' : '喜欢',
         icon: icons.like,
-        flags: enabled ? ['enabled'] : ['disabled'],
+        flags: enabled ? ['dismissonclick'] : ['disabled'],
         click: () => onThumbarClick('like'),
       },
     ])
@@ -1023,22 +1024,21 @@ function createTaskbarPreviewWindow() {
     if (!win.isDestroyed() && !win.isVisible()) reveal()
   })
 
-  // 任务栏图标激活：仅当主窗已收起时才还原；主窗已显示时绝不前置（避免点播放按钮却「打开主窗」）
+  // 点缩略图按钮时 Windows 仍可能 focus 预览窗
+  // 延迟判断：若是按钮点击（thumbarClickGuard）则绝不打开主窗
   win.on('focus', () => {
-    if (focusingMainFromTaskbar || suppressTaskbarFocusRestore || thumbarClickGuard) return
+    placeTaskbarPreviewWindow(win)
+    if (thumbarClickGuard || suppressTaskbarFocusRestore || focusingMainFromTaskbar) return
     focusingMainFromTaskbar = true
     setTimeout(() => {
       focusingMainFromTaskbar = false
-      if (suppressTaskbarFocusRestore || thumbarClickGuard) return
-      if (isMainWindowCollapsed()) {
-        focusMainWindow()
-      }
-      // 主窗已可见：什么都不做
-      placeTaskbarPreviewWindow(win)
-    }, 220)
+      if (thumbarClickGuard || suppressTaskbarFocusRestore) return
+      // 仅主窗已收起时，点任务栏图标才还原
+      if (isMainWindowCollapsed()) focusMainWindow()
+    }, 280)
   })
 
-  // 任务栏二次点击会 minimize 预览窗 → 在此切换主窗显隐
+  // 任务栏图标在已聚焦时再点会 minimize → 切换主窗显隐
   win.on('minimize', () => {
     if (thumbarClickGuard) {
       win.restore()

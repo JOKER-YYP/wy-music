@@ -54,7 +54,6 @@
               <StarFilled v-if="track.liked" />
               <Star v-else />
             </el-icon>
-            <span class="count" :class="{ on: track.liked }">{{ likeLabel }}</span>
           </button>
           <button class="social-btn" type="button" title="评论" @click="openComments">
             <el-icon :size="16"><ChatDotRound /></el-icon>
@@ -313,7 +312,6 @@ const progressPct = computed(() => {
   if (sliderMax.value <= 0) return '0%'
   return `${Math.min(100, (displayTime.value / sliderMax.value) * 100)}%`
 })
-const likeLabel = computed(() => (track.value?.liked ? '已喜欢' : ''))
 const commentLabel = computed(() => formatCount(commentCount.value))
 
 function formatTime(sec: number) {

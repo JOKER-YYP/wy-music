@@ -18,7 +18,7 @@
           <span class="name" :title="track.name">{{ track.name }}</span>
         </div>
         <div class="sub">
-          <span v-if="track.liked" class="heart" title="已喜欢">♥</span>
+          <span v-if="track.liked" class="heart" title="喜欢">♥</span>
           <span v-if="qualityTag(track)" class="badge badge-sq">{{ qualityTag(track) }}</span>
           <span class="badge badge-origin">原唱</span>
           <span class="artists">{{ track.artists?.join(' / ') || '未知歌手' }}</span>

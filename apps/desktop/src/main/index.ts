@@ -664,28 +664,93 @@ function flipNativeImageHorizontal(img: Electron.NativeImage) {
   return nativeImage.createFromBitmap(dst, { width, height })
 }
 
-/** Windows 缩略图按钮：约 16×16，近黑底转透明，再经 PNG 规范化 */
+/** Windows 缩略图按钮：先抠纯黑底再缩到 16×16，避免灰心形被当黑底抹掉 */
 function normalizeThumbarIcon(img: Electron.NativeImage) {
-  let sized =
-    img.getSize().width === 16 && img.getSize().height === 16
-      ? img
-      : img.resize({ width: 16, height: 16, quality: 'best' })
-  const { width, height } = sized.getSize()
-  const buf = Buffer.from(sized.toBitmap())
-  // Windows bitmap 为 BGRA；资源图是黑底灰标，需抠掉黑底否则缩略图栏可能不画按钮
+  const { width, height } = img.getSize()
+  const buf = Buffer.from(img.toBitmap())
+  let opaque = 0
   for (let i = 0; i < buf.length; i += 4) {
     const b = buf[i]
     const g = buf[i + 1]
     const r = buf[i + 2]
-    if (r < 45 && g < 45 && b < 45) buf[i + 3] = 0
+    // 只去接近纯黑的背景；灰线/红心必须保留
+    if (r + g + b <= 24) {
+      buf[i + 3] = 0
+    } else if (buf[i + 3] > 16) {
+      opaque++
+    }
   }
-  sized = nativeImage.createFromBitmap(buf, { width, height })
-  return nativeImage.createFromBuffer(sized.toPNG())
+  let out = nativeImage.createFromBitmap(buf, { width, height })
+  if (width !== 16 || height !== 16) {
+    out = out.resize({ width: 16, height: 16, quality: 'best' })
+  }
+  // 有效像素过少时视为失败（细线被缩没）
+  if (opaque < 12) return nativeImage.createEmpty()
+  return nativeImage.createFromBuffer(out.toPNG())
+}
+
+/** 程序绘制喜欢图标，避免资源图缩略后在任务栏不可见 */
+function createHeartThumbarIcon(filled: boolean) {
+  const w = 16
+  const h = 16
+  const buf = Buffer.alloc(w * h * 4, 0)
+  const set = (x: number, y: number, r: number, g: number, b: number, a = 255) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return
+    const i = (y * w + x) * 4
+    buf[i] = b
+    buf[i + 1] = g
+    buf[i + 2] = r
+    buf[i + 3] = a
+  }
+  // 简易心形采样
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const nx = (x - 7.5) / 6.2
+      const ny = (y - 8.2) / 6.2
+      const a = nx * nx + ny * ny - 1
+      const inside = a * a * a - nx * nx * ny * ny * ny < 0
+      if (!inside) continue
+      if (filled) {
+        set(x, y, 236, 65, 65)
+      } else {
+        // 描边：邻域有外部时画灰线
+        let edge = false
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ]) {
+          const xx = x + dx
+          const yy = y + dy
+          const nnx = (xx - 7.5) / 6.2
+          const nny = (yy - 8.2) / 6.2
+          const aa = nnx * nnx + nny * nny - 1
+          if (aa * aa * aa - nnx * nnx * nny * nny * nny >= 0) {
+            edge = true
+            break
+          }
+        }
+        if (edge) set(x, y, 120, 120, 120)
+      }
+    }
+  }
+  return nativeImage.createFromBuffer(
+    nativeImage.createFromBitmap(buf, { width: w, height: h }).toPNG(),
+  )
 }
 
 function resolveThumbarIcon(name: 'play' | 'pause' | 'prev' | 'next' | 'like' | 'like-off') {
   const cached = thumbarIconCache.get(name)
   if (cached && !cached.isEmpty()) return cached
+
+  if (name === 'like' || name === 'like-off') {
+    const drawn = createHeartThumbarIcon(name === 'like')
+    if (!drawn.isEmpty()) {
+      thumbarIconCache.set(name, drawn)
+      return drawn
+    }
+  }
 
   // 用户提供：play / stop(暂停) / next / like / like-off；prev = 水平翻转 next
   const fileName =
@@ -845,22 +910,31 @@ function applyTaskbarPlayerState(state: typeof lastPlayerState) {
   win.setTitle(title)
   updateThumbarButtons(state)
 
-  const seq = ++taskbarStateSeq
+  const coverAbs = absolutizeMediaUrl(state?.coverUrl)
   const base = {
     name: state?.name || '',
     artists: state?.artists || '',
     playing: Boolean(state?.playing),
     hasTrack: Boolean(state?.hasTrack),
     liked: Boolean(state?.liked),
-    coverUrl: absolutizeMediaUrl(state?.coverUrl),
+    // 优先复用已缓存的 data URL，避免喜欢切换时反复改封面地址导致缩略图闪白
+    coverUrl:
+      coverAbs && taskbarCoverCache?.src === coverAbs
+        ? taskbarCoverCache.dataUrl
+        : coverAbs,
   }
-  // 先推绝对地址，再异步换成 data URL，避免 file 页加载 /media 相对路径失败
   win.webContents.send('player:state', base)
-  void coverToDataUrl(state?.coverUrl).then((dataUrl) => {
+
+  if (!coverAbs || (taskbarCoverCache && taskbarCoverCache.src === coverAbs)) return
+  const seq = ++taskbarStateSeq
+  void coverToDataUrl(coverAbs).then((dataUrl) => {
     if (seq !== taskbarStateSeq) return
     if (!taskbarPreviewWindow || taskbarPreviewWindow.isDestroyed()) return
-    if (!dataUrl || dataUrl === base.coverUrl) return
-    taskbarPreviewWindow.webContents.send('player:state', { ...base, coverUrl: dataUrl })
+    if (!dataUrl || dataUrl === coverAbs) return
+    taskbarPreviewWindow.webContents.send('player:state', {
+      ...base,
+      coverUrl: dataUrl,
+    })
   })
 }
 

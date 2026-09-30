@@ -44,6 +44,7 @@
     <script>
       const cover = document.getElementById('cover')
       const empty = document.getElementById('empty')
+      let lastCoverUrl = ''
 
       function absUrl(u) {
         if (!u) return ''
@@ -58,17 +59,25 @@
         if (!has) {
           document.body.classList.add('empty')
           cover.style.backgroundImage = ''
+          lastCoverUrl = ''
           empty.textContent = 'WY Music'
           return
         }
-        if (url) {
-          document.body.classList.remove('empty')
-          cover.style.backgroundImage = 'url("' + url.replace(/"/g, '\\"') + '")'
-        } else {
-          document.body.classList.add('empty')
-          cover.style.backgroundImage = ''
-          empty.textContent = (state.name || 'WY Music').slice(0, 12)
+        document.body.classList.remove('empty')
+        if (!url) {
+          // 有曲目但暂无封面：保留上一张，避免点喜欢时闪白
+          if (!lastCoverUrl) {
+            document.body.classList.add('empty')
+            empty.textContent = (state.name || 'WY Music').slice(0, 12)
+          }
+          return
         }
+        if (url === lastCoverUrl) return
+        // 已用 data URL 展示时，忽略同曲的 http 回退，防止闪白
+        if (lastCoverUrl.startsWith('data:') && !url.startsWith('data:')) return
+        lastCoverUrl = url
+        cover.style.backgroundImage =
+          'url("' + url.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '")'
       }
 
       if (window.wyAPI && window.wyAPI.onPlayerState) {

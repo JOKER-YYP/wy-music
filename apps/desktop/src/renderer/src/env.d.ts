@@ -40,6 +40,9 @@ declare global {
       closeWindow?: () => Promise<boolean>
       isWindowMaximized?: () => Promise<boolean>
       onWindowMaximized?: (handler: (maximized: boolean) => void) => () => void
+      setThumbnailClip?: (
+        clip: { x: number; y: number; width: number; height: number } | null,
+      ) => void
       selectFolder: () => Promise<string | null>
       selectAudioFiles: (multi?: boolean) => Promise<string[]>
       selectLrcFile?: () => Promise<{

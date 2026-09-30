@@ -28,6 +28,7 @@
     <div class="body">
       <div class="meta">
         <button
+          ref="coverEl"
           class="cover"
           type="button"
           title="打开播放页"
@@ -208,6 +209,25 @@ const commentCount = ref(0)
 const barHovered = ref(false)
 const progressHovered = ref(false)
 const queueOpen = ref(false)
+const coverEl = ref<HTMLElement | null>(null)
+
+function reportThumbnailClip() {
+  if (!isDesktop || !window.wyAPI?.setThumbnailClip) return
+  const el = coverEl.value
+  if (!el || !track.value) {
+    window.wyAPI.setThumbnailClip(null)
+    return
+  }
+  const r = el.getBoundingClientRect()
+  // 略放大裁切区域，任务栏悬停时封面更清晰
+  const pad = 8
+  window.wyAPI.setThumbnailClip({
+    x: Math.max(0, r.left - pad),
+    y: Math.max(0, r.top - pad),
+    width: Math.max(48, r.width + pad * 2),
+    height: Math.max(48, r.height + pad * 2),
+  })
+}
 
 function toggleQueue() {
   if (!player.queue.length) return
@@ -247,6 +267,7 @@ watch(
     if (id && !id.startsWith('local:') && !id.startsWith('webfile:')) {
       void loadCommentCount(id)
     }
+    requestAnimationFrame(reportThumbnailClip)
   },
   { immediate: true },
 )
@@ -265,6 +286,12 @@ const coverStyle = computed(() => {
   const url = mediaUrl(track.value?.coverUrl)
   return url ? `url(${url})` : 'linear-gradient(135deg,#ec4141,#ff8a80)'
 })
+
+watch(
+  () => [coverStyle.value, track.value?.coverUrl],
+  () => requestAnimationFrame(reportThumbnailClip),
+)
+
 const modeTitle = computed(() => {
   if (player.mode === 'order') return '顺序播放'
   if (player.mode === 'single') return '单曲循环'
@@ -396,10 +423,14 @@ async function toggleDesktopLyric() {
 onMounted(() => {
   void refreshDesktopLyricState()
   document.addEventListener('mousedown', onDocClick)
+  window.addEventListener('resize', reportThumbnailClip)
+  requestAnimationFrame(reportThumbnailClip)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onDocClick)
+  window.removeEventListener('resize', reportThumbnailClip)
+  window.wyAPI?.setThumbnailClip?.(null)
 })
 </script>
 

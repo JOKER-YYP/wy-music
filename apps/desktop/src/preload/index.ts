@@ -55,6 +55,11 @@ const wyAPI = {
     ipcRenderer.on('window:maximized', listener)
     return () => ipcRenderer.removeListener('window:maximized', listener)
   },
+  setThumbnailClip: (
+    clip: { x: number; y: number; width: number; height: number } | null,
+  ) => {
+    ipcRenderer.send('window:thumbnailClip', clip)
+  },
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder') as Promise<string | null>,
   selectAudioFiles: (multi = false) =>
     ipcRenderer.invoke('dialog:selectAudioFiles', multi) as Promise<string[]>,

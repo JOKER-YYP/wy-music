@@ -53,6 +53,8 @@ let lastPlayerState: {
   liked?: boolean
 } | null = null
 let focusingMainFromTaskbar = false
+/** 最小化/收起时预览窗会抢焦点，短暂抑制以免立刻又把主窗拉起来 */
+let suppressTaskbarFocusRestore = false
 
 const DESKTOP_LYRIC_H = 100
 const DESKTOP_LYRIC_MENU_W = 300
@@ -615,9 +617,25 @@ function sendPlayerCommand(cmd: { type: string }) {
 function focusMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return false
   if (mainWindow.isMinimized()) mainWindow.restore()
-  mainWindow.show()
+  if (!mainWindow.isVisible()) mainWindow.show()
   mainWindow.focus()
   return true
+}
+
+/** 收起主窗（skipTaskbar 下用 hide，避免最小化后焦点落到预览窗又被拉回） */
+function collapseMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  suppressTaskbarFocusRestore = true
+  mainWindow.hide()
+  setTimeout(() => {
+    suppressTaskbarFocusRestore = false
+  }, 300)
+  return true
+}
+
+function isMainWindowCollapsed() {
+  if (!mainWindow || mainWindow.isDestroyed()) return true
+  return !mainWindow.isVisible() || mainWindow.isMinimized()
 }
 
 function playerTitle(state: typeof lastPlayerState) {
@@ -695,7 +713,7 @@ function createTaskbarPreviewWindow() {
     frame: false,
     resizable: false,
     maximizable: false,
-    minimizable: false,
+    minimizable: true,
     fullscreenable: false,
     skipTaskbar: false,
     title: 'WY Music',
@@ -737,19 +755,31 @@ function createTaskbarPreviewWindow() {
   })
 
   win.on('focus', () => {
-    if (focusingMainFromTaskbar) return
+    if (focusingMainFromTaskbar || suppressTaskbarFocusRestore) return
     focusingMainFromTaskbar = true
-    focusMainWindow()
+    // 主窗仍显示时点任务栏 → 收起；已收起时一般会走 minimize，这里兜底还原
+    if (!isMainWindowCollapsed()) {
+      collapseMainWindow()
+    } else {
+      focusMainWindow()
+    }
     setTimeout(() => {
       focusingMainFromTaskbar = false
     }, 200)
+  })
+
+  // 主窗已收起、预览窗已聚焦时再点任务栏，系统会最小化预览窗 → 改为还原主窗
+  win.on('minimize', () => {
+    if (suppressTaskbarFocusRestore) return
+    win.restore()
+    focusMainWindow()
   })
 
   win.on('close', (e) => {
     // 任务栏预览窗随主窗生命周期管理，禁止单独关掉导致丢失任务栏入口
     if (mainWindow && !mainWindow.isDestroyed()) {
       e.preventDefault()
-      focusMainWindow()
+      if (isMainWindowCollapsed()) focusMainWindow()
     }
   })
 
@@ -918,11 +948,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
-  ipcMain.handle('window:minimize', () => {
-    const win = mainWindow
-    if (win && !win.isDestroyed()) win.minimize()
-    return true
-  })
+  ipcMain.handle('window:minimize', () => collapseMainWindow())
   ipcMain.handle('window:maximize', () => {
     const win = mainWindow
     if (!win || win.isDestroyed()) return false

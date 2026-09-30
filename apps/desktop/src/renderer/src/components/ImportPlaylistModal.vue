@@ -101,15 +101,21 @@
               </div>
 
               <div class="preview-actions">
-                <el-button @click="backToInput">返回修改</el-button>
-                <el-button
-                  type="danger"
-                  :loading="confirming"
-                  :disabled="!canConfirm"
-                  @click="onConfirm"
-                >
-                  确认导入（{{ totalMatched }} 首）
-                </el-button>
+                <div class="public-opt">
+                  <el-switch v-model="isPublic" />
+                  <span class="public-tip">导入为公开歌单（可出现在推荐 / 广场）</span>
+                </div>
+                <div class="action-btns">
+                  <el-button @click="backToInput">返回修改</el-button>
+                  <el-button
+                    type="danger"
+                    :loading="confirming"
+                    :disabled="!canConfirm"
+                    @click="onConfirm"
+                  >
+                    确认导入（{{ totalMatched }} 首）
+                  </el-button>
+                </div>
               </div>
             </template>
           </div>
@@ -164,6 +170,7 @@ const step = ref<'input' | 'preview'>('input')
 const links = ref<string[]>([''])
 const loading = ref(false)
 const confirming = ref(false)
+const isPublic = ref(false)
 const sources = ref<ImportSource[]>([])
 
 const totalMatched = computed(() =>
@@ -178,6 +185,7 @@ watch(
       step.value = 'input'
       links.value = ['']
       sources.value = []
+      isPublic.value = false
       loading.value = false
       confirming.value = false
     }
@@ -240,6 +248,7 @@ async function onConfirm() {
     .map((s) => ({
       name: (s.name || '导入歌单').slice(0, 40),
       description: s.description || undefined,
+      isPublic: isPublic.value,
       trackIds: s.matched.map((m) => m.trackId),
     }))
   if (!items.length) {
@@ -448,9 +457,24 @@ async function onConfirm() {
 }
 .preview-actions {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 16px;
+}
+.public-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.public-tip {
+  font-size: 13px;
+  color: #666;
+}
+.action-btns {
+  display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 16px;
 }
 .import-fade-enter-active,
 .import-fade-leave-active {

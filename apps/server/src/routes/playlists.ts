@@ -175,6 +175,7 @@ router.post('/import/confirm', requireAuth, async (req: AuthedRequest, res) => {
     const name = String(raw.name || '').trim().slice(0, 40)
     if (!name) continue
     const description = String(raw.description || '').trim().slice(0, 1000) || null
+    const isPublic = raw.isPublic === true
     const rawIds = Array.isArray(raw.trackIds) ? (raw.trackIds as unknown[]) : []
     const trackIds = Array.from(
       new Set(
@@ -189,7 +190,7 @@ router.post('/import/confirm', requireAuth, async (req: AuthedRequest, res) => {
       data: {
         name,
         description,
-        isPublic: false,
+        isPublic,
         isSystem: false,
         ownerId: req.user!.id,
       },

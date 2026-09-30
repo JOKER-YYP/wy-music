@@ -2,7 +2,10 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob: http: https: wy-local:;" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' 'unsafe-inline' data: blob: http: https: wy-local:;"
+    />
     <title>WY Music</title>
     <style>
       html,
@@ -17,9 +20,7 @@
       #cover {
         width: 100%;
         height: 100%;
-        object-fit: cover;
-        display: block;
-        background: linear-gradient(135deg, #ec4141, #ff8a80);
+        background: #1a1a1a center / cover no-repeat;
       }
       #empty {
         position: absolute;
@@ -27,12 +28,10 @@
         display: none;
         align-items: center;
         justify-content: center;
-        color: rgba(255, 255, 255, 0.85);
-        font: 600 18px/1.2 "Segoe UI", "Microsoft YaHei", sans-serif;
+        color: rgba(255, 255, 255, 0.9);
+        font: 600 18px/1.2 'Segoe UI', 'Microsoft YaHei', sans-serif;
         letter-spacing: 0.04em;
-      }
-      body.empty #cover {
-        opacity: 0;
+        background: linear-gradient(135deg, #ec4141, #ff8a80);
       }
       body.empty #empty {
         display: flex;
@@ -40,7 +39,7 @@
     </style>
   </head>
   <body class="empty">
-    <img id="cover" alt="" draggable="false" />
+    <div id="cover"></div>
     <div id="empty">WY Music</div>
     <script>
       const cover = document.getElementById('cover')
@@ -48,7 +47,7 @@
 
       function absUrl(u) {
         if (!u) return ''
-        if (/^(https?:|data:|blob:|wy-local:)/i.test(u)) return u
+        if (/^(https?:|data:|blob:|file:|wy-local:)/i.test(u)) return u
         if (u.startsWith('/')) return 'http://127.0.0.1:3001' + u
         return 'http://127.0.0.1:3001/media/' + String(u).replace(/^\/+/, '')
       }
@@ -58,16 +57,16 @@
         const has = Boolean(state && state.hasTrack)
         if (!has) {
           document.body.classList.add('empty')
-          cover.removeAttribute('src')
+          cover.style.backgroundImage = ''
           empty.textContent = 'WY Music'
           return
         }
-        document.body.classList.remove('empty')
         if (url) {
-          if (cover.getAttribute('src') !== url) cover.src = url
+          document.body.classList.remove('empty')
+          cover.style.backgroundImage = 'url("' + url.replace(/"/g, '\\"') + '")'
         } else {
-          cover.removeAttribute('src')
           document.body.classList.add('empty')
+          cover.style.backgroundImage = ''
           empty.textContent = (state.name || 'WY Music').slice(0, 12)
         }
       }
@@ -76,7 +75,9 @@
         window.wyAPI.onPlayerState(apply)
       }
       document.addEventListener('dblclick', () => {
-        window.wyAPI && window.wyAPI.sendPlayerCommand && window.wyAPI.sendPlayerCommand({ type: 'openMain' })
+        window.wyAPI &&
+          window.wyAPI.sendPlayerCommand &&
+          window.wyAPI.sendPlayerCommand({ type: 'openMain' })
       })
     </script>
   </body>

@@ -61,7 +61,57 @@ let mainWindowCollapsed = false
 const DESKTOP_LYRIC_H = 100
 const DESKTOP_LYRIC_MENU_W = 300
 const DESKTOP_LYRIC_MENU_H = 236
-const TASKBAR_PREVIEW_SIZE = 200
+const TASKBAR_PREVIEW_SIZE = 240
+let taskbarCoverCache: { src: string; dataUrl: string } | null = null
+let taskbarStateSeq = 0
+
+function absolutizeMediaUrl(u?: string | null) {
+  if (!u) return ''
+  if (/^(https?:|data:|blob:|file:|wy-local:)/i.test(u)) return u
+  if (u.startsWith('/')) return `${API_BASE}${u}`
+  return `${API_BASE}/media/${String(u).replace(/^\/+/, '')}`
+}
+
+async function coverToDataUrl(coverUrl?: string | null) {
+  const abs = absolutizeMediaUrl(coverUrl)
+  if (!abs) return ''
+  if (abs.startsWith('data:')) return abs
+  if (taskbarCoverCache?.src === abs) return taskbarCoverCache.dataUrl
+  try {
+    const res = await net.fetch(abs)
+    if (!res.ok) return abs
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (!buf.length) return abs
+    const ct = (res.headers.get('content-type') || 'image/jpeg').split(';')[0]
+    const dataUrl = `data:${ct};base64,${buf.toString('base64')}`
+    taskbarCoverCache = { src: abs, dataUrl }
+    return dataUrl
+  } catch {
+    return abs
+  }
+}
+
+function placeTaskbarPreviewWindow(win: BrowserWindow) {
+  const displays = screen.getAllDisplays()
+  const primary = screen.getPrimaryDisplay()
+  const size = TASKBAR_PREVIEW_SIZE
+
+  const overlapsAny = (x: number, y: number) =>
+    displays.some((d) => {
+      const b = d.bounds
+      return x < b.x + b.width && x + size > b.x && y < b.y + b.height && y + size > b.y
+    })
+
+  // 优先放主屏左侧外侧；若多屏占用该区域，改放到所有屏下方外侧
+  let x = primary.bounds.x - size - 8
+  let y = primary.bounds.y + Math.max(0, Math.floor((primary.bounds.height - size) / 2))
+  if (overlapsAny(x, y)) {
+    const maxBottom = Math.max(...displays.map((d) => d.bounds.y + d.bounds.height))
+    x = primary.bounds.x + Math.max(0, Math.floor((primary.bounds.width - size) / 2))
+    y = maxBottom + 8
+  }
+  win.setBounds({ x, y, width: size, height: size })
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -708,11 +758,29 @@ function applyTaskbarPlayerState(state: typeof lastPlayerState) {
     mainWindow.setTitle(title)
   }
   if (process.platform !== 'win32') return
-  if (taskbarPreviewWindow && !taskbarPreviewWindow.isDestroyed()) {
-    taskbarPreviewWindow.setTitle(title)
-    taskbarPreviewWindow.webContents.send('player:state', state || {})
-    updateThumbarButtons(state)
+  const win = taskbarPreviewWindow
+  if (!win || win.isDestroyed()) return
+
+  win.setTitle(title)
+  updateThumbarButtons(state)
+
+  const seq = ++taskbarStateSeq
+  const base = {
+    name: state?.name || '',
+    artists: state?.artists || '',
+    playing: Boolean(state?.playing),
+    hasTrack: Boolean(state?.hasTrack),
+    liked: Boolean(state?.liked),
+    coverUrl: absolutizeMediaUrl(state?.coverUrl),
   }
+  // 先推绝对地址，再异步换成 data URL，避免 file 页加载 /media 相对路径失败
+  win.webContents.send('player:state', base)
+  void coverToDataUrl(state?.coverUrl).then((dataUrl) => {
+    if (seq !== taskbarStateSeq) return
+    if (!taskbarPreviewWindow || taskbarPreviewWindow.isDestroyed()) return
+    if (!dataUrl || dataUrl === base.coverUrl) return
+    taskbarPreviewWindow.webContents.send('player:state', { ...base, coverUrl: dataUrl })
+  })
 }
 
 function createTaskbarPreviewWindow() {
@@ -723,8 +791,6 @@ function createTaskbarPreviewWindow() {
   const win = new BrowserWindow({
     width: TASKBAR_PREVIEW_SIZE,
     height: TASKBAR_PREVIEW_SIZE,
-    x: -20000,
-    y: -20000,
     show: false,
     frame: false,
     resizable: false,
@@ -732,18 +798,29 @@ function createTaskbarPreviewWindow() {
     minimizable: true,
     fullscreenable: false,
     skipTaskbar: false,
+    focusable: true,
     title: 'WY Music',
     icon: appIcon,
     backgroundColor: '#1a1a1a',
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
       devTools: false,
+      backgroundThrottling: false,
+      webSecurity: false,
     },
   })
   taskbarPreviewWindow = win
+  placeTaskbarPreviewWindow(win)
+  win.setMenuBarVisibility(false)
+  try {
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  } catch {
+    // ignore
+  }
 
   const htmlCandidates = [
     join(__dirname, '../../resources/taskbar-preview.html'),
@@ -761,13 +838,27 @@ function createTaskbarPreviewWindow() {
     )
   }
 
-  win.once('ready-to-show', () => {
-    // 必须 show 才能作为任务栏缩略图源；放在屏外避免干扰
+  const revealPreview = () => {
+    placeTaskbarPreviewWindow(win)
+    // 必须 show 才能作为任务栏缩略图源；屏外 + 忽略鼠标，避免干扰
     win.showInactive()
+    try {
+      win.setIgnoreMouseEvents(true, { forward: true })
+    } catch {
+      win.setIgnoreMouseEvents(true)
+    }
+    win.webContents.setFrameRate(15)
     updateThumbarButtons(lastPlayerState)
     if (lastPlayerState) {
-      win.webContents.send('player:state', lastPlayerState)
+      applyTaskbarPlayerState(lastPlayerState)
     }
+  }
+
+  win.webContents.once('did-finish-load', () => {
+    revealPreview()
+  })
+  win.once('ready-to-show', () => {
+    if (!win.isVisible()) revealPreview()
   })
 
   win.on('focus', () => {
@@ -791,6 +882,7 @@ function createTaskbarPreviewWindow() {
     suppressTaskbarFocusRestore = true
     focusingMainFromTaskbar = true
     win.restore()
+    placeTaskbarPreviewWindow(win)
     focusMainWindow()
     setTimeout(() => {
       suppressTaskbarFocusRestore = false

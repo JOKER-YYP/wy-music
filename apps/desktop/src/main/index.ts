@@ -638,8 +638,56 @@ function resolveAppIcon() {
   return undefined
 }
 
+const thumbarIconCache = new Map<string, Electron.NativeImage>()
+
+function flipNativeImageHorizontal(img: Electron.NativeImage) {
+  try {
+    if (typeof img.flipHorizontally === 'function') {
+      return img.flipHorizontally()
+    }
+  } catch {
+    // fall through to bitmap flip
+  }
+  const { width, height } = img.getSize()
+  const src = img.toBitmap()
+  const dst = Buffer.alloc(src.length)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const si = (y * width + x) * 4
+      const di = (y * width + (width - 1 - x)) * 4
+      dst[di] = src[si]
+      dst[di + 1] = src[si + 1]
+      dst[di + 2] = src[si + 2]
+      dst[di + 3] = src[si + 3]
+    }
+  }
+  return nativeImage.createFromBitmap(dst, { width, height })
+}
+
+/** Windows 缩略图按钮：约 16×16，近黑底转透明，再经 PNG 规范化 */
+function normalizeThumbarIcon(img: Electron.NativeImage) {
+  let sized =
+    img.getSize().width === 16 && img.getSize().height === 16
+      ? img
+      : img.resize({ width: 16, height: 16, quality: 'best' })
+  const { width, height } = sized.getSize()
+  const buf = Buffer.from(sized.toBitmap())
+  // Windows bitmap 为 BGRA；资源图是黑底灰标，需抠掉黑底否则缩略图栏可能不画按钮
+  for (let i = 0; i < buf.length; i += 4) {
+    const b = buf[i]
+    const g = buf[i + 1]
+    const r = buf[i + 2]
+    if (r < 45 && g < 45 && b < 45) buf[i + 3] = 0
+  }
+  sized = nativeImage.createFromBitmap(buf, { width, height })
+  return nativeImage.createFromBuffer(sized.toPNG())
+}
+
 function resolveThumbarIcon(name: 'play' | 'pause' | 'prev' | 'next' | 'like' | 'like-off') {
-  // 用户提供：play / stop(暂停) / next / like / like-off；prev = 翻转 next
+  const cached = thumbarIconCache.get(name)
+  if (cached && !cached.isEmpty()) return cached
+
+  // 用户提供：play / stop(暂停) / next / like / like-off；prev = 水平翻转 next
   const fileName =
     name === 'prev' ? 'next' : name === 'pause' ? 'stop' : name
   const candidates = [
@@ -648,16 +696,88 @@ function resolveThumbarIcon(name: 'play' | 'pause' | 'prev' | 'next' | 'like' | 
   ]
   for (const p of candidates) {
     if (!existsSync(p)) continue
-    let img = nativeImage.createFromPath(p)
-    if (img.isEmpty()) continue
-    if (name === 'prev') img = img.flipHorizontally()
-    const size = img.getSize()
-    if (size.width > 24 || size.height > 24) {
-      img = img.resize({ width: 20, height: 20, quality: 'best' })
+    try {
+      let img = nativeImage.createFromPath(p)
+      if (img.isEmpty()) continue
+      if (name === 'prev') img = flipNativeImageHorizontal(img)
+      img = normalizeThumbarIcon(img)
+      if (img.isEmpty()) continue
+      thumbarIconCache.set(name, img)
+      return img
+    } catch (e) {
+      console.warn('[taskbar] load icon failed', name, p, e)
     }
-    return img
   }
+  console.warn('[taskbar] missing icon', name, candidates)
   return nativeImage.createEmpty()
+}
+
+let lastThumbarKey = ''
+
+function updateThumbarButtons(state: typeof lastPlayerState, force = false) {
+  if (process.platform !== 'win32') return
+  const win = taskbarPreviewWindow
+  if (!win || win.isDestroyed()) return
+  const enabled = Boolean(state?.hasTrack)
+  const playing = Boolean(state?.playing)
+  const liked = Boolean(state?.liked)
+  const key = `${enabled ? 1 : 0}|${playing ? 1 : 0}|${liked ? 1 : 0}`
+  // 播放进度会高频 pushState；按钮只在状态变化时重设，否则容易不显示
+  if (!force && key === lastThumbarKey) return
+
+  const icons = {
+    prev: resolveThumbarIcon('prev'),
+    playPause: resolveThumbarIcon(playing ? 'pause' : 'play'),
+    next: resolveThumbarIcon('next'),
+    like: resolveThumbarIcon(liked ? 'like' : 'like-off'),
+  }
+  if (
+    icons.prev.isEmpty() ||
+    icons.playPause.isEmpty() ||
+    icons.next.isEmpty() ||
+    icons.like.isEmpty()
+  ) {
+    console.warn('[taskbar] thumbar icons empty, skip setThumbarButtons', {
+      prev: icons.prev.isEmpty(),
+      playPause: icons.playPause.isEmpty(),
+      next: icons.next.isEmpty(),
+      like: icons.like.isEmpty(),
+    })
+    return
+  }
+
+  try {
+    const ok = win.setThumbarButtons([
+      {
+        tooltip: '上一首',
+        icon: icons.prev,
+        flags: enabled ? ['enabled'] : ['disabled'],
+        click: () => sendPlayerCommand({ type: 'prev' }),
+      },
+      {
+        tooltip: playing ? '暂停' : '播放',
+        icon: icons.playPause,
+        flags: enabled ? ['enabled'] : ['disabled'],
+        click: () => sendPlayerCommand({ type: 'toggle' }),
+      },
+      {
+        tooltip: '下一首',
+        icon: icons.next,
+        flags: enabled ? ['enabled'] : ['disabled'],
+        click: () => sendPlayerCommand({ type: 'next' }),
+      },
+      {
+        tooltip: liked ? '取消喜欢' : '喜欢',
+        icon: icons.like,
+        flags: enabled ? ['enabled'] : ['disabled'],
+        click: () => sendPlayerCommand({ type: 'like' }),
+      },
+    ])
+    if (ok) lastThumbarKey = key
+    else console.warn('[taskbar] setThumbarButtons returned false')
+  } catch (e) {
+    console.warn('[taskbar] setThumbarButtons failed', e)
+  }
 }
 
 function sendPlayerCommand(cmd: { type: string }) {
@@ -710,45 +830,6 @@ function playerTitle(state: typeof lastPlayerState) {
   const artists = (state.artists || '').trim()
   const title = artists ? `${name} - ${artists}` : name
   return title.slice(0, 80)
-}
-
-function updateThumbarButtons(state: typeof lastPlayerState) {
-  if (process.platform !== 'win32') return
-  const win = taskbarPreviewWindow
-  if (!win || win.isDestroyed()) return
-  const enabled = Boolean(state?.hasTrack)
-  const playing = Boolean(state?.playing)
-  const liked = Boolean(state?.liked)
-  try {
-    win.setThumbarButtons([
-      {
-        tooltip: '上一首',
-        icon: resolveThumbarIcon('prev'),
-        flags: enabled ? ['enabled'] : ['disabled'],
-        click: () => sendPlayerCommand({ type: 'prev' }),
-      },
-      {
-        tooltip: playing ? '暂停' : '播放',
-        icon: resolveThumbarIcon(playing ? 'pause' : 'play'),
-        flags: enabled ? ['enabled'] : ['disabled'],
-        click: () => sendPlayerCommand({ type: 'toggle' }),
-      },
-      {
-        tooltip: '下一首',
-        icon: resolveThumbarIcon('next'),
-        flags: enabled ? ['enabled'] : ['disabled'],
-        click: () => sendPlayerCommand({ type: 'next' }),
-      },
-      {
-        tooltip: liked ? '取消喜欢' : '喜欢',
-        icon: resolveThumbarIcon(liked ? 'like' : 'like-off'),
-        flags: enabled ? ['enabled'] : ['disabled'],
-        click: () => sendPlayerCommand({ type: 'like' }),
-      },
-    ])
-  } catch (e) {
-    console.warn('[taskbar] setThumbarButtons failed', e)
-  }
 }
 
 function applyTaskbarPlayerState(state: typeof lastPlayerState) {
@@ -848,7 +929,11 @@ function createTaskbarPreviewWindow() {
       win.setIgnoreMouseEvents(true)
     }
     win.webContents.setFrameRate(15)
-    updateThumbarButtons(lastPlayerState)
+    lastThumbarKey = ''
+    updateThumbarButtons(lastPlayerState, true)
+    // 任务栏入口偶发未就绪，延迟再挂一次按钮
+    setTimeout(() => updateThumbarButtons(lastPlayerState, true), 400)
+    setTimeout(() => updateThumbarButtons(lastPlayerState, true), 1200)
     if (lastPlayerState) {
       applyTaskbarPlayerState(lastPlayerState)
     }

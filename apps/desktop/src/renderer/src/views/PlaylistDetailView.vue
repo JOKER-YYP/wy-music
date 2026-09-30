@@ -7,7 +7,7 @@
           <div class="title-row">
             <h1>{{ detail.name }}</h1>
             <button
-              v-if="!detail.isSystem"
+              v-if="isOwner && !detail.isSystem"
               class="icon-btn"
               type="button"
               title="编辑歌单信息"
@@ -43,8 +43,15 @@
                   <el-dropdown-item command="share" disabled>分享...</el-dropdown-item>
                   <el-dropdown-item command="batch">批量操作</el-dropdown-item>
                   <el-dropdown-item command="addAll">添加全部至播放列表</el-dropdown-item>
-                  <template v-if="!detail.isSystem">
-                    <el-dropdown-item command="edit" divided>编辑歌单信息</el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="canSaveAs"
+                    command="saveAs"
+                    divided
+                  >
+                    另存为自己的歌单
+                  </el-dropdown-item>
+                  <template v-if="isOwner && !detail.isSystem">
+                    <el-dropdown-item command="edit" :divided="!canSaveAs">编辑歌单信息</el-dropdown-item>
                     <el-dropdown-item command="delete">删除歌单</el-dropdown-item>
                   </template>
                 </el-dropdown-menu>
@@ -91,7 +98,7 @@
           v-model:batch-mode="batchMode"
           :tracks="filteredTracks"
           :allow-delete="false"
-          :allow-remove="Boolean(detail && !detail.isSystem)"
+          :allow-remove="isOwner && Boolean(detail && !detail.isSystem)"
           :playlist-id="detail.id"
           :empty-text="emptySongsText"
           @refresh="onTracksRefresh"
@@ -118,18 +125,32 @@ import { Download, Edit, MoreFilled, Search, VideoPlay } from '@element-plus/ico
 import { mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
 import { usePlaylistStore, type PlaylistDetail } from '../stores/playlist'
+import { useUserStore } from '../stores/user'
 import SongListTable from '../components/SongListTable.vue'
 
 const route = useRoute()
 const router = useRouter()
 const player = usePlayerStore()
 const playlistStore = usePlaylistStore()
+const user = useUserStore()
 
 const loading = ref(false)
 const detail = ref<PlaylistDetail | null>(null)
 const activeTab = ref<'songs' | 'comments' | 'collectors'>('songs')
 const keyword = ref('')
 const batchMode = ref(false)
+const savingAs = ref(false)
+
+const isOwner = computed(() => {
+  if (!detail.value || !user.user?.id) return false
+  return detail.value.ownerId === user.user.id
+})
+
+const canSaveAs = computed(() => {
+  if (!detail.value) return false
+  if (detail.value.isSystem) return false
+  return !isOwner.value
+})
 
 const coverStyle = computed(() => {
   const url = mediaUrl(detail.value?.coverUrl || detail.value?.tracks?.[0]?.coverUrl)
@@ -207,16 +228,30 @@ function addAllToQueue() {
 }
 
 function goEdit() {
-  if (!detail.value || detail.value.isSystem) return
+  if (!detail.value || detail.value.isSystem || !isOwner.value) return
   router.push(`/playlist/${detail.value.id}/edit`)
 }
 
 async function onDelete() {
-  if (!detail.value || detail.value.isSystem) return
+  if (!detail.value || detail.value.isSystem || !isOwner.value) return
   await ElMessageBox.confirm(`确认删除歌单「${detail.value.name}」？`, '提示', { type: 'warning' })
   await playlistStore.remove(detail.value.id)
   ElMessage.success('已删除')
   router.push('/discover')
+}
+
+async function onSaveAs() {
+  if (!detail.value || !canSaveAs.value || savingAs.value) return
+  savingAs.value = true
+  try {
+    const created = await playlistStore.saveAs(detail.value.id)
+    ElMessage.success(`已另存为「${created.name}」`)
+    router.push(`/playlist/${created.id}`)
+  } catch {
+    // interceptor toasts
+  } finally {
+    savingAs.value = false
+  }
 }
 
 function onMoreCommand(cmd: string) {
@@ -226,6 +261,7 @@ function onMoreCommand(cmd: string) {
   } else if (cmd === 'addAll') addAllToQueue()
   else if (cmd === 'edit') goEdit()
   else if (cmd === 'delete') void onDelete()
+  else if (cmd === 'saveAs') void onSaveAs()
   else if (cmd === 'share') ElMessage.info('分享功能暂未开放')
 }
 

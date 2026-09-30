@@ -312,6 +312,86 @@ router.get('/:id', requireAuth, async (req: AuthedRequest, res) => {
   })
 })
 
+/** 另存为自己的歌单（可复制他人公开歌单 / 自己的歌单） */
+router.post('/:id/save-as', requireAuth, async (req: AuthedRequest, res) => {
+  const source = await prisma.playlist.findUnique({
+    where: { id: req.params.id },
+    include: {
+      tracks: {
+        orderBy: { position: 'asc' },
+        include: { track: { select: { id: true, status: true, coverUrl: true } } },
+      },
+    },
+  })
+  if (!source) return fail(res, 40401, '歌单不存在', 404)
+
+  const isOwner = source.ownerId === req.user!.id
+  const isAdmin = req.user!.role === 'admin'
+  if (!isOwner && !source.isPublic && !isAdmin) {
+    return fail(res, 40301, '无权另存该歌单', 403)
+  }
+  if (source.isSystem && !isOwner) {
+    return fail(res, 40002, '系统歌单不可另存', 400)
+  }
+
+  const parsed = z
+    .object({
+      name: z.string().min(1).max(40).optional(),
+      isPublic: z.boolean().optional(),
+    })
+    .safeParse(req.body || {})
+  if (!parsed.success) return fail(res, 40001, '参数无效')
+
+  const baseName = (parsed.data.name || source.name || '另存歌单').trim().slice(0, 40)
+  const name = isOwner && !parsed.data.name ? `${baseName} 副本`.slice(0, 40) : baseName
+
+  const publishedTracks = source.tracks.filter((t) => t.track.status === 'published')
+  const playlist = await prisma.playlist.create({
+    data: {
+      name,
+      description: source.description,
+      tags: source.tags,
+      coverUrl: source.coverUrl,
+      isPublic: parsed.data.isPublic ?? false,
+      isSystem: false,
+      ownerId: req.user!.id,
+    },
+  })
+
+  if (publishedTracks.length) {
+    await prisma.playlistTrack.createMany({
+      data: publishedTracks.map((t, i) => ({
+        playlistId: playlist.id,
+        trackId: t.trackId,
+        position: i,
+      })),
+    })
+    if (!playlist.coverUrl) {
+      const cover = publishedTracks.find((t) => t.track.coverUrl)?.track.coverUrl
+      if (cover) {
+        await prisma.playlist.update({
+          where: { id: playlist.id },
+          data: { coverUrl: cover },
+        })
+      }
+    }
+  }
+
+  const full = await prisma.playlist.findUnique({
+    where: { id: playlist.id },
+    include: {
+      _count: { select: { tracks: true } },
+      tracks: {
+        orderBy: { position: 'asc' },
+        take: 1,
+        include: { track: { select: { coverUrl: true } } },
+      },
+    },
+  })
+
+  return ok(res, toPlaylistDto(full!), '已另存为自己的歌单')
+})
+
 router.put('/:id', requireAuth, async (req: AuthedRequest, res) => {
   const playlist = await prisma.playlist.findUnique({ where: { id: req.params.id } })
   if (!playlist) return fail(res, 40401, '歌单不存在', 404)

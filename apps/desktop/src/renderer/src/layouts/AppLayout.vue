@@ -148,9 +148,17 @@
 
         <div class="nav-title playlist-head">
           <span>创建的歌单 {{ playlistStore.createdPlaylists.length || '' }}</span>
-          <button class="add-btn" type="button" title="新建歌单" @click="onCreatePlaylist">
-            <el-icon :size="14"><Plus /></el-icon>
-          </button>
+          <el-dropdown trigger="click" @command="onPlaylistMenu">
+            <button class="add-btn" type="button" title="歌单操作">
+              <el-icon :size="14"><Plus /></el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="create">创建歌单</el-dropdown-item>
+                <el-dropdown-item command="import">歌单导入</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
         <div class="nav-group">
           <router-link
@@ -188,6 +196,7 @@
     <LoginModal />
     <NowPlayingPanel />
     <CollectPlaylistModal />
+    <ImportPlaylistModal :visible="importPlaylistOpen" @close="importPlaylistOpen = false" />
     <CommentsPanel />
     <MessagePanel
       :visible="messageOpen"
@@ -228,6 +237,7 @@ import PlayerIpcBridge from '../components/PlayerIpcBridge.vue'
 import LoginModal from '../components/LoginModal.vue'
 import NowPlayingPanel from '../components/NowPlayingPanel.vue'
 import CollectPlaylistModal from '../components/CollectPlaylistModal.vue'
+import ImportPlaylistModal from '../components/ImportPlaylistModal.vue'
 import CommentsPanel from '../components/CommentsPanel.vue'
 import SearchDropdown from '../components/SearchDropdown.vue'
 import MessagePanel from '../components/MessagePanel.vue'
@@ -249,6 +259,7 @@ const searchPanelStyle = ref<Record<string, string>>({})
 const messageOpen = ref(false)
 const unreadTotal = ref(0)
 const isMaximized = ref(false)
+const importPlaylistOpen = ref(false)
 let unsubMaximized: (() => void) | null = null
 
 async function refreshMaximized() {
@@ -513,6 +524,19 @@ async function onCreatePlaylist() {
   } catch {
     // cancel
   }
+}
+
+function onImportPlaylist() {
+  if (!user.accessToken) {
+    ui.openLogin('login')
+    return
+  }
+  importPlaylistOpen.value = true
+}
+
+function onPlaylistMenu(command: string | number) {
+  if (command === 'create') onCreatePlaylist()
+  else if (command === 'import') onImportPlaylist()
 }
 
 function onLogout() {
@@ -917,6 +941,10 @@ function onLogout() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  :deep(.el-dropdown) {
+    display: inline-flex;
+    line-height: 1;
+  }
 }
 .add-btn {
   width: 20px;

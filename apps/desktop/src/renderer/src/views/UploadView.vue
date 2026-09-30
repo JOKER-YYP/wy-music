@@ -5,6 +5,7 @@
       支持 mp3 / wav / flac / m4a / aac，单文件不超过 100MB。
       <template v-if="isDesktop">
         桌面端可扫描文件夹批量上传；同目录下同名 <code>.lrc</code> 会自动匹配歌词。
+        扫描后会对比公共曲库，将未收录的「新曲」标出并排在前面。
       </template>
       网页端请使用「单曲上传」，可另选 LRC 文件补充歌词。
     </p>
@@ -19,6 +20,8 @@
           <span v-if="folderPath" class="folder-path" :title="folderPath">{{ folderPath }}</span>
           <span v-if="items.length" class="count">
             共 {{ items.length }} 首
+            <template v-if="newTrackCount"> · 新曲 {{ newTrackCount }}</template>
+            <template v-if="inLibraryCount"> · 曲库已有 {{ inLibraryCount }}</template>
             <template v-if="lyricMatchedCount"> · 已匹配歌词 {{ lyricMatchedCount }}</template>
           </span>
         </div>
@@ -32,6 +35,9 @@
           >
             上传选中（{{ selected.length }}）
           </el-button>
+          <el-button :disabled="!newTrackCount" @click="selectNewTracks">
+            全选新曲（{{ newTrackCount }}）
+          </el-button>
           <el-button :disabled="!selected.length" @click="swapSelected">
             互换歌名/歌手（{{ selected.length || 0 }}）
           </el-button>
@@ -39,6 +45,11 @@
             删除选中（{{ selected.length || 0 }}）
           </el-button>
           <el-button :disabled="!filteredItems.length" @click="playAll">播放全部</el-button>
+          <el-radio-group v-model="libraryFilter" size="small" class="library-filter">
+            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="new">仅新曲</el-radio-button>
+            <el-radio-button value="library">仅已有</el-radio-button>
+          </el-radio-group>
           <el-input
             v-model="listQuery"
             class="list-search"
@@ -49,13 +60,14 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
-          <span v-if="listQuery.trim()" class="filter-count">
+          <span v-if="listQuery.trim() || libraryFilter !== 'all'" class="filter-count">
             显示 {{ filteredItems.length }} / {{ items.length }}
           </span>
         </div>
 
         <div ref="tableWrapRef" class="upload-table-wrap">
           <el-table
+            ref="tableRef"
             v-loading="scanning"
             :data="filteredItems"
             :row-key="uploadRowKey"
@@ -67,6 +79,12 @@
           >
             <el-table-column type="selection" width="48" />
             <el-table-column type="index" width="50" label="#" />
+            <el-table-column label="状态" width="88" align="center">
+              <template #default="{ row }">
+                <span v-if="row.inLibrary" class="lib-tag lib-exist" title="公共曲库已有相同文件">已有</span>
+                <span v-else class="lib-tag lib-new" title="公共曲库中尚未收录">新曲</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="name" label="歌曲" min-width="160" show-overflow-tooltip>
               <template #default="{ row }">
                 <UploadEditCell
@@ -307,6 +325,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, shallowRef, triggerRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { TableInstance } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { decodeLyricBytes, parseAudioFilename, swapNameAndArtists } from '@wy-music/shared'
 import type { LocalAudioItem } from '../types/local'
@@ -316,6 +335,7 @@ import PlayingLocateFab from '../components/PlayingLocateFab.vue'
 import { usePlayingLocate } from '../composables/usePlayingLocate'
 import {
   browserFileToQueueTrack,
+  checkLibraryHashes,
   formatBytes,
   formatDuration,
   isElectronApp,
@@ -333,12 +353,21 @@ const folderPath = ref('')
 const items = shallowRef<LocalAudioItem[]>([])
 const selected = shallowRef<LocalAudioItem[]>([])
 const listQuery = ref('')
+const libraryFilter = ref<'all' | 'new' | 'library'>('all')
 const lyricMatchedCount = computed(() => items.value.filter((i) => i.lyricText).length)
+const newTrackCount = computed(() => items.value.filter((i) => !i.inLibrary).length)
+const inLibraryCount = computed(() => items.value.filter((i) => i.inLibrary).length)
 
 const filteredItems = computed(() => {
+  let list = items.value
+  if (libraryFilter.value === 'new') {
+    list = list.filter((row) => !row.inLibrary)
+  } else if (libraryFilter.value === 'library') {
+    list = list.filter((row) => row.inLibrary)
+  }
   const q = listQuery.value.trim().toLowerCase()
-  if (!q) return items.value
-  return items.value.filter((row) => {
+  if (!q) return list
+  return list.filter((row) => {
     const artists = (row.artists || []).join(' ')
     const hay = `${row.name || ''} ${artists} ${row.album || ''} ${row.fileName || ''}`.toLowerCase()
     return hay.includes(q)
@@ -383,6 +412,7 @@ const retryingId = ref('')
 
 const player = usePlayerStore()
 const tableWrapRef = ref<HTMLElement | null>(null)
+const tableRef = ref<TableInstance>()
 
 const currentInUploadList = computed(() => {
   if (tab.value !== 'folder') return false
@@ -400,7 +430,13 @@ const { showLocate, locateCurrent } = usePlayingLocate({
       '.el-table__body tr.is-playing-row',
     ) as HTMLElement | null,
   deps: () =>
-    [player.currentTrack?.id, filteredItems.value.length, tab.value, listQuery.value] as const,
+    [
+      player.currentTrack?.id,
+      filteredItems.value.length,
+      tab.value,
+      listQuery.value,
+      libraryFilter.value,
+    ] as const,
 })
 
 function uploadRowKey(row: LocalAudioItem) {
@@ -408,7 +444,49 @@ function uploadRowKey(row: LocalAudioItem) {
 }
 
 function uploadRowClass({ row }: { row: LocalAudioItem }) {
-  return player.currentTrack?.id === `local:${row.id}` ? 'is-playing-row' : ''
+  const classes: string[] = []
+  if (player.currentTrack?.id === `local:${row.id}`) classes.push('is-playing-row')
+  if (!row.inLibrary) classes.push('is-new-track-row')
+  return classes.join(' ')
+}
+
+function sortItemsByLibrary(list: LocalAudioItem[]) {
+  return [...list].sort((a, b) => {
+    const an = a.inLibrary ? 1 : 0
+    const bn = b.inLibrary ? 1 : 0
+    if (an !== bn) return an - bn
+    return (a.name || '').localeCompare(b.name || '', 'zh')
+  })
+}
+
+async function markLibraryStatus(list: LocalAudioItem[]) {
+  const hashes = list.map((i) => i.fileHash || '').filter(Boolean)
+  let existing = new Set<string>()
+  try {
+    existing = await checkLibraryHashes(hashes)
+  } catch (e) {
+    console.warn('[markLibraryStatus]', e)
+  }
+  for (const item of list) {
+    const hash = (item.fileHash || '').trim()
+    item.inLibrary = Boolean(hash && existing.has(hash))
+  }
+  return sortItemsByLibrary(list)
+}
+
+function selectNewTracks() {
+  const table = tableRef.value
+  if (!table) return
+  table.clearSelection()
+  for (const row of filteredItems.value) {
+    if (!row.inLibrary) table.toggleRowSelection(row, true)
+  }
+}
+
+function markItemUploaded(item: LocalAudioItem) {
+  item.inLibrary = true
+  items.value = sortItemsByLibrary(items.value)
+  triggerRef(items)
 }
 
 const progressPercent = computed(() => {
@@ -668,17 +746,26 @@ async function doScan(folder: string) {
   scanning.value = true
   selected.value = []
   listQuery.value = ''
+  libraryFilter.value = 'all'
   try {
     const result = await window.wyAPI!.scanFolder(folder)
-    items.value = result.items
+    const sorted = await markLibraryStatus(result.items)
+    items.value = sorted
     const matched = result.lyricMatched ?? result.items.filter((i) => i.lyricText).length
     const deduped = result.deduped || 0
     const shortFiltered = result.shortFiltered || 0
+    const newCount = sorted.filter((i) => !i.inLibrary).length
+    const existCount = sorted.length - newCount
     const parts = [`扫描完成：${result.total} 首`]
+    if (newCount) parts.push(`新曲 ${newCount}`)
+    if (existCount) parts.push(`曲库已有 ${existCount}`)
     if (matched) parts.push(`已匹配歌词 ${matched} 首`)
     if (deduped) parts.push(`已过滤重复 ${deduped} 首`)
     if (shortFiltered) parts.push(`已过滤过短（<30秒）${shortFiltered} 首`)
     ElMessage.success(parts.join('，'))
+    if (newCount && existCount) {
+      libraryFilter.value = 'new'
+    }
   } catch (e) {
     console.error('[scan]', e)
     ElMessage.error(e instanceof Error ? `扫描失败：${e.message}` : '扫描失败')
@@ -703,7 +790,7 @@ async function uploadOne(item: LocalAudioItem) {
   try {
     assertUploadDuration(item)
     const result = await uploadLocalItem(item, applyUploadDefaults(item))
-    triggerRef(items)
+    markItemUploaded(item)
     ElMessage.success(result.message || `「${item.name}」上传成功`)
   } catch (e) {
     console.error(e)
@@ -731,6 +818,7 @@ async function uploadSelected() {
     try {
       assertUploadDuration(item)
       await uploadLocalItem(item, applyUploadDefaults(item))
+      item.inLibrary = true
       okCount += 1
     } catch (e: unknown) {
       const msg =
@@ -740,6 +828,10 @@ async function uploadSelected() {
       pendingRetries.value.push({ item, reason: msg, kind: 'fail' })
     }
     progressDone.value += 1
+  }
+  if (okCount) {
+    items.value = sortItemsByLibrary(items.value)
+    triggerRef(items)
   }
   progressText.value = `完成：成功 ${okCount} / ${list.length}`
   progressStatus.value = pendingRetries.value.length ? 'exception' : 'success'
@@ -765,8 +857,8 @@ async function retryUploadOne(row: PendingRetry, index: number) {
   retryingId.value = row.item.id
   try {
     await doUploadItem(row.item)
+    markItemUploaded(row.item)
     pendingRetries.value.splice(index, 1)
-    triggerRef(items)
     ElMessage.success(`「${row.item.name}」上传成功`)
     if (!pendingRetries.value.length) {
       retryVisible.value = false
@@ -795,6 +887,7 @@ async function retryUploadAll() {
     retryingId.value = row.item.id
     try {
       await doUploadItem(row.item)
+      row.item.inLibrary = true
       okCount += 1
     } catch (e: unknown) {
       const msg =
@@ -806,7 +899,10 @@ async function retryUploadAll() {
   }
   retryingId.value = ''
   pendingRetries.value = remain
-  triggerRef(items)
+  if (okCount) {
+    items.value = sortItemsByLibrary(items.value)
+    triggerRef(items)
+  }
   retryUploading.value = false
   if (okCount) ElMessage.success(`成功上传 ${okCount} 首`)
   if (!remain.length) {
@@ -980,6 +1076,30 @@ async function submitSingle() {
     color: #ec4141;
   }
 }
+:deep(.el-table .is-new-track-row) {
+  td {
+    background-color: rgba(236, 65, 65, 0.04);
+  }
+}
+.lib-tag {
+  display: inline-block;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 20px;
+  border-radius: 3px;
+}
+.lib-new {
+  color: #ec4141;
+  background: rgba(236, 65, 65, 0.12);
+  font-weight: 600;
+}
+.lib-exist {
+  color: #909399;
+  background: #f4f4f5;
+}
+.library-filter {
+  margin-left: 4px;
+}
 .tip {
   color: #888;
   margin: 0 0 12px;
@@ -1012,7 +1132,7 @@ async function submitSingle() {
   flex-wrap: wrap;
 }
 .list-search {
-  width: 260px;
+  width: 240px;
   margin-left: auto;
 }
 .filter-count {

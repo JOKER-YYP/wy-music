@@ -7,6 +7,27 @@ export function isElectronApp() {
   return Boolean(window.wyAPI?.selectFolder && window.wyAPI?.uploadTrack)
 }
 
+/** 批量查询哪些 fileHash 已在公共曲库中（非 offline） */
+export async function checkLibraryHashes(hashes: string[]): Promise<Set<string>> {
+  const unique = [...new Set(hashes.map((h) => h.trim()).filter(Boolean))]
+  if (!unique.length) return new Set()
+  if (!localStorage.getItem('accessToken')) return new Set()
+
+  const existing = new Set<string>()
+  const CHUNK = 500
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK)
+    const { data } = await http.post<{
+      code: number
+      data?: { hashes?: string[] }
+    }>('/api/tracks/check-library', { hashes: chunk })
+    for (const h of data?.data?.hashes || []) {
+      if (h) existing.add(h)
+    }
+  }
+  return existing
+}
+
 export async function uploadLocalItem(
   item: LocalAudioItem,
   extra?: { name?: string; artists?: string; album?: string; lyricText?: string },

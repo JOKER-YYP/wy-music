@@ -10,6 +10,8 @@ export interface LocalAudioItem {
   ext: string
   /** 音频文件内容 SHA256，用于精确去重 */
   fileHash?: string
+  /** 公共曲库是否已有相同文件（按 fileHash） */
+  inLibrary?: boolean
   /** 匹配到的 LRC 文本 */
   lyricText?: string | null
   /** 匹配到的歌词文件名 */

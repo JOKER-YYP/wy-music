@@ -80,6 +80,170 @@ router.get('/', requireAuth, async (req: AuthedRequest, res) => {
   return ok(res, list.map(toPlaylistDto))
 })
 
+router.post('/import/preview', requireAuth, async (req: AuthedRequest, res) => {
+  const { fetchExternalPlaylist } = await import('../services/externalPlaylist.js')
+  const { matchExternalSongs } = await import('../services/trackMatch.js')
+
+  const rawUrls = Array.isArray(req.body?.urls) ? (req.body.urls as unknown[]) : []
+  const urls = Array.from(
+    new Set(
+      rawUrls
+        .filter((u): u is string => typeof u === 'string')
+        .map((u) => u.trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 10)
+
+  if (!urls.length) return fail(res, 40001, '请至少粘贴一个歌单链接')
+
+  const library = await prisma.track.findMany({
+    where: { status: 'published' },
+    select: { id: true, name: true, artists: true },
+  })
+
+  const sources: Array<Record<string, unknown>> = []
+  for (const url of urls) {
+    try {
+      const remote = await fetchExternalPlaylist(url)
+      const matchedRows = matchExternalSongs(remote.songs, library)
+      const matched = matchedRows.flatMap((r) =>
+        r.status === 'matched'
+          ? [
+              {
+                name: r.remote.name,
+                artists: r.remote.artists,
+                trackId: r.trackId,
+                trackName: r.trackName,
+                trackArtists: r.trackArtists,
+              },
+            ]
+          : [],
+      )
+      const missing = matchedRows.flatMap((r) =>
+        r.status === 'missing'
+          ? [
+              {
+                name: r.remote.name,
+                artists: r.remote.artists,
+              },
+            ]
+          : [],
+      )
+
+      sources.push({
+        ok: true,
+        url,
+        platform: remote.platform,
+        name: remote.name,
+        description: remote.description,
+        coverUrl: remote.coverUrl,
+        total: remote.songs.length,
+        matchedCount: matched.length,
+        missingCount: missing.length,
+        matched,
+        missing,
+      })
+    } catch (e) {
+      sources.push({
+        ok: false,
+        url,
+        platform: null,
+        name: null,
+        error: e instanceof Error ? e.message : '解析失败',
+        total: 0,
+        matchedCount: 0,
+        missingCount: 0,
+        matched: [],
+        missing: [],
+      })
+    }
+  }
+
+  return ok(res, { sources })
+})
+
+router.post('/import/confirm', requireAuth, async (req: AuthedRequest, res) => {
+  const items = Array.isArray(req.body?.items) ? (req.body.items as unknown[]) : []
+  if (!items.length) return fail(res, 40001, '没有可导入的歌单')
+
+  const created: Array<ReturnType<typeof toPlaylistDto> & { added: number }> = []
+  for (const rawItem of items.slice(0, 10)) {
+    const raw = (rawItem && typeof rawItem === 'object' ? rawItem : {}) as Record<
+      string,
+      unknown
+    >
+    const name = String(raw.name || '').trim().slice(0, 40)
+    if (!name) continue
+    const description = String(raw.description || '').trim().slice(0, 1000) || null
+    const rawIds = Array.isArray(raw.trackIds) ? (raw.trackIds as unknown[]) : []
+    const trackIds = Array.from(
+      new Set(
+        rawIds
+          .filter((id): id is string => typeof id === 'string')
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+    )
+
+    const playlist = await prisma.playlist.create({
+      data: {
+        name,
+        description,
+        isPublic: false,
+        isSystem: false,
+        ownerId: req.user!.id,
+      },
+    })
+
+    let added = 0
+    if (trackIds.length) {
+      const tracks = await prisma.track.findMany({
+        where: { id: { in: trackIds }, status: 'published' },
+        select: { id: true, coverUrl: true },
+      })
+      const order = new Map(trackIds.map((id, i) => [id, i]))
+      tracks.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+
+      if (tracks.length) {
+        await prisma.playlistTrack.createMany({
+          data: tracks.map((t, i) => ({
+            playlistId: playlist.id,
+            trackId: t.id,
+            position: i,
+          })),
+        })
+        added = tracks.length
+        const cover = tracks.find((t) => t.coverUrl)?.coverUrl
+        if (cover) {
+          await prisma.playlist.update({
+            where: { id: playlist.id },
+            data: { coverUrl: cover },
+          })
+        }
+      }
+    }
+
+    const full = await prisma.playlist.findUnique({
+      where: { id: playlist.id },
+      include: {
+        _count: { select: { tracks: true } },
+        tracks: {
+          orderBy: { position: 'asc' },
+          take: 1,
+          include: { track: { select: { coverUrl: true } } },
+        },
+      },
+    })
+    created.push({
+      ...toPlaylistDto(full!),
+      added,
+    })
+  }
+
+  if (!created.length) return fail(res, 40001, '没有成功创建的歌单')
+  return ok(res, { playlists: created }, `已导入 ${created.length} 个歌单`)
+})
+
 router.post('/', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = z
     .object({

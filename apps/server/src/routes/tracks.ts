@@ -101,6 +101,34 @@ router.get('/mine', requireAuth, async (req: AuthedRequest, res) => {
   return ok(res, list.map((t) => toTrackDto(t)))
 })
 
+/** 批量核对 fileHash，用于上传扫描列表标注「曲库已有 / 新曲」 */
+router.post('/check-library', requireAuth, async (req: AuthedRequest, res) => {
+  const raw = Array.isArray(req.body?.hashes) ? req.body.hashes : []
+  const hashes = [
+    ...new Set(
+      raw
+        .filter((h: unknown): h is string => typeof h === 'string')
+        .map((h: string) => h.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, 3000)
+
+  const existing: string[] = []
+  const CHUNK = 400
+  for (let i = 0; i < hashes.length; i += CHUNK) {
+    const chunk = hashes.slice(i, i + CHUNK)
+    const rows = await prisma.track.findMany({
+      where: { fileHash: { in: chunk }, status: { not: 'offline' } },
+      select: { fileHash: true },
+    })
+    for (const r of rows) {
+      if (r.fileHash) existing.push(r.fileHash)
+    }
+  }
+
+  return ok(res, { hashes: [...new Set(existing)] })
+})
+
 router.get('/:id', optionalAuth, async (req: AuthedRequest, res) => {
   const track = await prisma.track.findUnique({
     where: { id: req.params.id },

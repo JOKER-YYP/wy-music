@@ -58,17 +58,24 @@
         </div>
       </div>
     </Transition>
+    <CreatePlaylistModal
+      v-model:visible="createOpen"
+      :loading="creating"
+      @confirm="onConfirmCreate"
+    />
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { Close, Plus } from '@element-plus/icons-vue'
 import type { PlaylistDto, TrackDto } from '@wy-music/shared'
 import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
 import { usePlaylistStore } from '../stores/playlist'
 import { mediaUrl } from '../services/http'
+import CreatePlaylistModal from './CreatePlaylistModal.vue'
 
 const ui = useUiStore()
 const user = useUserStore()
@@ -76,6 +83,8 @@ const playlistStore = usePlaylistStore()
 
 const loading = ref(false)
 const sort = ref<'default' | 'frequent'>('default')
+const createOpen = ref(false)
+const creating = ref(false)
 
 const displayList = computed(() => {
   const list = [...playlistStore.createdPlaylists]
@@ -109,30 +118,33 @@ function coverStyle(p: PlaylistDto) {
   return { backgroundImage: 'linear-gradient(135deg,#ff8a80,#ec4141)' }
 }
 
-async function onCreate() {
+function onCreate() {
+  createOpen.value = true
+}
+
+async function onConfirmCreate(payload: { name: string; isPublic: boolean }) {
+  creating.value = true
   try {
-    const { value } = await ElMessageBox.prompt('请输入歌单名称', '创建新歌单', {
-      confirmButtonText: '创建',
-      cancelButtonText: '取消',
-      inputPattern: /\S+/,
-      inputErrorMessage: '名称不能为空',
-      inputPlaceholder: '例如：我的收藏',
-    })
-    const created = await playlistStore.create(value.trim())
-    const tracks = (ui.collectTracks.length ? ui.collectTracks : ui.collectTrack ? [ui.collectTrack] : []).filter(
-      (t) => t && !t.id.startsWith('local:') && !t.id.startsWith('webfile:'),
-    )
+    const created = await playlistStore.create(payload.name, { isPublic: payload.isPublic })
+    createOpen.value = false
+    const tracks = (
+      ui.collectTracks.length ? ui.collectTracks : ui.collectTrack ? [ui.collectTrack] : []
+    ).filter((t) => t && !t.id.startsWith('local:') && !t.id.startsWith('webfile:'))
     for (const track of tracks) {
       await playlistStore.addTrack(created.id, track.id)
     }
     if (tracks.length) {
-      ElMessage.success(`已创建并加入「${created.name}」${tracks.length > 1 ? `（${tracks.length} 首）` : ''}`)
+      ElMessage.success(
+        `已创建并加入「${created.name}」${tracks.length > 1 ? `（${tracks.length} 首）` : ''}`,
+      )
     } else {
-      ElMessage.success('歌单已创建')
+      ElMessage.success(payload.isPublic ? '公开歌单已创建' : '歌单已创建')
     }
     ui.closeCollect()
   } catch {
-    // cancel
+    // http interceptor handles toast
+  } finally {
+    creating.value = false
   }
 }
 

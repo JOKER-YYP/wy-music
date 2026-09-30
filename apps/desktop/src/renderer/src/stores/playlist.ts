@@ -30,8 +30,15 @@ export const usePlaylistStore = defineStore('playlist', {
         this.loading = false
       }
     },
-    async create(name: string, description?: string) {
-      const { data } = await http.post('/api/playlists', { name, description })
+    async create(
+      name: string,
+      options?: { description?: string; isPublic?: boolean },
+    ) {
+      const { data } = await http.post('/api/playlists', {
+        name,
+        description: options?.description,
+        isPublic: options?.isPublic ?? false,
+      })
       await this.fetchMine()
       return data.data as PlaylistDto
     },

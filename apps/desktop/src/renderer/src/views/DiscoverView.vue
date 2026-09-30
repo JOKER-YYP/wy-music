@@ -39,11 +39,11 @@
             v-for="item in playlists"
             :key="item.id"
             class="playlist-card"
-            @click="playTrack(item)"
+            @click="openPlaylist(item.id)"
           >
-            <div class="cover" :style="coverStyle(item)">
+            <div class="cover" :style="playlistCoverStyle(item)">
               <span class="play-count">▷ {{ formatCount(item.playCount) }}</span>
-              <button class="play-fab" type="button" @click.stop="playTrack(item)">
+              <button class="play-fab" type="button" @click.stop="playPlaylist(item.id)">
                 <el-icon><VideoPlay /></el-icon>
               </button>
             </div>
@@ -51,7 +51,7 @@
           </div>
           <el-empty
             v-if="!playlists.length && !loading"
-            description="暂无歌曲，去上传吧"
+            :description="playlistEmptyTip"
             :image-size="80"
           />
         </div>
@@ -80,8 +80,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { VideoPlay } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
@@ -92,12 +93,23 @@ import ChartsPanel from '../components/discover/ChartsPanel.vue'
 import ArtistsPanel from '../components/discover/ArtistsPanel.vue'
 import SongGrid from '../components/SongGrid.vue'
 
+type RecommendPlaylistCard = {
+  id: string
+  name: string
+  coverUrl?: string | null
+  trackCount: number
+  playCount: number
+  ownerNickname?: string
+  tags?: string | null
+}
+
 const router = useRouter()
 const tabs = ['精选', '歌单', '排行榜', '歌手']
 const activeTab = ref('精选')
 const loading = ref(false)
 const latest = ref<TrackDto[]>([])
 const hot = ref<TrackDto[]>([])
+const playlists = ref<RecommendPlaylistCard[]>([])
 const player = usePlayerStore()
 const user = useUserStore()
 const ui = useUiStore()
@@ -113,9 +125,12 @@ const banners = [
   { title: '热门精选', sub: '大家正在听', bg: 'linear-gradient(135deg,#5f27cd,#341f97)' },
 ]
 
-const playlists = computed(() => latest.value.slice(0, 6))
+const playlistEmptyTip = computed(() => {
+  if (!user.accessToken) return '登录后可根据口味推荐公开歌单'
+  return '暂无匹配的公开歌单，可去广场看看'
+})
 
-function coverStyle(item: TrackDto) {
+function playlistCoverStyle(item: RecommendPlaylistCard) {
   const url = mediaUrl(item.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
   const hues = [0, 30, 200, 260, 320, 140]
@@ -152,9 +167,35 @@ function onBannerClick(b: { to?: string; title: string }) {
   void router.push(b.to)
 }
 
-function playTrack(item: TrackDto) {
+function openPlaylist(id: string) {
+  if (!ensureLogin()) {
+    sessionStorage.setItem('loginRedirect', `/playlist/${id}`)
+    return
+  }
+  void router.push(`/playlist/${id}`)
+}
+
+async function playPlaylist(id: string) {
   if (!ensureLogin()) return
-  player.playTrack(item, latest.value.length ? latest.value : [item])
+  try {
+    const { data } = await http.get(`/api/playlists/${id}`)
+    const tracks = (data.data?.tracks || []) as TrackDto[]
+    if (!tracks.length) return
+    player.setQueue(tracks, 0)
+  } catch {
+    // keep quiet; http interceptor already toasts
+  }
+}
+
+async function loadRecommendedPlaylists() {
+  try {
+    const { data } = await http.get('/api/discover/recommended-playlists', {
+      params: { limit: 6 },
+    })
+    playlists.value = data.data?.list || []
+  } catch {
+    playlists.value = []
+  }
 }
 
 async function reload() {
@@ -165,7 +206,15 @@ async function reload() {
   } catch {
     // keep current
   }
+  await loadRecommendedPlaylists()
 }
+
+watch(
+  () => user.accessToken,
+  () => {
+    void loadRecommendedPlaylists()
+  },
+)
 
 onMounted(async () => {
   loading.value = true

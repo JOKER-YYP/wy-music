@@ -43,38 +43,209 @@ router.get('/', optionalAuth, async (_req, res) => {
   })
 })
 
-/** 歌单广场：公开歌单 + 系统推荐 */
+/** 歌单广场：仅展示用户公开歌单 */
 router.get('/playlists', optionalAuth, async (_req, res) => {
   const list = await prisma.playlist.findMany({
     where: {
       isSystem: false,
+      isPublic: true,
     },
     include: {
       owner: { select: { nickname: true } },
       _count: { select: { tracks: true } },
       tracks: {
         orderBy: { position: 'asc' },
-        take: 1,
-        include: { track: { select: { coverUrl: true, playCount: true } } },
+        take: 30,
+        include: { track: { select: { coverUrl: true, playCount: true, status: true } } },
       },
     },
-    orderBy: [{ isPublic: 'desc' }, { createdAt: 'desc' }],
-    take: 60,
+    orderBy: [{ createdAt: 'desc' }],
+    take: 80,
   })
 
   const cards = list
-    .filter((p) => p._count.tracks > 0 || !p.isSystem)
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      coverUrl: toPublicUrl(p.coverUrl || p.tracks[0]?.track?.coverUrl),
-      trackCount: p._count.tracks,
-      playCount: p.tracks.reduce((s, t) => s + (t.track.playCount || 0), 0),
-      ownerNickname: p.owner.nickname,
-      isSystem: p.isSystem,
-    }))
+    .filter((p) => p._count.tracks > 0)
+    .map((p) => {
+      const published = p.tracks.filter((t) => t.track.status === 'published')
+      return {
+        id: p.id,
+        name: p.name,
+        coverUrl: toPublicUrl(p.coverUrl || published[0]?.track?.coverUrl),
+        trackCount: p._count.tracks,
+        playCount: published.reduce((s, t) => s + (t.track.playCount || 0), 0),
+        ownerNickname: p.owner.nickname,
+        isSystem: p.isSystem,
+      }
+    })
 
   return ok(res, { list: cards })
+})
+
+/**
+ * 推荐歌单：他人公开歌单，按当前用户喜欢/历史/自建歌单口味匹配
+ * 未登录时回退为热度公开歌单
+ */
+router.get('/recommended-playlists', optionalAuth, async (req: AuthedRequest, res) => {
+  const limit = Math.min(24, Math.max(1, Number(req.query.limit) || 12))
+  const userId = req.user?.id
+
+  const playlists = await prisma.playlist.findMany({
+    where: {
+      isPublic: true,
+      isSystem: false,
+      ...(userId ? { ownerId: { not: userId } } : {}),
+    },
+    include: {
+      owner: { select: { nickname: true } },
+      _count: { select: { tracks: true } },
+      tracks: {
+        orderBy: { position: 'asc' },
+        take: 40,
+        include: {
+          track: {
+            select: {
+              coverUrl: true,
+              playCount: true,
+              artists: true,
+              album: true,
+              status: true,
+            },
+          },
+        },
+      },
+    },
+    take: 100,
+  })
+
+  const candidates = playlists.filter((p) => {
+    if (p._count.tracks <= 0) return false
+    return p.tracks.some((t) => t.track.status === 'published')
+  })
+
+  const artistScore = new Map<string, number>()
+  const albumScore = new Map<string, number>()
+  const tagScore = new Map<string, number>()
+  let hasTaste = false
+
+  if (userId) {
+    const [likes, history, mineTracks] = await Promise.all([
+      prisma.like.findMany({
+        where: { userId },
+        include: { track: true },
+        orderBy: { createdAt: 'desc' },
+        take: 80,
+      }),
+      prisma.playHistory.findMany({
+        where: { userId },
+        include: { track: true },
+        orderBy: { playedAt: 'desc' },
+        take: 100,
+      }),
+      prisma.playlistTrack.findMany({
+        where: { playlist: { ownerId: userId } },
+        include: { track: true },
+        take: 160,
+      }),
+    ])
+
+    const bumpArtist = (name: string, w: number) => {
+      const n = name.trim()
+      if (!n || n === '未知歌手') return
+      artistScore.set(n, (artistScore.get(n) || 0) + w)
+    }
+    const bumpAlbum = (name: string | null | undefined, w: number) => {
+      const n = (name || '').trim()
+      if (!n || n === '未知专辑') return
+      albumScore.set(n, (albumScore.get(n) || 0) + w)
+    }
+    const absorb = (
+      track: { artists: string; album: string | null; status: string },
+      weight: number,
+    ) => {
+      if (track.status !== 'published') return
+      hasTaste = true
+      for (const a of parseArtists(track.artists)) bumpArtist(a, weight)
+      bumpAlbum(track.album, weight * 0.55)
+    }
+
+    for (const like of likes) absorb(like.track, 5)
+    const seenHist = new Set<string>()
+    let histIdx = 0
+    for (const h of history) {
+      if (seenHist.has(h.trackId)) continue
+      seenHist.add(h.trackId)
+      absorb(h.track, Math.max(1.2, 3.5 - histIdx * 0.06))
+      histIdx += 1
+      if (histIdx >= 50) break
+    }
+    for (const pt of mineTracks) absorb(pt.track, 2)
+
+    const minePlaylists = await prisma.playlist.findMany({
+      where: { ownerId: userId, isSystem: false },
+      select: { tags: true },
+      take: 40,
+    })
+    for (const mp of minePlaylists) {
+      const tags = String(mp.tags || '')
+        .split(/[,，/、\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+      for (const tag of tags) {
+        tagScore.set(tag, (tagScore.get(tag) || 0) + 3)
+      }
+    }
+  }
+
+  type ScoredCard = {
+    id: string
+    name: string
+    coverUrl: string | null
+    trackCount: number
+    playCount: number
+    ownerNickname: string
+    tags: string | null
+    score: number
+  }
+
+  const scored: ScoredCard[] = candidates.map((p) => {
+    const published = p.tracks.filter((t) => t.track.status === 'published')
+    const playCount = published.reduce((s, t) => s + (t.track.playCount || 0), 0)
+    let score = Math.log10(playCount + 1) * 1.2 + Math.min(published.length, 30) * 0.05
+
+    if (hasTaste) {
+      for (const pt of published) {
+        for (const a of parseArtists(pt.track.artists)) {
+          if (a && a !== '未知歌手') score += (artistScore.get(a) || 0) * 2.4
+        }
+        const album = (pt.track.album || '').trim()
+        if (album && album !== '未知专辑') score += (albumScore.get(album) || 0) * 1.2
+      }
+      const tags = String(p.tags || '')
+        .split(/[,，/、\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+      for (const tag of tags) score += (tagScore.get(tag) || 0) * 4
+    }
+
+    return {
+      id: p.id,
+      name: p.name,
+      coverUrl: toPublicUrl(p.coverUrl || published[0]?.track?.coverUrl),
+      trackCount: p._count.tracks,
+      playCount,
+      ownerNickname: p.owner.nickname,
+      tags: p.tags ?? null,
+      score,
+    }
+  })
+
+  scored.sort((a, b) => b.score - a.score || b.playCount - a.playCount)
+  const list = scored.slice(0, limit).map(({ score: _s, ...rest }) => rest)
+
+  return ok(res, {
+    list,
+    personalized: Boolean(userId && hasTaste),
+  })
 })
 
 /** 搜索下拉：空态热搜/猜你喜欢/榜单；有关键词时返回联想 */

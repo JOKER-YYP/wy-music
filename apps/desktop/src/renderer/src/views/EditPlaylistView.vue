@@ -81,6 +81,14 @@
             </div>
           </div>
 
+          <div class="field">
+            <label>公开：</label>
+            <div class="public-row">
+              <el-switch v-model="form.isPublic" />
+              <span class="public-tip">开启后，其他人可在「推荐歌单 / 歌单广场」看到</span>
+            </div>
+          </div>
+
           <div class="actions">
             <button class="btn-save" type="button" :disabled="saving" @click="onSave">
               {{ saving ? '保存中…' : '保存' }}
@@ -207,6 +215,7 @@ const previewUrl = ref('')
 const form = reactive({
   name: '',
   description: '',
+  isPublic: false,
 })
 
 const selectedTags = ref<string[]>([])
@@ -292,6 +301,7 @@ async function load() {
     detail.value = d
     form.name = d.name || ''
     form.description = d.description || ''
+    form.isPublic = Boolean(d.isPublic)
     selectedTags.value = parseTags(d.tags)
   } catch {
     detail.value = null
@@ -313,6 +323,7 @@ async function onSave() {
       name,
       description: form.description.trim(),
       tags: selectedTags.value.join(','),
+      isPublic: form.isPublic,
     })
     ElMessage.success('已保存')
     router.replace(`/playlist/${detail.value.id}`)
@@ -428,6 +439,16 @@ h2 {
   align-items: center;
   gap: 8px;
   flex: 1;
+}
+.public-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.public-tip {
+  font-size: 12px;
+  color: #999;
 }
 .tag-chip {
   height: 28px;

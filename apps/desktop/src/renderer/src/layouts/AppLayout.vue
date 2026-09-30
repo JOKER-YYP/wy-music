@@ -197,6 +197,11 @@
     <NowPlayingPanel />
     <CollectPlaylistModal />
     <ImportPlaylistModal :visible="importPlaylistOpen" @close="importPlaylistOpen = false" />
+    <CreatePlaylistModal
+      v-model:visible="createPlaylistOpen"
+      :loading="createPlaylistLoading"
+      @confirm="onConfirmCreatePlaylist"
+    />
     <CommentsPanel />
     <MessagePanel
       :visible="messageOpen"
@@ -238,6 +243,7 @@ import LoginModal from '../components/LoginModal.vue'
 import NowPlayingPanel from '../components/NowPlayingPanel.vue'
 import CollectPlaylistModal from '../components/CollectPlaylistModal.vue'
 import ImportPlaylistModal from '../components/ImportPlaylistModal.vue'
+import CreatePlaylistModal from '../components/CreatePlaylistModal.vue'
 import CommentsPanel from '../components/CommentsPanel.vue'
 import SearchDropdown from '../components/SearchDropdown.vue'
 import MessagePanel from '../components/MessagePanel.vue'
@@ -260,6 +266,8 @@ const messageOpen = ref(false)
 const unreadTotal = ref(0)
 const isMaximized = ref(false)
 const importPlaylistOpen = ref(false)
+const createPlaylistOpen = ref(false)
+const createPlaylistLoading = ref(false)
 let unsubMaximized: (() => void) | null = null
 
 async function refreshMaximized() {
@@ -510,19 +518,20 @@ async function onCreatePlaylist() {
     ui.openLogin('login')
     return
   }
+  createPlaylistOpen.value = true
+}
+
+async function onConfirmCreatePlaylist(payload: { name: string; isPublic: boolean }) {
+  createPlaylistLoading.value = true
   try {
-    const { value } = await ElMessageBox.prompt('请输入歌单名称', '新建歌单', {
-      confirmButtonText: '创建',
-      cancelButtonText: '取消',
-      inputPattern: /\S+/,
-      inputErrorMessage: '名称不能为空',
-      inputPlaceholder: '例如：我的收藏',
-    })
-    const created = await playlistStore.create(value.trim())
-    ElMessage.success('歌单已创建')
+    const created = await playlistStore.create(payload.name, { isPublic: payload.isPublic })
+    createPlaylistOpen.value = false
+    ElMessage.success(payload.isPublic ? '公开歌单已创建' : '歌单已创建')
     router.push(`/playlist/${created.id}`)
   } catch {
-    // cancel
+    // http interceptor handles toast
+  } finally {
+    createPlaylistLoading.value = false
   }
 }
 

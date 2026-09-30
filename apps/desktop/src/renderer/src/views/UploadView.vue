@@ -2,7 +2,7 @@
   <div class="upload-page">
     <h2>上传到公共曲库</h2>
     <p class="tip">
-      支持 mp3 / wav / flac / m4a / aac，单文件不超过 100MB。
+      支持 mp3 / wav / flac / m4a / aac，单文件不超过 500MB。
       <template v-if="isDesktop">
         桌面端可扫描文件夹批量上传；同目录下同名 <code>.lrc</code> 会自动匹配歌词。
         扫描后会对比公共曲库，将未收录的「新曲」标出并排在前面。

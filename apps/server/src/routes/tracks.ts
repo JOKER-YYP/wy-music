@@ -37,7 +37,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: config.uploadMaxSizeMb * 1024 * 1024 },
+  limits: {
+    fileSize: config.uploadMaxSizeMb * 1024 * 1024,
+    // 歌词文本等表单字段
+    fieldSize: 2 * 1024 * 1024,
+  },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase()
     if (!AUDIO_EXT_WHITELIST.includes(ext as (typeof AUDIO_EXT_WHITELIST)[number])) {
@@ -232,6 +236,13 @@ router.post(
   (req, res, next) => {
     upload.single('audio')(req, res, (err) => {
       if (err) {
+        if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+          return fail(
+            res,
+            40010,
+            `文件过大，单文件不能超过 ${config.uploadMaxSizeMb}MB`,
+          )
+        }
         return fail(res, 40010, err.message || '上传失败')
       }
       next()

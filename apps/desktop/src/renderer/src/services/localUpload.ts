@@ -81,7 +81,9 @@ export async function uploadBrowserFile(
   if (extra?.lyricText !== undefined) fd.append('lyricText', extra.lyricText ?? '')
 
   const { data } = await http.post('/api/tracks/upload', fd, {
-    timeout: 120000,
+    timeout: 300000,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
   })
   return data
 }

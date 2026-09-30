@@ -17,7 +17,7 @@ import { readdir, stat, readFile } from 'fs/promises'
 import { createHash, randomUUID } from 'crypto'
 import FormData from 'form-data'
 import axios from 'axios'
-import { decodeLyricBytes, resolveTrackMeta } from '@wy-music/shared'
+import { decodeLyricBytes, resolveTrackMeta, UPLOAD_MAX_SIZE_MB } from '@wy-music/shared'
 
 /** music-metadata v10 在 CJS(Electron main) 下 require 只有 loadMusicMetadata，需动态 import */
 async function readAudioMetadata(filePath: string) {
@@ -993,9 +993,12 @@ app.whenReady().then(() => {
         }
 
         const st = await stat(filePath)
-        const maxBytes = 100 * 1024 * 1024
+        const maxBytes = UPLOAD_MAX_SIZE_MB * 1024 * 1024
         if (st.size > maxBytes) {
-          return { ok: false, message: '文件超过 100MB 限制' }
+          return {
+            ok: false,
+            message: `文件过大，单文件不能超过 ${UPLOAD_MAX_SIZE_MB}MB（当前 ${(st.size / 1024 / 1024).toFixed(1)}MB）`,
+          }
         }
 
         try {
@@ -1032,7 +1035,7 @@ app.whenReady().then(() => {
           },
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
-          timeout: 120000,
+          timeout: 300000,
           validateStatus: () => true,
         })
 

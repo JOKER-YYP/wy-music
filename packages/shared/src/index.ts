@@ -128,6 +128,10 @@ export const AUDIO_MIME_WHITELIST = [
 
 export const AUDIO_EXT_WHITELIST = ['.mp3', '.wav', '.flac', '.m4a', '.aac'] as const
 
+/** 单文件上传大小上限（MB），服务端可用环境变量 UPLOAD_MAX_SIZE_MB 覆盖 */
+export const UPLOAD_MAX_SIZE_MB = 500
+
+
 export const DEFAULT_PAGE_SIZE = 20
 
 function cjkCount(s: string): number {

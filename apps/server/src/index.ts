@@ -51,4 +51,5 @@ app.use((_req, res) => {
 app.listen(config.port, () => {
   console.log(`[wy-music-server] http://127.0.0.1:${config.port}`)
   console.log(`[storage] ${path.resolve(config.storageRoot)}`)
+  console.log(`[upload] max file size ${config.uploadMaxSizeMb}MB`)
 })

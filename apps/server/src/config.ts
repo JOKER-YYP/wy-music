@@ -1,11 +1,20 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
+import { UPLOAD_MAX_SIZE_MB } from '@wy-music/shared'
 
 dotenv.config()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
+
+function resolveUploadMaxMb() {
+  const raw = process.env.UPLOAD_MAX_SIZE_MB
+  if (raw == null || String(raw).trim() === '') return UPLOAD_MAX_SIZE_MB
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return UPLOAD_MAX_SIZE_MB
+  return Math.floor(n)
+}
 
 export const config = {
   port: Number(process.env.PORT || 3001),
@@ -15,6 +24,6 @@ export const config = {
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   storageRoot: path.resolve(rootDir, process.env.STORAGE_ROOT || './storage'),
   uploadNeedReview: process.env.UPLOAD_NEED_REVIEW === 'true',
-  uploadMaxSizeMb: Number(process.env.UPLOAD_MAX_SIZE_MB || 100),
+  uploadMaxSizeMb: resolveUploadMaxMb(),
   corsOrigin: (process.env.CORS_ORIGIN || '*').split(',').map((s) => s.trim()),
 }

@@ -959,4 +959,72 @@ router.get('/daily', requireAuth, async (req: AuthedRequest, res) => {
   })
 })
 
+/** 多源并行搜索：本地曲库 + migu/vkeys/tang/kw */
+router.get('/music-search', optionalAuth, async (req: AuthedRequest, res) => {
+  const keyword = String(req.query.keyword || req.query.q || '').trim()
+  if (!keyword) return fail(res, 40001, '请输入关键词')
+
+  const num = Math.min(50, Math.max(1, Number(req.query.num) || 20))
+  const { parallelMusicSearch } = await import('../services/musicSources/index.js')
+
+  const [localList, external] = await Promise.all([
+    (async () => {
+      const rows = await prisma.track.findMany({
+        where: {
+          status: 'published',
+          OR: [
+            { name: { contains: keyword } },
+            { artists: { contains: keyword } },
+            { album: { contains: keyword } },
+          ],
+        },
+        include: { uploader: { select: { nickname: true } } },
+        orderBy: { playCount: 'desc' },
+        take: num,
+      })
+      let likedSet = new Set<string>()
+      if (req.user) {
+        const likes = await prisma.like.findMany({
+          where: { userId: req.user.id, trackId: { in: rows.map((t) => t.id) } },
+          select: { trackId: true },
+        })
+        likedSet = new Set(likes.map((l) => l.trackId))
+      }
+      return rows.map((t) => ({
+        ...toTrackDto(t, likedSet.has(t.id)),
+        source: 'local' as const,
+      }))
+    })(),
+    parallelMusicSearch(keyword, num),
+  ])
+
+  return ok(res, {
+    list: [...localList, ...external.list],
+    localCount: localList.length,
+    externalCount: external.list.length,
+    sources: external.sources,
+    keyword,
+  })
+})
+
+/** 外部曲目点播详情：解析临时播放链 / 歌词 / 封面 */
+router.get('/music-detail', optionalAuth, async (req, res) => {
+  const { MUSIC_SOURCES } = await import('@wy-music/shared')
+  const source = String(req.query.source || '').trim()
+  const id = String(req.query.id || req.query.externalId || '').trim()
+  if (!(MUSIC_SOURCES as readonly string[]).includes(source)) {
+    return fail(res, 40001, '无效的音乐源')
+  }
+  if (!id) return fail(res, 40002, '缺少曲目 id')
+
+  try {
+    const { resolveMusicDetail } = await import('../services/musicSources/index.js')
+    const detail = await resolveMusicDetail(source as (typeof MUSIC_SOURCES)[number], id)
+    return ok(res, detail)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '解析播放地址失败'
+    return fail(res, 50001, msg, 502)
+  }
+})
+
 export default router

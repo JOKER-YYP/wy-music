@@ -81,6 +81,11 @@ declare global {
         }
       }) => Promise<{ ok: boolean; message?: string; data?: unknown }>
       toLocalPlayUrl: (filePath: string) => string
+      fetchJson?: (url: string) => Promise<unknown>
+      fetchFormJson?: (
+        url: string,
+        form: Record<string, string | number>,
+      ) => Promise<unknown>
       toggleMiniPlayer?: () => Promise<{ open: boolean }>
       closeMiniPlayer?: () => Promise<boolean>
       isMiniPlayerOpen?: () => Promise<boolean>

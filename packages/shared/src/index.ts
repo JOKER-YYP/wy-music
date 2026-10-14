@@ -24,6 +24,71 @@ export interface UserPublic {
   createdAt: string
 }
 
+/** 外部音乐源（并行搜索；netease/qq/kugou/kuwo 走 xm95522 聚合） */
+export type MusicSource =
+  | 'migu'
+  | 'vkeys'
+  | 'tang'
+  | 'kw'
+  | 'netease'
+  | 'qq'
+  | 'kugou'
+  | 'kuwo'
+
+export const MUSIC_SOURCES: MusicSource[] = [
+  'migu',
+  'vkeys',
+  'tang',
+  'kw',
+  'netease',
+  'qq',
+  'kugou',
+  'kuwo',
+]
+
+export const MUSIC_SOURCE_LABEL: Record<MusicSource, string> = {
+  migu: '源1',
+  vkeys: '源2',
+  tang: '源3',
+  kw: '源4',
+  netease: '网易',
+  qq: 'QQ',
+  kugou: '酷狗',
+  kuwo: '酷我',
+}
+
+/** xm95522 聚合接口承载的源 */
+export type XmMusicSource = 'netease' | 'qq' | 'kugou' | 'kuwo'
+
+export const XM_MUSIC_SOURCES: XmMusicSource[] = ['netease', 'qq', 'kugou', 'kuwo']
+
+export function isXmMusicSource(source: string): source is XmMusicSource {
+  return (XM_MUSIC_SOURCES as readonly string[]).includes(source)
+}
+
+export function isExternalTrackId(id: string): boolean {
+  return id.startsWith('ext:')
+}
+
+export function makeExternalTrackId(source: MusicSource, externalId: string): string {
+  return `ext:${source}:${encodeURIComponent(String(externalId))}`
+}
+
+export function parseExternalTrackId(
+  id: string,
+): { source: MusicSource; externalId: string } | null {
+  if (!isExternalTrackId(id)) return null
+  const parts = id.split(':')
+  if (parts.length < 3) return null
+  const source = parts[1] as MusicSource
+  if (!MUSIC_SOURCES.includes(source)) return null
+  try {
+    return { source, externalId: decodeURIComponent(parts.slice(2).join(':')) }
+  } catch {
+    return { source, externalId: parts.slice(2).join(':') }
+  }
+}
+
 export interface TrackDto {
   id: string
   name: string
@@ -42,6 +107,12 @@ export interface TrackDto {
   mimeType: string
   createdAt: string
   updatedAt: string
+  /** 本地曲库为 local / 缺省；外部搜索结果为对应源 */
+  source?: 'local' | MusicSource
+  /** 外部源内的原始 id（如 song_mid / rid / n） */
+  externalId?: string
+  /** 付费等提示（仅展示） */
+  payTag?: string | null
 }
 
 export type NotificationChannel = 'dm' | 'comment' | 'mention' | 'notice'

@@ -19,14 +19,22 @@
         </div>
         <div class="sub">
           <span v-if="track.liked" class="heart" title="喜欢">♥</span>
+          <span v-if="sourceTag(track)" class="badge badge-source">{{ sourceTag(track) }}</span>
+          <span v-if="track.payTag" class="badge badge-pay">{{ track.payTag }}</span>
           <span v-if="qualityTag(track)" class="badge badge-sq">{{ qualityTag(track) }}</span>
-          <span class="badge badge-origin">原唱</span>
+          <span v-if="!isExternal(track)" class="badge badge-origin">原唱</span>
           <span class="artists">{{ track.artists?.join(' / ') || '未知歌手' }}</span>
         </div>
       </div>
 
       <div class="hover-actions">
-        <button type="button" title="下载" class="disabled-act" @click.stop>
+        <button
+          type="button"
+          :title="isExternal(track) ? '下载到曲库' : '下载'"
+          :class="{ 'disabled-act': !isExternal(track) || downloadingId === track.id }"
+          :disabled="!isExternal(track) || downloadingId === track.id"
+          @click.stop="onDownload(track)"
+        >
           <el-icon><Download /></el-icon>
         </button>
         <button type="button" title="喜欢" @click.stop="onLike(track)">
@@ -41,7 +49,7 @@
       </div>
     </div>
 
-    <el-empty v-if="!displayTracks.length" description="暂无歌曲" :image-size="72" />
+    <el-empty v-if="!hideEmpty && !displayTracks.length" description="暂无歌曲" :image-size="72" />
   </div>
 
   <Teleport to="body">
@@ -54,6 +62,14 @@
       <div class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
         <button type="button" @click="menu.track && onPlay(menu.track)">播放</button>
         <button type="button" @click="menu.track && onNext(menu.track)">下一首播放</button>
+        <button
+          v-if="menu.track && isExternal(menu.track)"
+          type="button"
+          :disabled="downloadingId === menu.track.id"
+          @click="menu.track && onDownload(menu.track)"
+        >
+          下载到曲库
+        </button>
         <button type="button" @click="menu.track && onLike(menu.track)">
           {{ menu.track?.liked ? '取消喜欢' : '喜欢' }}
         </button>
@@ -68,7 +84,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, MoreFilled, Star, StarFilled } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
+import { isExternalTrackId, MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
+import { importExternalToLibrary } from '../services/externalMusic'
 import { usePlayerStore } from '../stores/player'
 import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
@@ -86,13 +104,15 @@ const props = withDefaults(
     minItemWidth?: number
     /** 一行最多几首 */
     maxColumns?: number
+    hideEmpty?: boolean
   }>(),
   {
     columns: 3,
     adaptive: false,
     rows: 3,
     minItemWidth: 280,
-    maxColumns: 3
+    maxColumns: 3,
+    hideEmpty: false,
   }
 )
 
@@ -103,6 +123,7 @@ const ui = useUiStore()
 
 const rootEl = ref<HTMLElement | null>(null)
 const measuredCols = ref(props.columns)
+const downloadingId = ref<string | null>(null)
 let ro: ResizeObserver | null = null
 
 function recomputeCols() {
@@ -169,6 +190,15 @@ function coverStyle(t: TrackDto) {
     : { background: 'linear-gradient(135deg,#f3c4c4,#ec4141)' }
 }
 
+function isExternal(t: TrackDto) {
+  return isExternalTrackId(t.id) || Boolean(t.source && t.source !== 'local')
+}
+
+function sourceTag(t: TrackDto): string | null {
+  if (!t.source || t.source === 'local') return null
+  return MUSIC_SOURCE_LABEL[t.source] || t.source
+}
+
 function qualityTag(t: TrackDto): string | null {
   // 无码率字段时按体积粗略判断
   const size = Number(t.fileSize || 0)
@@ -194,8 +224,50 @@ function onNext(t: TrackDto) {
   ElMessage.success('已添加到下一首播放')
 }
 
+async function onDownload(t: TrackDto) {
+  closeMenu()
+  if (!isExternal(t)) {
+    ElMessage.info('本地曲库歌曲无需下载')
+    return
+  }
+  if (!user.accessToken) {
+    ui.openLogin('login')
+    return
+  }
+  if (downloadingId.value === t.id) return
+  downloadingId.value = t.id
+  const loading = ElMessage({
+    message: `正在下载「${t.name}」到曲库…`,
+    type: 'info',
+    duration: 0,
+    showClose: false,
+  })
+  try {
+    const imported = await importExternalToLibrary(t)
+    loading.close()
+    ElMessage.success(
+      imported.status === 'pending'
+        ? `「${imported.name}」已提交审核`
+        : `「${imported.name}」已下载到曲库`,
+    )
+    // 不触发整页 refresh：搜索页会重新并行拉外部源并进入 v-loading，易白屏卡住
+  } catch (e: any) {
+    loading.close()
+    // http 拦截器已提示；详情解析等本地错误再提示
+    if (e?.message && typeof e.code !== 'number' && !e?.response) {
+      ElMessage.error(e.message)
+    }
+  } finally {
+    downloadingId.value = null
+  }
+}
+
 async function onLike(t: TrackDto) {
   closeMenu()
+  if (isExternal(t)) {
+    ElMessage.info('外部搜索结果请先下载到曲库后再收藏')
+    return
+  }
   if (!user.accessToken) {
     ui.openLogin('login')
     return
@@ -211,6 +283,10 @@ async function onLike(t: TrackDto) {
 
 async function onDelete(t: TrackDto) {
   closeMenu()
+  if (isExternal(t)) {
+    ElMessage.info('外部搜索结果无需删除')
+    return
+  }
   try {
     await ElMessageBox.confirm(`确定删除「${t.name}」？此操作不可恢复。`, '删除歌曲', {
       type: 'warning',
@@ -339,6 +415,16 @@ function closeMenu() {
   font-weight: 600;
 }
 
+.badge-source {
+  color: #1485ee;
+  border: 1px solid rgba(20, 133, 238, 0.35);
+  background: rgba(20, 133, 238, 0.08);
+}
+.badge-pay {
+  color: #c27c0e;
+  border: 1px solid rgba(194, 124, 14, 0.35);
+  background: rgba(194, 124, 14, 0.08);
+}
 .badge-sq {
   color: #c8a45c;
   border: 1px solid rgba(200, 164, 92, 0.55);

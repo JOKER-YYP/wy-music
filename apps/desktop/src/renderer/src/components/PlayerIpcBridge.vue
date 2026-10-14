@@ -25,8 +25,8 @@ async function ensureLyric() {
     return
   }
   if (lyricCache.value?.id === t.id) return
-  if (t.id.startsWith('local:') || t.id.startsWith('webfile:')) {
-    lyricCache.value = { id: t.id, text: '' }
+  if (t.id.startsWith('local:') || t.id.startsWith('webfile:') || t.id.startsWith('ext:')) {
+    lyricCache.value = { id: t.id, text: t.lyricText || '' }
     return
   }
   if (lyricLoadingId === t.id) return
@@ -98,7 +98,14 @@ function onCommand(cmd: { type: string; time?: number }) {
 
 async function toggleLikeFromIpc() {
   const t = currentTrack.value
-  if (!t || t.id.startsWith('local:') || t.id.startsWith('webfile:')) return
+  if (
+    !t ||
+    t.id.startsWith('local:') ||
+    t.id.startsWith('webfile:') ||
+    t.id.startsWith('ext:')
+  ) {
+    return
+  }
   try {
     const { data } = await http.post(`/api/likes/${t.id}`)
     t.liked = data.data.liked

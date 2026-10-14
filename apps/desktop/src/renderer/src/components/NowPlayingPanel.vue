@@ -366,7 +366,8 @@ async function loadLyric() {
     !raw &&
     track.value.id &&
     !track.value.id.startsWith('local:') &&
-    !track.value.id.startsWith('webfile:')
+    !track.value.id.startsWith('webfile:') &&
+    !track.value.id.startsWith('ext:')
   ) {
     try {
       const { data } = await http.get(`/api/tracks/${track.value.id}/lyric`)
@@ -379,8 +380,8 @@ async function loadLyric() {
 }
 
 watch(
-  () => track.value?.id,
-  (id) => {
+  () => [track.value?.id, track.value?.lyricText] as const,
+  ([id]) => {
     void loadLyric()
     void loadCommentCount(id || '')
   },

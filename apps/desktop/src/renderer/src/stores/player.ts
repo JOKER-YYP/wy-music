@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import type { TrackDto } from '@wy-music/shared'
+import type { MusicSource, TrackDto } from '@wy-music/shared'
+import { isExternalTrackId, parseExternalTrackId } from '@wy-music/shared'
 import { http, streamUrl } from '../services/http'
 
 type PlayMode = 'order' | 'loop' | 'single' | 'shuffle'
@@ -9,6 +10,31 @@ export type QueueTrack = TrackDto & {
   /** 网页端选中的 File（试听用，比 blob URL 更稳） */
   previewFile?: File
   previewUrl?: string
+}
+
+async function resolveExternalPlay(track: QueueTrack): Promise<string> {
+  const parsed =
+    parseExternalTrackId(track.id) ||
+    (track.source &&
+    track.source !== 'local' &&
+    track.externalId
+      ? { source: track.source as MusicSource, externalId: track.externalId }
+      : null)
+  if (!parsed) throw new Error('无法识别外部曲目')
+
+  // 与皮卡丘音乐站一致：前端直连详情接口
+  const { resolveExternalDetail } = await import('../services/externalMusic')
+  const detail = await resolveExternalDetail(parsed.source, parsed.externalId)
+  const musicUrl = detail?.musicUrl
+  if (!musicUrl) throw new Error('未获取到播放地址')
+
+  track.previewUrl = musicUrl
+  if (detail.coverUrl) track.coverUrl = detail.coverUrl
+  if (detail.lyricText) track.lyricText = detail.lyricText
+  if (detail.name) track.name = detail.name
+  if (detail.artists?.length) track.artists = detail.artists
+  if (detail.album != null) track.album = detail.album
+  return musicUrl
 }
 
 function toUint8Array(data: unknown): Uint8Array {
@@ -136,9 +162,17 @@ export const usePlayerStore = defineStore('player', {
         return this.objectUrl
       }
 
-      // 2) 已有预览 URL（兼容）
+      // 2) 已有预览 URL（兼容 / 外部源已解析）
       if (track.previewUrl) {
         return track.previewUrl
+      }
+
+      // 2.5) 外部多源搜索结果：点播时再解析播放链
+      if (
+        isExternalTrackId(track.id) ||
+        (track.source && track.source !== 'local')
+      ) {
+        return resolveExternalPlay(track)
       }
 
       // 3) Electron 本地路径

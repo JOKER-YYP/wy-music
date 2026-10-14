@@ -448,6 +448,297 @@ router.post(
   },
 )
 
+/** 外部曲目入库：拉取音频 + 封面 + 歌词后写入曲库 */
+router.post('/import-external', requireAuth, async (req: AuthedRequest, res) => {
+  const { MUSIC_SOURCES } = await import('@wy-music/shared')
+  const { downloadToFile, guessAudioExt, guessImageExt } = await import(
+    '../services/downloadRemote.js'
+  )
+
+  const sourceRaw = String(req.body?.source || '').trim()
+  const externalId = String(req.body?.externalId || '').trim()
+  let audioUrl = String(req.body?.audioUrl || '').trim()
+  let coverUrl = String(req.body?.coverUrl || '').trim()
+  let lyricText: string | null = Object.prototype.hasOwnProperty.call(req.body || {}, 'lyricText')
+    ? String(req.body.lyricText || '') || null
+    : null
+  let detailName = String(req.body?.name || '').trim()
+  let detailArtists: string[] | undefined
+  let detailAlbum = String(req.body?.album || '').trim()
+
+  const artistsRaw = req.body?.artists
+  if (Array.isArray(artistsRaw)) {
+    detailArtists = artistsRaw.map((s) => String(s).trim()).filter(Boolean)
+  } else if (artistsRaw && String(artistsRaw).trim()) {
+    detailArtists = String(artistsRaw)
+      .split(/[,，/]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+
+  // 优先服务端解析详情，保证歌词/封面/音频地址齐全
+  if (sourceRaw && externalId && (MUSIC_SOURCES as readonly string[]).includes(sourceRaw)) {
+    try {
+      const { resolveMusicDetail } = await import('../services/musicSources/index.js')
+      const detail = await resolveMusicDetail(
+        sourceRaw as (typeof MUSIC_SOURCES)[number],
+        externalId,
+      )
+      audioUrl = detail.musicUrl || audioUrl
+      if (detail.coverUrl) coverUrl = detail.coverUrl
+      if (detail.lyricText) lyricText = detail.lyricText
+      if (detail.name) detailName = detail.name
+      if (detail.artists?.length) detailArtists = detail.artists
+      if (detail.album) detailAlbum = String(detail.album)
+    } catch (e: any) {
+      if (!audioUrl) {
+        return fail(res, 40014, e?.message || '解析外部曲目失败')
+      }
+    }
+  }
+
+  // 仅有歌词 URL 时，服务端再拉一次歌词正文
+  const lyricUrl = String(req.body?.lyricUrl || '').trim()
+  if (!lyricText && lyricUrl) {
+    try {
+      const { requestText } = await import('../services/musicSources/http.js')
+      const { status, body } = await requestText(lyricUrl, { timeoutMs: 20_000 })
+      if (status < 400 && body.trim()) lyricText = body
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (!audioUrl) {
+    return fail(res, 40011, '缺少音频地址')
+  }
+  let parsed: URL
+  try {
+    parsed = new URL(audioUrl)
+  } catch {
+    return fail(res, 40011, '音频地址无效')
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return fail(res, 40011, '仅支持 http/https 音频地址')
+  }
+
+  const now = new Date()
+  const audioDir = path.join(
+    config.storageRoot,
+    'audio',
+    String(now.getFullYear()),
+    String(now.getMonth() + 1).padStart(2, '0'),
+  )
+  fs.mkdirSync(audioDir, { recursive: true })
+  const tmpBase = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const tmpAbs = path.join(audioDir, `${tmpBase}.download`)
+
+  let absPath = tmpAbs
+  let relativeAudio = ''
+  let coverRelative: string | null = null
+  let embeddedCover: string | null = null
+  let fileSize = 0
+  let mimeType = 'audio/mpeg'
+  let durationMs = 0
+  let metaName = ''
+  let metaArtists: string[] = []
+  let metaAlbum = ''
+
+  try {
+    // 1) 音频
+    const dl = await downloadToFile(audioUrl, tmpAbs)
+    fileSize = dl.bytes
+    const ext = guessAudioExt(audioUrl, dl.contentType)
+    if (!AUDIO_EXT_WHITELIST.includes(ext as (typeof AUDIO_EXT_WHITELIST)[number])) {
+      throw new Error(`不支持的音频格式: ${ext}`)
+    }
+    absPath = path.join(audioDir, `${tmpBase}${ext}`)
+    fs.renameSync(tmpAbs, absPath)
+    relativeAudio = path.relative(config.storageRoot, absPath).replace(/\\/g, '/')
+
+    if (ext === '.wav') mimeType = 'audio/wav'
+    else if (ext === '.flac') mimeType = 'audio/flac'
+    else if (ext === '.m4a') mimeType = 'audio/mp4'
+    else if (ext === '.aac') mimeType = 'audio/aac'
+    else mimeType = 'audio/mpeg'
+    if (dl.contentType?.startsWith('audio/')) mimeType = dl.contentType.split(';')[0].trim()
+
+    try {
+      const meta = await parseFile(absPath)
+      durationMs = Math.round((meta.format.duration || 0) * 1000)
+      metaName = meta.common.title || ''
+      metaArtists = meta.common.artists || (meta.common.artist ? [meta.common.artist] : [])
+      metaAlbum = meta.common.album || ''
+      if (meta.common.picture?.[0]) {
+        const pic = meta.common.picture[0]
+        const picExt = pic.format?.includes('png') ? '.png' : '.jpg'
+        const coverDir = path.join(config.storageRoot, 'covers')
+        fs.mkdirSync(coverDir, { recursive: true })
+        const coverName = `${Date.now()}-emb${picExt}`
+        fs.writeFileSync(path.join(coverDir, coverName), pic.data)
+        embeddedCover = `covers/${coverName}`
+      }
+    } catch {
+      // 元数据解析失败不阻断
+    }
+
+    const MIN_DURATION_MS = 30_000
+    if (durationMs > 0 && durationMs < MIN_DURATION_MS) {
+      throw new Error('音频时长过短（需至少 30 秒）')
+    }
+
+    // 2) 封面：优先外部封面 URL，失败再用内嵌封面
+    if (coverUrl) {
+      try {
+        const coverDir = path.join(config.storageRoot, 'covers')
+        fs.mkdirSync(coverDir, { recursive: true })
+        const coverTmp = path.join(coverDir, `${Date.now()}-cover.download`)
+        const cdl = await downloadToFile(coverUrl, coverTmp, {
+          maxBytes: 8 * 1024 * 1024,
+          timeoutMs: 30_000,
+        })
+        const coverExt = guessImageExt(coverUrl, cdl.contentType)
+        const coverName = `${Date.now()}${coverExt}`
+        const coverAbs = path.join(coverDir, coverName)
+        fs.renameSync(coverTmp, coverAbs)
+        coverRelative = `covers/${coverName}`
+        if (embeddedCover && embeddedCover !== coverRelative) {
+          try {
+            const embAbs = audioAbsolutePath(embeddedCover)
+            if (fs.existsSync(embAbs)) fs.unlinkSync(embAbs)
+          } catch {
+            /* ignore */
+          }
+          embeddedCover = null
+        }
+      } catch {
+        coverRelative = embeddedCover
+      }
+    } else {
+      coverRelative = embeddedCover
+    }
+
+    const fileHash = hashFile(absPath)
+    const fromFile = resolveTrackMeta({
+      fileName: `import${ext}`,
+      title: metaName,
+      artists: metaArtists,
+      album: metaAlbum,
+    })
+    const name = detailName || fromFile.name || '未知歌曲'
+    let artists = detailArtists?.length
+      ? detailArtists
+      : (fromFile.artists || []).map((s) => String(s).trim()).filter(Boolean)
+    if (!artists.length) artists = ['未知歌手']
+    const album = detailAlbum || fromFile.album || '未知专辑'
+
+    const dup = await prisma.track.findFirst({
+      where: { fileHash, status: { not: 'offline' } },
+      include: { uploader: { select: { nickname: true } } },
+    })
+
+    if (dup) {
+      try {
+        if (fs.existsSync(absPath)) fs.unlinkSync(absPath)
+      } catch {
+        /* ignore */
+      }
+
+      const canUpdate = dup.uploaderId === req.user!.id || req.user!.role === 'admin'
+      const patch: Record<string, unknown> = {}
+      if (canUpdate) {
+        if (lyricText && !dup.lyricText) patch.lyricText = lyricText
+        if (coverRelative && !dup.coverUrl) patch.coverUrl = coverRelative
+        else if (coverRelative && dup.coverUrl) {
+          try {
+            const coverAbs = audioAbsolutePath(coverRelative)
+            if (fs.existsSync(coverAbs)) fs.unlinkSync(coverAbs)
+          } catch {
+            /* ignore */
+          }
+          coverRelative = null
+        }
+        if (detailName && dup.name !== detailName) patch.name = detailName
+        if (artists.length) {
+          const nextArtists = JSON.stringify(artists)
+          if (dup.artists !== nextArtists) patch.artists = nextArtists
+        }
+        if (detailAlbum && (dup.album || '') !== detailAlbum) patch.album = detailAlbum
+      } else if (coverRelative) {
+        try {
+          const coverAbs = audioAbsolutePath(coverRelative)
+          if (fs.existsSync(coverAbs)) fs.unlinkSync(coverAbs)
+        } catch {
+          /* ignore */
+        }
+        coverRelative = null
+      }
+
+      if (Object.keys(patch).length) {
+        const updated = await prisma.track.update({
+          where: { id: dup.id },
+          data: patch,
+          include: { uploader: { select: { nickname: true } } },
+        })
+        return ok(res, toTrackDto(updated), '曲库中已有相同歌曲，已补全信息')
+      }
+      return ok(res, toTrackDto(dup), '曲库中已有相同歌曲')
+    }
+
+    // 3) 写入曲库（含歌词）
+    const status = config.uploadNeedReview ? 'pending' : 'published'
+    const track = await prisma.track.create({
+      data: {
+        name,
+        artists: JSON.stringify(artists),
+        album,
+        durationMs,
+        coverUrl: coverRelative,
+        audioPath: relativeAudio,
+        lyricText,
+        fileHash,
+        fileSize,
+        mimeType,
+        status,
+        uploaderId: req.user!.id,
+      },
+      include: { uploader: { select: { nickname: true } } },
+    })
+
+    if (status === 'published') {
+      try {
+        const { notifyArtistNewTrack } = await import('../services/notify.js')
+        await notifyArtistNewTrack(track)
+      } catch (e) {
+        console.warn('[notifyArtistNewTrack]', e)
+      }
+    }
+
+    return ok(res, toTrackDto(track), status === 'pending' ? '已提交，等待审核' : '已下载到曲库')
+  } catch (e: any) {
+    try {
+      if (fs.existsSync(tmpAbs)) fs.unlinkSync(tmpAbs)
+    } catch {
+      /* ignore */
+    }
+    try {
+      if (absPath !== tmpAbs && fs.existsSync(absPath)) fs.unlinkSync(absPath)
+    } catch {
+      /* ignore */
+    }
+    for (const rel of [coverRelative, embeddedCover]) {
+      if (!rel) continue
+      try {
+        const coverAbs = audioAbsolutePath(rel)
+        if (fs.existsSync(coverAbs)) fs.unlinkSync(coverAbs)
+      } catch {
+        /* ignore */
+      }
+    }
+    return fail(res, 40014, e?.message || '导入失败')
+  }
+})
+
 router.put('/:id', requireAuth, async (req: AuthedRequest, res) => {
   const track = await prisma.track.findUnique({ where: { id: req.params.id } })
   if (!track) {

@@ -41,8 +41,33 @@
             播放
           </el-button>
         </div>
-        <SongGrid :tracks="tracks" :columns="2" @refresh="load" />
+        <div v-if="sourceTips.length" class="source-tips">
+          <span
+            v-for="s in sourceTips"
+            :key="s.source"
+            class="source-tip"
+            :class="{ bad: !s.ok }"
+          >
+            {{ s.label }}{{ s.ok ? ` ${s.count}首` : ' 失败' }}
+            <span v-if="!s.ok && s.error" class="source-err" :title="s.error">
+              （{{ s.error }}）
+            </span>
+          </span>
+        </div>
+        <SongGrid :tracks="tracks" :columns="2" hide-empty @refresh="reload" />
         <el-empty v-if="!tracks.length && !loading" description="未找到相关单曲" :image-size="64" />
+        <div v-if="tracks.length" class="load-more">
+          <el-button
+            v-if="hasMore"
+            round
+            :loading="loadingMore"
+            :disabled="loading || loadingMore"
+            @click="loadMore"
+          >
+            加载更多
+          </el-button>
+          <span v-else class="load-more-end">没有更多了</span>
+        </div>
       </section>
 
       <section v-if="tab === 'all' || tab === 'playlist'" class="block">
@@ -72,12 +97,18 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { PlaylistDto, TrackDto } from '@wy-music/shared'
+import { VideoPlay } from '@element-plus/icons-vue'
+import type { MusicSource, PlaylistDto, TrackDto } from '@wy-music/shared'
+import { MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
+import { parallelExternalSearch, type SourceSearchStat } from '../services/externalMusic'
 import { usePlayerStore } from '../stores/player'
 import { usePlaylistStore } from '../stores/playlist'
 import { useUserStore } from '../stores/user'
 import SongGrid from '../components/SongGrid.vue'
+
+/** 与皮卡丘站默认一致：每源每次 20 首 */
+const PAGE_SIZE = 20
 
 const route = useRoute()
 const router = useRouter()
@@ -96,9 +127,22 @@ type TabKey = (typeof tabs)[number]['key']
 
 const tab = ref<TabKey>('all')
 const loading = ref(false)
+const loadingMore = ref(false)
+const hasMore = ref(false)
+const page = ref(1)
 const tracks = ref<TrackDto[]>([])
+const sourceStats = ref<SourceSearchStat[]>([])
+let seq = 0
 
 const keyword = computed(() => String(route.query.keyword || '').trim())
+
+const sourceTips = computed(() =>
+  sourceStats.value.map((s) => ({
+    ...s,
+    label: MUSIC_SOURCE_LABEL[s.source as MusicSource] || s.source,
+    error: s.error ? s.error.slice(0, 40) : undefined,
+  })),
+)
 
 const artistSummary = computed(() => {
   if (!keyword.value || !tracks.value.length) return null
@@ -108,7 +152,9 @@ const artistSummary = computed(() => {
   )
   if (!matched.length) return null
   const name =
-    matched[0].artists?.find((a) => a.toLowerCase().includes(kw)) || matched[0].artists?.[0] || keyword.value
+    matched[0].artists?.find((a) => a.toLowerCase().includes(kw)) ||
+    matched[0].artists?.[0] ||
+    keyword.value
   return {
     name,
     count: matched.length,
@@ -135,21 +181,88 @@ function plistCover(p: PlaylistDto) {
   return { backgroundImage: 'linear-gradient(135deg,#ff8a80,#ec4141)' }
 }
 
-async function load() {
-  if (!keyword.value) {
-    tracks.value = []
-    return
+function mergeTracks(prev: TrackDto[], next: TrackDto[]) {
+  const seen = new Set(prev.map((t) => t.id))
+  const out = [...prev]
+  for (const t of next) {
+    if (!t?.id || seen.has(t.id)) continue
+    seen.add(t.id)
+    out.push(t)
   }
-  loading.value = true
+  return out
+}
+
+async function fetchLocal(nextPage: number) {
   try {
     const { data } = await http.get('/api/tracks', {
-      params: { page: 1, pageSize: 40, keyword: keyword.value },
+      params: { page: nextPage, pageSize: PAGE_SIZE, keyword: keyword.value },
     })
-    tracks.value = data.data.list || []
-    if (user.accessToken) await playlistStore.fetchMine()
-  } finally {
-    loading.value = false
+    const list = ((data.data.list || []) as TrackDto[]).map((t) => ({
+      ...t,
+      source: 'local' as const,
+    }))
+    const total = Number(data.data.total || 0)
+    return {
+      list,
+      hasMore: nextPage * PAGE_SIZE < total,
+    }
+  } catch {
+    return { list: [] as TrackDto[], hasMore: false }
   }
+}
+
+async function fetchPage(nextPage: number, append: boolean) {
+  if (!keyword.value) {
+    tracks.value = []
+    hasMore.value = false
+    sourceStats.value = []
+    return
+  }
+  const token = ++seq
+  if (append) loadingMore.value = true
+  else loading.value = true
+
+  try {
+    // 皮卡丘站：migu/qq 用累计 limit；vkeys/kw 用 page
+    const cumulativeLimit = nextPage * PAGE_SIZE
+    const [local, external] = await Promise.all([
+      fetchLocal(nextPage),
+      parallelExternalSearch({
+        keyword: keyword.value,
+        pageSize: PAGE_SIZE,
+        page: nextPage,
+        cumulativeLimit,
+      }),
+    ])
+    if (token !== seq) return
+
+    const merged = [...local.list, ...external.list]
+    tracks.value = append ? mergeTracks(tracks.value, merged) : merged
+    page.value = nextPage
+    hasMore.value = local.hasMore || external.hasMore
+    sourceStats.value = external.sources
+    if (!append && user.accessToken) await playlistStore.fetchMine()
+  } catch {
+    if (token === seq && !append) {
+      // 首次搜索失败时至少清掉遮罩，避免一直白屏加载
+      hasMore.value = false
+    }
+  } finally {
+    if (token === seq) {
+      loading.value = false
+      loadingMore.value = false
+    }
+  }
+}
+
+function reload() {
+  page.value = 1
+  void fetchPage(1, false)
+}
+
+function loadMore() {
+  if (loading.value || loadingMore.value || !hasMore.value || !keyword.value) return
+  void fetchPage(page.value + 1, true)
 }
 
 function playAll() {
@@ -161,7 +274,17 @@ function goArtist(name: string) {
   router.push(`/artist/${encodeURIComponent(name)}`)
 }
 
-watch(keyword, load, { immediate: true })
+watch(
+  keyword,
+  () => {
+    tracks.value = []
+    page.value = 1
+    hasMore.value = false
+    sourceStats.value = []
+    void fetchPage(1, false)
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped lang="scss">
@@ -277,5 +400,30 @@ watch(keyword, load, { immediate: true })
 .plist-count {
   font-size: 12px;
   color: #999;
+}
+.load-more {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 8px;
+}
+.load-more-end {
+  font-size: 12px;
+  color: #999;
+}
+.source-tips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #888;
+}
+.source-tip {
+  &.bad {
+    color: #c45656;
+  }
+}
+.source-err {
+  color: #b07a7a;
 }
 </style>

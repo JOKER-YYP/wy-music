@@ -15,9 +15,104 @@ import { pathToFileURL } from 'url'
 import { createReadStream, existsSync } from 'fs'
 import { readdir, stat, readFile } from 'fs/promises'
 import { createHash, randomUUID } from 'crypto'
+import https from 'https'
+import http from 'http'
 import FormData from 'form-data'
 import axios from 'axios'
 import { decodeLyricBytes, resolveTrackMeta } from '@wy-music/shared'
+
+/** 外部音乐源域名：允许忽略过期证书（如酷我 kw-api） */
+const MUSIC_API_HOSTS = new Set([
+  'api.xcvts.cn',
+  'api.vkeys.cn',
+  'api.epdd.cn',
+  'api.qijieya.cn',
+  'tang.api.s01s.cn',
+  'kw-api.cenguigui.cn',
+  'disige-api.cenguigui.cn',
+  'api.cenguigui.cn',
+  'www.xm95522.com',
+  'xm95522.com',
+])
+
+function fetchMusicApiText(
+  url: string,
+  opts?: {
+    method?: 'GET' | 'POST'
+    form?: Record<string, string | number>
+    headers?: Record<string, string>
+    timeoutMs?: number
+  },
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch (e) {
+      reject(e)
+      return
+    }
+    if (!MUSIC_API_HOSTS.has(parsed.hostname)) {
+      reject(new Error(`不允许的域名: ${parsed.hostname}`))
+      return
+    }
+    const method = opts?.method || 'GET'
+    const timeoutMs = opts?.timeoutMs ?? 30_000
+    const formBody =
+      method === 'POST' && opts?.form
+        ? new URLSearchParams(
+            Object.fromEntries(Object.entries(opts.form).map(([k, v]) => [k, String(v)])),
+          ).toString()
+        : ''
+    const lib = parsed.protocol === 'https:' ? https : http
+    const req = lib.request(
+      {
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        port: parsed.port || undefined,
+        path: parsed.pathname + parsed.search,
+        method,
+        family: 4,
+        rejectUnauthorized: false,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          Accept: 'application/json,text/plain,*/*',
+          Referer:
+            parsed.hostname.includes('xm95522')
+              ? 'http://www.xm95522.com/mp3/'
+              : 'http://qjjlb.quanjian.com.cn/musicdl/',
+          Origin: parsed.hostname.includes('xm95522')
+            ? 'http://www.xm95522.com'
+            : 'http://qjjlb.quanjian.com.cn',
+          ...(method === 'POST'
+            ? {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(formBody),
+                'X-Requested-With': 'XMLHttpRequest',
+              }
+            : {}),
+          ...(opts?.headers || {}),
+        },
+        timeout: timeoutMs,
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (c) => chunks.push(c))
+        res.on('end', () => {
+          resolve({
+            status: res.statusCode || 0,
+            body: Buffer.concat(chunks).toString('utf8'),
+          })
+        })
+      },
+    )
+    req.on('error', reject)
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('请求超时')))
+    if (formBody) req.write(formBody)
+    req.end()
+  })
+}
 
 /** 与服务端默认上限一致；不从 shared 解构常量，避免未 build shared 时主进程起不来 */
 const UPLOAD_MAX_SIZE_MB = 500
@@ -1212,6 +1307,50 @@ app.whenReady().then(() => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.wy-music.desktop')
   }
+
+  // 酷我等源证书过期时，Chromium 直连会失败；放行白名单域名
+  app.on('certificate-error', (event, _wc, url, _error, _cert, callback) => {
+    try {
+      const host = new URL(url).hostname
+      if (MUSIC_API_HOSTS.has(host)) {
+        event.preventDefault()
+        callback(true)
+        return
+      }
+    } catch {
+      /* ignore */
+    }
+    callback(false)
+  })
+
+  ipcMain.handle('net:fetchJson', async (_e, url: string) => {
+    const { status, body } = await fetchMusicApiText(String(url || ''))
+    if (status >= 400) throw new Error(`HTTP ${status}`)
+    if (!body.trim()) throw new Error('外部接口返回为空')
+    try {
+      return JSON.parse(body)
+    } catch {
+      throw new Error(`外部接口非 JSON：${body.slice(0, 60)}`)
+    }
+  })
+
+  ipcMain.handle(
+    'net:fetchFormJson',
+    async (_e, url: string, form: Record<string, string | number>) => {
+      const { status, body } = await fetchMusicApiText(String(url || ''), {
+        method: 'POST',
+        form: form || {},
+        timeoutMs: 30_000,
+      })
+      if (status >= 400) throw new Error(`HTTP ${status}`)
+      if (!body.trim()) throw new Error('外部接口返回为空')
+      try {
+        return JSON.parse(body)
+      } catch {
+        throw new Error(`外部接口非 JSON：${body.slice(0, 60)}`)
+      }
+    },
+  )
 
   protocol.handle('wy-local', (request) => {
     try {

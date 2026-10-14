@@ -109,6 +109,12 @@ const wyAPI = {
     }>,
   toLocalPlayUrl: (filePath: string) => `wy-local://play/${toBase64Url(filePath)}`,
 
+  /** 主进程拉取外部音乐 API（可忽略白名单域名过期证书） */
+  fetchJson: (url: string) => ipcRenderer.invoke('net:fetchJson', url) as Promise<unknown>,
+  /** 主进程 form POST 拉取外部音乐 API（xm95522 等） */
+  fetchFormJson: (url: string, form: Record<string, string | number>) =>
+    ipcRenderer.invoke('net:fetchFormJson', url, form) as Promise<unknown>,
+
   // 桌面小组件
   toggleMiniPlayer: () =>
     ipcRenderer.invoke('mini:toggle') as Promise<{ open: boolean }>,

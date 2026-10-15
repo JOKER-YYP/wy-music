@@ -44,6 +44,13 @@ declare global {
         clip: { x: number; y: number; width: number; height: number } | null,
       ) => void
       selectFolder: () => Promise<string | null>
+      saveAudioFile?: (opts?: { defaultName?: string; title?: string }) => Promise<string | null>
+      downloadFile?: (payload: {
+        url: string
+        destPath: string
+        headers?: Record<string, string>
+      }) => Promise<{ ok: boolean; path: string }>
+      writeTextFile?: (payload: { path: string; text: string }) => Promise<{ ok: boolean; path: string }>
       selectAudioFiles: (multi?: boolean) => Promise<string[]>
       selectLrcFile?: () => Promise<{
         path: string

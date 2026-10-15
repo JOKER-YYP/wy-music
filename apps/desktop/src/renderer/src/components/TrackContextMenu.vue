@@ -35,9 +35,9 @@
           </el-icon>
           <span>{{ track?.liked ? '取消喜欢' : '喜欢' }}</span>
         </li>
-        <li class="disabled" title="暂未开放">
+        <li @click="emitAction('download')">
           <el-icon><Download /></el-icon>
-          <span>下载</span>
+          <span>{{ isExternal ? '下载…' : '下载到本地' }}</span>
         </li>
         <li @click="emitAction('copy')">
           <el-icon><Link /></el-icon>
@@ -68,9 +68,11 @@ import {
   Star,
   StarFilled,
 } from '@element-plus/icons-vue'
+import { computed } from 'vue'
 import type { TrackDto } from '@wy-music/shared'
+import { isExternalTrack } from '../services/trackDownload'
 
-defineProps<{
+const props = defineProps<{
   visible: boolean
   x: number
   y: number
@@ -83,6 +85,8 @@ const emit = defineEmits<{
   close: []
   action: [action: string]
 }>()
+
+const isExternal = computed(() => (props.track ? isExternalTrack(props.track) : false))
 
 function emitAction(action: string) {
   emit('action', action)

@@ -30,9 +30,8 @@
       <div class="hover-actions">
         <button
           type="button"
-          :title="isExternal(track) ? '下载到曲库' : '下载'"
-          :class="{ 'disabled-act': !isExternal(track) || downloadingId === track.id }"
-          :disabled="!isExternal(track) || downloadingId === track.id"
+          :title="isExternal(track) ? '下载（曲库/本地）' : '下载到本地'"
+          :disabled="downloadingId === track.id"
           @click.stop="onDownload(track)"
         >
           <el-icon><Download /></el-icon>
@@ -63,12 +62,11 @@
         <button type="button" @click="menu.track && onPlay(menu.track)">播放</button>
         <button type="button" @click="menu.track && onNext(menu.track)">下一首播放</button>
         <button
-          v-if="menu.track && isExternal(menu.track)"
           type="button"
-          :disabled="downloadingId === menu.track.id"
+          :disabled="!menu.track || downloadingId === menu.track.id"
           @click="menu.track && onDownload(menu.track)"
         >
-          下载到曲库
+          {{ menu.track && isExternal(menu.track) ? '下载…' : '下载到本地' }}
         </button>
         <button type="button" @click="menu.track && onLike(menu.track)">
           {{ menu.track?.liked ? '取消喜欢' : '喜欢' }}
@@ -84,9 +82,15 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, MoreFilled, Star, StarFilled } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
-import { isExternalTrackId, MUSIC_SOURCE_LABEL } from '@wy-music/shared'
+import { MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
-import { importExternalToLibrary } from '../services/externalMusic'
+import {
+  chooseLocalSavePath,
+  downloadTrackToLibrary,
+  downloadTrackToPath,
+  isExternalTrack,
+  pickDownloadMode,
+} from '../services/trackDownload'
 import { usePlayerStore } from '../stores/player'
 import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
@@ -191,7 +195,7 @@ function coverStyle(t: TrackDto) {
 }
 
 function isExternal(t: TrackDto) {
-  return isExternalTrackId(t.id) || Boolean(t.source && t.source !== 'local')
+  return isExternalTrack(t)
 }
 
 function sourceTag(t: TrackDto): string | null {
@@ -226,38 +230,41 @@ function onNext(t: TrackDto) {
 
 async function onDownload(t: TrackDto) {
   closeMenu()
-  if (!isExternal(t)) {
-    ElMessage.info('本地曲库歌曲无需下载')
-    return
-  }
+  if (downloadingId.value === t.id) return
   if (!user.accessToken) {
     ui.openLogin('login')
     return
   }
-  if (downloadingId.value === t.id) return
+  const mode = await pickDownloadMode(t)
+  if (!mode) return
+
+  let destPath: string | null = null
+  if (mode === 'file') {
+    destPath = await chooseLocalSavePath(t)
+    if (!destPath) return
+  }
+
   downloadingId.value = t.id
   const loading = ElMessage({
-    message: `正在下载「${t.name}」到曲库…`,
+    message:
+      mode === 'library' ? `正在下载「${t.name}」到曲库…` : `正在下载「${t.name}」到本地…`,
     type: 'info',
     duration: 0,
     showClose: false,
   })
   try {
-    const imported = await importExternalToLibrary(t)
-    loading.close()
-    ElMessage.success(
-      imported.status === 'pending'
-        ? `「${imported.name}」已提交审核`
-        : `「${imported.name}」已下载到曲库`,
-    )
-    // 不触发整页 refresh：搜索页会重新并行拉外部源并进入 v-loading，易白屏卡住
+    if (mode === 'library') {
+      await downloadTrackToLibrary(t)
+      return
+    }
+    await downloadTrackToPath(t, destPath!)
+    ElMessage.success(`已保存到 ${destPath}`)
   } catch (e: any) {
-    loading.close()
-    // http 拦截器已提示；详情解析等本地错误再提示
     if (e?.message && typeof e.code !== 'number' && !e?.response) {
       ElMessage.error(e.message)
     }
   } finally {
+    loading.close()
     downloadingId.value = null
   }
 }

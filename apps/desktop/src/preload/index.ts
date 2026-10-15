@@ -61,6 +61,12 @@ const wyAPI = {
     ipcRenderer.send('window:thumbnailClip', clip)
   },
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder') as Promise<string | null>,
+  saveAudioFile: (opts?: { defaultName?: string; title?: string }) =>
+    ipcRenderer.invoke('dialog:saveAudioFile', opts) as Promise<string | null>,
+  downloadFile: (payload: { url: string; destPath: string; headers?: Record<string, string> }) =>
+    ipcRenderer.invoke('net:downloadFile', payload) as Promise<{ ok: boolean; path: string }>,
+  writeTextFile: (payload: { path: string; text: string }) =>
+    ipcRenderer.invoke('fs:writeTextFile', payload) as Promise<{ ok: boolean; path: string }>,
   selectAudioFiles: (multi = false) =>
     ipcRenderer.invoke('dialog:selectAudioFiles', multi) as Promise<string[]>,
   selectLrcFile: () =>

@@ -100,7 +100,12 @@
           <div class="name-line">
             <span class="name" :title="row.name">{{ row.name }}</span>
             <div v-if="!batchMode" class="row-actions">
-              <button type="button" title="下载" class="disabled-act" @click.stop>
+              <button
+                type="button"
+                title="下载到本地"
+                :disabled="downloadingId === row.id"
+                @click.stop="onDownload(row)"
+              >
                 <el-icon><Download /></el-icon>
               </button>
               <button type="button" title="收藏到歌单" @click.stop="onCollect(row)">
@@ -172,6 +177,12 @@ import { usePlayerStore } from '../stores/player'
 import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
 import { formatDuration } from '../services/localUpload'
+import {
+  chooseLocalSavePath,
+  downloadTrackToLibrary,
+  downloadTrackToPath,
+  pickDownloadMode,
+} from '../services/trackDownload'
 import { usePlayingLocate } from '../composables/usePlayingLocate'
 import TrackContextMenu from './TrackContextMenu.vue'
 import PlayingLocateFab from './PlayingLocateFab.vue'
@@ -204,6 +215,7 @@ const ui = useUiStore()
 const user = useUserStore()
 const rootRef = ref<HTMLElement | null>(null)
 const selected = ref<Set<string>>(new Set())
+const downloadingId = ref<string | null>(null)
 
 const batchMode = computed({
   get: () => props.batchMode,
@@ -430,6 +442,48 @@ function closeMenu() {
   menu.track = null
 }
 
+async function onDownload(track: TrackDto) {
+  if (downloadingId.value === track.id) return
+  if (!user.accessToken) {
+    ui.openLogin('login')
+    return
+  }
+  const mode = await pickDownloadMode(track)
+  if (!mode) return
+
+  let destPath: string | null = null
+  if (mode === 'file') {
+    destPath = await chooseLocalSavePath(track)
+    if (!destPath) return
+  }
+
+  downloadingId.value = track.id
+  const loading = ElMessage({
+    message:
+      mode === 'library'
+        ? `正在下载「${track.name}」到曲库…`
+        : `正在下载「${track.name}」到本地…`,
+    type: 'info',
+    duration: 0,
+    showClose: false,
+  })
+  try {
+    if (mode === 'library') {
+      await downloadTrackToLibrary(track)
+      return
+    }
+    await downloadTrackToPath(track, destPath!)
+    ElMessage.success(`已保存到 ${destPath}`)
+  } catch (e: any) {
+    if (e?.message && typeof e.code !== 'number' && !e?.response) {
+      ElMessage.error(e.message)
+    }
+  } finally {
+    loading.close()
+    downloadingId.value = null
+  }
+}
+
 async function onMenuAction(action: string) {
   const track = menu.track
   closeMenu()
@@ -441,6 +495,7 @@ async function onMenuAction(action: string) {
   } else if (action === 'comments') onComments(track)
   else if (action === 'collect') onCollect(track)
   else if (action === 'like') await toggleLike(track)
+  else if (action === 'download') await onDownload(track)
   else if (action === 'copy') {
     try {
       await navigator.clipboard.writeText(streamUrl(track.id))

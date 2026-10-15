@@ -148,13 +148,15 @@ let lastPlayerState: {
   hasTrack?: boolean
   liked?: boolean
 } | null = null
-let focusingMainFromTaskbar = false
-/** 收起/还原过渡期抑制预览窗 focus，避免主窗闪一下又被藏掉 */
-let suppressTaskbarFocusRestore = false
-/** 缩略图工具栏按钮点击时，短暂抑制 focus→开主窗 */
+/** 缩略图工具栏按钮点击时，短暂抑制任务栏显隐切换 */
 let thumbarClickGuard = false
 /** 主窗是否被用户收起（比 isVisible 更稳，避免过渡态误判） */
 let mainWindowCollapsed = false
+/** 任务栏单击切换互斥（同一次点击可能同时来 focus + minimize） */
+let taskbarToggleLock = false
+/** 最近一次由任务栏主动切换的时间 */
+let lastTaskbarToggleAt = 0
+const TASKBAR_TOGGLE_LOCK_MS = 450
 
 const DESKTOP_LYRIC_H = 100
 const DESKTOP_LYRIC_MENU_W = 300
@@ -201,14 +203,22 @@ function placeTaskbarPreviewWindow(win: BrowserWindow) {
     })
 
   // 优先放主屏左侧外侧；若多屏占用该区域，改放到所有屏下方外侧
-  let x = primary.bounds.x - size - 8
+  // 预览窗仅供任务栏「鼠标悬停」缩略图，必须始终在屏外，避免点击时被 Windows 拉回桌面
+  let x = primary.bounds.x - size - 80
   let y = primary.bounds.y + Math.max(0, Math.floor((primary.bounds.height - size) / 2))
   if (overlapsAny(x, y)) {
     const maxBottom = Math.max(...displays.map((d) => d.bounds.y + d.bounds.height))
     x = primary.bounds.x + Math.max(0, Math.floor((primary.bounds.width - size) / 2))
-    y = maxBottom + 8
+    y = maxBottom + 80
   }
   win.setBounds({ x, y, width: size, height: size })
+}
+
+/** 强制预览窗留在屏外（点击任务栏时 Windows 可能把窗体拽回可见区） */
+function keepTaskbarPreviewOffscreen(win?: BrowserWindow | null) {
+  const w = win || taskbarPreviewWindow
+  if (!w || w.isDestroyed()) return
+  placeTaskbarPreviewWindow(w)
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -875,13 +885,12 @@ function resolveThumbarIcon(name: 'play' | 'pause' | 'prev' | 'next' | 'like' | 
 /** 缩略图按钮：只控制播放，绝不打开/前置主窗 */
 function onThumbarClick(type: 'prev' | 'next' | 'toggle' | 'like') {
   thumbarClickGuard = true
-  suppressTaskbarFocusRestore = true
+  taskbarToggleLock = true
   sendPlayerCommand({ type })
-  // 保持预览窗在任务栏，但不把主窗拉到前台
   setTimeout(() => {
     thumbarClickGuard = false
-    suppressTaskbarFocusRestore = false
-  }, 800)
+    taskbarToggleLock = false
+  }, TASKBAR_TOGGLE_LOCK_MS)
 }
 
 function updateThumbarButtons(state: typeof lastPlayerState, force = false) {
@@ -962,17 +971,16 @@ function focusMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore()
   if (!mainWindow.isVisible()) mainWindow.show()
   mainWindow.focus()
+  // 主窗前置后，确保封面预览窗仍在屏外（仅悬停缩略图用）
+  keepTaskbarPreviewOffscreen()
   return true
 }
 
 function collapseMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return false
   mainWindowCollapsed = true
-  suppressTaskbarFocusRestore = true
   mainWindow.hide()
-  setTimeout(() => {
-    suppressTaskbarFocusRestore = false
-  }, 400)
+  keepTaskbarPreviewOffscreen()
   return true
 }
 
@@ -980,6 +988,29 @@ function isMainWindowCollapsed() {
   if (!mainWindow || mainWindow.isDestroyed()) return true
   if (mainWindowCollapsed) return true
   return !mainWindow.isVisible() || mainWindow.isMinimized()
+}
+
+/** 任务栏单击：立刻切换主窗显隐（一次点击完成，不再等第二次 minimize） */
+function toggleMainFromTaskbar() {
+  if (thumbarClickGuard || taskbarToggleLock) return false
+  taskbarToggleLock = true
+  lastTaskbarToggleAt = Date.now()
+  try {
+    if (isMainWindowCollapsed()) focusMainWindow()
+    else collapseMainWindow()
+  } finally {
+    setTimeout(() => {
+      taskbarToggleLock = false
+      keepTaskbarPreviewOffscreen()
+    }, TASKBAR_TOGGLE_LOCK_MS)
+  }
+  return true
+}
+
+function isOurWindowFocused() {
+  const focused = BrowserWindow.getFocusedWindow()
+  if (!focused || focused.isDestroyed()) return false
+  return focused === mainWindow || focused === taskbarPreviewWindow
 }
 
 function playerTitle(state: typeof lastPlayerState) {
@@ -1059,6 +1090,7 @@ function createTaskbarPreviewWindow() {
   if (taskbarPreviewWindow && !taskbarPreviewWindow.isDestroyed()) return
 
   const appIcon = resolveAppIcon()
+  // 预览窗：只负责任务栏悬停缩略图 + 缩略图按钮；不作为可点击操作的界面
   const win = new BrowserWindow({
     width: TASKBAR_PREVIEW_SIZE,
     height: TASKBAR_PREVIEW_SIZE,
@@ -1068,11 +1100,13 @@ function createTaskbarPreviewWindow() {
     maximizable: false,
     minimizable: true,
     fullscreenable: false,
+    movable: false,
     skipTaskbar: false,
     focusable: true,
     title: 'WY Music',
     icon: appIcon,
     backgroundColor: '#1a1a1a',
+    hasShadow: false,
     paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -1085,7 +1119,7 @@ function createTaskbarPreviewWindow() {
     },
   })
   taskbarPreviewWindow = win
-  placeTaskbarPreviewWindow(win)
+  keepTaskbarPreviewOffscreen(win)
   win.setMenuBarVisibility(false)
 
   const htmlCandidates = [
@@ -1105,8 +1139,10 @@ function createTaskbarPreviewWindow() {
 
   const reveal = () => {
     if (win.isDestroyed()) return
-    placeTaskbarPreviewWindow(win)
+    // 只用 showInactive，避免预览窗抢焦点弹出到桌面
+    keepTaskbarPreviewOffscreen(win)
     win.showInactive()
+    keepTaskbarPreviewOffscreen(win)
     lastThumbarKey = ''
     lastSentPreviewCover = ''
     updateThumbarButtons(lastPlayerState, true)
@@ -1120,35 +1156,39 @@ function createTaskbarPreviewWindow() {
     if (!win.isDestroyed() && !win.isVisible()) reveal()
   })
 
-  // 点缩略图按钮时 Windows 仍可能 focus 预览窗
-  // 延迟判断：若是按钮点击（thumbarClickGuard）则绝不打开主窗
+  // 任何可能导致预览窗出现在桌面的事件，都立刻推回屏外
+  const pinOffscreen = () => keepTaskbarPreviewOffscreen(win)
+  win.on('show', pinOffscreen)
+  win.on('restore', pinOffscreen)
+  win.on('moved', pinOffscreen)
+  win.on('resize', pinOffscreen)
+
+  // 单击任务栏（预览窗获得焦点）→ 立即切换主窗，无需再点第二次
   win.on('focus', () => {
-    placeTaskbarPreviewWindow(win)
-    if (thumbarClickGuard || suppressTaskbarFocusRestore || focusingMainFromTaskbar) return
-    focusingMainFromTaskbar = true
-    setTimeout(() => {
-      focusingMainFromTaskbar = false
-      if (thumbarClickGuard || suppressTaskbarFocusRestore) return
-      // 仅主窗已收起时，点任务栏图标才还原
-      if (isMainWindowCollapsed()) focusMainWindow()
-    }, 280)
+    keepTaskbarPreviewOffscreen(win)
+    if (thumbarClickGuard || taskbarToggleLock) return
+    // 刚切换过则忽略连发 focus
+    if (Date.now() - lastTaskbarToggleAt < TASKBAR_TOGGLE_LOCK_MS) return
+    toggleMainFromTaskbar()
+    keepTaskbarPreviewOffscreen(win)
   })
 
-  // 任务栏图标在已聚焦时再点会 minimize → 切换主窗显隐
+  // 预览窗已是前台时再点任务栏会走 minimize，而不是 focus
+  // 注意：切到其他应用时 Windows 也可能 minimize 我们 —— 此时绝不能把主窗拉起来
   win.on('minimize', () => {
-    if (thumbarClickGuard) {
-      win.restore()
-      placeTaskbarPreviewWindow(win)
-      return
-    }
-    suppressTaskbarFocusRestore = true
     win.restore()
-    placeTaskbarPreviewWindow(win)
-    if (isMainWindowCollapsed()) focusMainWindow()
-    else collapseMainWindow()
+    keepTaskbarPreviewOffscreen(win)
+    if (thumbarClickGuard || taskbarToggleLock) return
+    if (Date.now() - lastTaskbarToggleAt < TASKBAR_TOGGLE_LOCK_MS) return
+
+    // 等前台窗口切换完成：若焦点已不在本应用，说明是点了别的应用，忽略
     setTimeout(() => {
-      suppressTaskbarFocusRestore = false
-    }, 400)
+      keepTaskbarPreviewOffscreen(win)
+      if (thumbarClickGuard || taskbarToggleLock) return
+      if (!isOurWindowFocused()) return
+      toggleMainFromTaskbar()
+      keepTaskbarPreviewOffscreen(win)
+    }, 40)
   })
 
   win.on('close', (e) => {

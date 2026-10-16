@@ -46,25 +46,32 @@
             v-for="s in sourceTips"
             :key="s.source"
             class="source-tip"
-            :class="{ bad: !s.ok }"
+            :class="{ bad: !s.ok && !s.pending, pending: s.pending }"
           >
-            {{ s.label }}{{ s.ok ? ` ${s.count}首` : ' 失败' }}
-            <span v-if="!s.ok && s.error" class="source-err" :title="s.error">
-              （{{ s.error }}）
-            </span>
+            <template v-if="s.pending">{{ s.label }} 加载中</template>
+            <template v-else>
+              {{ s.label }}{{ s.ok ? ` ${s.count}首` : ' 失败' }}
+              <span v-if="!s.ok && s.error" class="source-err" :title="s.error">
+                （{{ s.error }}）
+              </span>
+            </template>
           </span>
         </div>
         <SongGrid :tracks="tracks" :columns="2" hide-empty @refresh="reload" />
-        <el-empty v-if="!tracks.length && !loading" description="未找到相关单曲" :image-size="64" />
-        <div v-if="tracks.length" class="load-more">
+        <el-empty
+          v-if="!tracks.length && !loading && !sourcesPending"
+          description="未找到相关单曲"
+          :image-size="64"
+        />
+        <div v-if="tracks.length || sourcesPending" class="load-more">
           <el-button
-            v-if="hasMore"
+            v-if="hasMore || sourcesPending"
             round
-            :loading="loadingMore"
-            :disabled="loading || loadingMore"
+            :loading="loadingMore || sourcesPending"
+            :disabled="loading || loadingMore || sourcesPending"
             @click="loadMore"
           >
-            加载更多
+            {{ sourcesPending ? '正在加载更多源…' : '加载更多' }}
           </el-button>
           <span v-else class="load-more-end">没有更多了</span>
         </div>
@@ -99,7 +106,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { VideoPlay } from '@element-plus/icons-vue'
 import type { MusicSource, PlaylistDto, TrackDto } from '@wy-music/shared'
-import { MUSIC_SOURCE_LABEL } from '@wy-music/shared'
+import { MUSIC_SOURCES, MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
 import { parallelExternalSearch, type SourceSearchStat } from '../services/externalMusic'
 import { usePlayerStore } from '../stores/player'
@@ -143,6 +150,8 @@ const sourceTips = computed(() =>
     error: s.error ? s.error.slice(0, 40) : undefined,
   })),
 )
+
+const sourcesPending = computed(() => sourceStats.value.some((s) => s.pending))
 
 const artistSummary = computed(() => {
   if (!keyword.value || !tracks.value.length) return null
@@ -211,6 +220,27 @@ async function fetchLocal(nextPage: number) {
   }
 }
 
+function initPendingSourceStats(): SourceSearchStat[] {
+  return MUSIC_SOURCES.map((source) => ({
+    source,
+    ok: true,
+    count: 0,
+    hasMore: false,
+    pending: true,
+  }))
+}
+
+function patchSourceStat(stat: SourceSearchStat) {
+  const idx = sourceStats.value.findIndex((s) => s.source === stat.source)
+  if (idx >= 0) {
+    const next = sourceStats.value.slice()
+    next[idx] = stat
+    sourceStats.value = next
+  } else {
+    sourceStats.value = [...sourceStats.value, stat]
+  }
+}
+
 async function fetchPage(nextPage: number, append: boolean) {
   if (!keyword.value) {
     tracks.value = []
@@ -219,32 +249,75 @@ async function fetchPage(nextPage: number, append: boolean) {
     return
   }
   const token = ++seq
-  if (append) loadingMore.value = true
-  else loading.value = true
+  if (append) {
+    loadingMore.value = true
+    // 加载更多时把各源重新标为 pending，便于提示
+    sourceStats.value = initPendingSourceStats()
+  } else {
+    loading.value = true
+    tracks.value = []
+    sourceStats.value = initPendingSourceStats()
+  }
+
+  let localHasMore = false
+
+  const clearFullPageLoading = () => {
+    if (token !== seq) return
+    // 任一源/本地先到即可去掉全页遮罩，后续结果渐进追加
+    if (loading.value) loading.value = false
+  }
 
   try {
-    // 皮卡丘站：migu/qq 用累计 limit；vkeys/kw 用 page
     const cumulativeLimit = nextPage * PAGE_SIZE
-    const [local, external] = await Promise.all([
-      fetchLocal(nextPage),
-      parallelExternalSearch({
-        keyword: keyword.value,
-        pageSize: PAGE_SIZE,
-        page: nextPage,
-        cumulativeLimit,
-      }),
-    ])
+
+    const localP = fetchLocal(nextPage).then((local) => {
+      if (token !== seq) return
+      localHasMore = local.hasMore
+      if (append) {
+        tracks.value = mergeTracks(tracks.value, local.list)
+      } else {
+        // 本地与已先到的外部结果合并（外部可能比本地更快返回）
+        const externalArrived = tracks.value.filter((t) => t.source && t.source !== 'local')
+        tracks.value = mergeTracks(local.list, externalArrived)
+      }
+      hasMore.value = localHasMore || sourceStats.value.some((s) => s.hasMore || s.pending)
+      clearFullPageLoading()
+    })
+
+    const externalP = parallelExternalSearch({
+      keyword: keyword.value,
+      pageSize: PAGE_SIZE,
+      page: nextPage,
+      cumulativeLimit,
+      onSource: (chunk) => {
+        if (token !== seq) return
+        patchSourceStat({
+          source: chunk.source,
+          ok: chunk.ok,
+          count: chunk.list.length,
+          hasMore: chunk.hasMore,
+          error: chunk.error,
+          pending: false,
+        })
+        if (chunk.ok && chunk.list.length) {
+          tracks.value = mergeTracks(tracks.value, chunk.list)
+        }
+        hasMore.value =
+          localHasMore || sourceStats.value.some((s) => s.hasMore || Boolean(s.pending))
+        clearFullPageLoading()
+      },
+    })
+
+    const [, external] = await Promise.all([localP, externalP])
     if (token !== seq) return
 
-    const merged = [...local.list, ...external.list]
-    tracks.value = append ? mergeTracks(tracks.value, merged) : merged
     page.value = nextPage
-    hasMore.value = local.hasMore || external.hasMore
+    // 最终以有序 sources 覆盖（与 MUSIC_SOURCES 一致）
     sourceStats.value = external.sources
+    hasMore.value = localHasMore || external.hasMore
     if (!append && user.accessToken) await playlistStore.fetchMine()
   } catch {
     if (token === seq && !append) {
-      // 首次搜索失败时至少清掉遮罩，避免一直白屏加载
       hasMore.value = false
     }
   } finally {
@@ -421,6 +494,9 @@ watch(
 .source-tip {
   &.bad {
     color: #c45656;
+  }
+  &.pending {
+    color: #999;
   }
 }
 .source-err {

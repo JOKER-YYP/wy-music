@@ -22,6 +22,16 @@ export type SourceSearchStat = {
   count: number
   hasMore: boolean
   error?: string
+  /** 该源仍在请求中 */
+  pending?: boolean
+}
+
+export type SourceSearchChunk = {
+  source: MusicSource
+  ok: boolean
+  list: TrackDto[]
+  hasMore: boolean
+  error?: string
 }
 
 type ExtHit = {
@@ -385,11 +395,50 @@ export type ParallelSearchResult = {
   hasMore: boolean
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  if (ms <= 0) return promise
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return new Promise<T>((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} 请求超时`)), ms)
+    promise.then(
+      (v) => {
+        if (timer) clearTimeout(timer)
+        resolve(v)
+      },
+      (e) => {
+        if (timer) clearTimeout(timer)
+        reject(e)
+      },
+    )
+  })
+}
+
+function sliceHitsForPage(
+  source: MusicSource,
+  hits: ExtHit[],
+  page: number,
+  pageSize: number,
+  cumulative: number,
+): { pageHits: ExtHit[]; hasMore: boolean } {
+  if ((source === 'migu' || source === 'tang') && page > 1) {
+    const start = (page - 1) * pageSize
+    return {
+      pageHits: hits.slice(start, start + pageSize),
+      hasMore: hits.length >= cumulative,
+    }
+  }
+  const hasMore =
+    source === 'migu' || source === 'tang'
+      ? hits.length >= cumulative
+      : hits.length >= pageSize ||
+        (isXmMusicSource(source) && hits.length >= Math.min(pageSize, XM_NATIVE_PAGE_SIZE))
+  return { pageHits: hits, hasMore }
+}
+
 /**
- * 与皮卡丘站一致：
- * - migu/qq：用累计 limit 重拉（调用方控制 limit）
- * - vkeys：page + 固定 pageSize
- * - kw：page + limit
+ * 多源并行搜索；各源互不阻塞。
+ * - 传入 onSource 时：谁先完成谁先回调，便于渐进渲染
+ * - 单源超时（默认 15s）后记为失败，不影响其它源
  */
 export async function parallelExternalSearch(opts: {
   keyword: string
@@ -399,6 +448,10 @@ export async function parallelExternalSearch(opts: {
   page?: number
   /** migu / tang 使用的累计 limit（加载更多时递增） */
   cumulativeLimit?: number
+  /** 单源超时毫秒，默认 15000 */
+  timeoutMs?: number
+  /** 单个源完成后的回调（先到先回调） */
+  onSource?: (chunk: SourceSearchChunk) => void
 }): Promise<ParallelSearchResult> {
   const kw = opts.keyword.trim()
   if (!kw) return { list: [], sources: [], hasMore: false }
@@ -406,6 +459,7 @@ export async function parallelExternalSearch(opts: {
   const pageSize = Math.max(1, Math.min(50, opts.pageSize || 20))
   const page = Math.max(1, opts.page || 1)
   const cumulative = Math.max(pageSize, opts.cumulativeLimit || pageSize)
+  const timeoutMs = opts.timeoutMs ?? 15_000
 
   const tasks: Record<MusicSource, Promise<ExtHit[]>> = {
     migu: searchMigu(kw, cumulative),
@@ -418,55 +472,39 @@ export async function parallelExternalSearch(opts: {
     kuwo: searchXm('kuwo', kw, page, pageSize),
   }
 
-  const settled = await Promise.all(
+  const sources: SourceSearchStat[] = []
+  const list: TrackDto[] = []
+
+  await Promise.all(
     MUSIC_SOURCES.map(async (source) => {
       try {
-        const hits = await tasks[source]
-        return { source, ok: true as const, hits, error: undefined as string | undefined }
+        const raw = await withTimeout(tasks[source], timeoutMs, source)
+        const { pageHits, hasMore } = sliceHitsForPage(source, raw, page, pageSize, cumulative)
+        const tracks = pageHits.map(toTrack)
+        sources.push({ source, ok: true, count: tracks.length, hasMore, pending: false })
+        for (const t of tracks) list.push(t)
+        opts.onSource?.({ source, ok: true, list: tracks, hasMore })
       } catch (e) {
-        return {
-          source,
-          ok: false as const,
-          hits: [] as ExtHit[],
-          error: errMsg(e),
-        }
+        const error = errMsg(e)
+        sources.push({ source, ok: false, count: 0, hasMore: false, error, pending: false })
+        opts.onSource?.({ source, ok: false, list: [], hasMore: false, error })
       }
     }),
   )
 
-  const sources: SourceSearchStat[] = []
-  const list: TrackDto[] = []
-  for (const r of settled) {
-    if (r.ok) {
-      // migu/tang 累计重拉时，只取本页新增区间，避免重复追加
-      let hits = r.hits
-      if ((r.source === 'migu' || r.source === 'tang') && page > 1) {
-        const start = (page - 1) * pageSize
-        hits = r.hits.slice(start, start + pageSize)
-      }
-      sources.push({
-        source: r.source,
-        ok: true,
-        count: hits.length,
-        hasMore:
-          r.source === 'migu' || r.source === 'tang'
-            ? r.hits.length >= cumulative
-            : r.hits.length >= pageSize ||
-              (isXmMusicSource(r.source) && r.hits.length >= Math.min(pageSize, XM_NATIVE_PAGE_SIZE)),
-      })
-      for (const h of hits) list.push(toTrack(h))
-    } else {
-      sources.push({
-        source: r.source,
-        ok: false,
-        count: 0,
-        hasMore: false,
-        error: r.error,
-      })
-    }
-  }
+  // 保持与 MUSIC_SOURCES 顺序一致，便于 UI 展示
+  const ordered = MUSIC_SOURCES.map(
+    (s) => sources.find((x) => x.source === s) || {
+      source: s,
+      ok: false,
+      count: 0,
+      hasMore: false,
+      error: '未知错误',
+      pending: false,
+    },
+  )
 
-  return { list, sources, hasMore: sources.some((s) => s.hasMore) }
+  return { list, sources: ordered, hasMore: ordered.some((s) => s.hasMore) }
 }
 
 function pickBestTangUrl(d: Record<string, unknown>): string {

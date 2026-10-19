@@ -90,6 +90,8 @@ export const usePlayerStore = defineStore('player', {
     loading: false,
     seeking: false,
     playToken: 0,
+    /** 「下一首播放」优先队列：不改动 queue 排序，任意模式下优先于 mode 跳转 */
+    nextPlayQueue: [] as QueueTrack[],
   }),
   getters: {
     currentTrack(state): QueueTrack | null {
@@ -221,6 +223,7 @@ export const usePlayerStore = defineStore('player', {
 
     setQueue(tracks: QueueTrack[], startIndex = 0) {
       this.queue = tracks
+      this.nextPlayQueue = []
       this.currentIndex = startIndex
       void this.playCurrent()
     },
@@ -232,7 +235,10 @@ export const usePlayerStore = defineStore('player', {
     },
 
     playTrack(track: QueueTrack, queue?: QueueTrack[]) {
-      if (queue) this.queue = queue
+      if (queue) {
+        this.queue = queue
+        this.nextPlayQueue = []
+      }
       const idx = this.queue.findIndex((t) => t.id === track.id)
       if (idx >= 0) {
         this.currentIndex = idx
@@ -340,6 +346,7 @@ export const usePlayerStore = defineStore('player', {
       this.revokeObjectUrl()
       this.resetAudioElement(audio)
       this.queue = []
+      this.nextPlayQueue = []
       this.currentIndex = -1
       this.playing = false
       this.currentTime = 0
@@ -358,6 +365,7 @@ export const usePlayerStore = defineStore('player', {
       this.revokeObjectUrl()
       this.resetAudioElement(audio)
       this.queue = []
+      this.nextPlayQueue = []
       this.currentIndex = -1
       this.playing = false
       this.currentTime = 0
@@ -365,19 +373,43 @@ export const usePlayerStore = defineStore('player', {
       this.playToken++
     },
 
-    /** 下一首播放：插入到当前曲目之后 */
+    /**
+     * 下一首播放：记入优先队列，不改变播放列表排序。
+     * 任意播放模式（含随机）下，切歌/播完都会优先走该队列。
+     */
     playNext(track: QueueTrack) {
       if (!this.queue.length || this.currentIndex < 0) {
         this.playTrack(track, [track])
         return
       }
-      const exists = this.queue.findIndex((t) => t.id === track.id)
-      if (exists === this.currentIndex) return
-      if (exists >= 0) {
-        this.queue.splice(exists, 1)
-        if (exists < this.currentIndex) this.currentIndex -= 1
+      if (track.id === this.currentTrack?.id) return
+
+      // 列表中没有则追加到末尾（不移动已有曲目）
+      if (!this.queue.some((t) => t.id === track.id)) {
+        this.queue.push({ ...track })
       }
-      this.queue.splice(this.currentIndex + 1, 0, track)
+
+      // 已在「下一首」队列中则挪到队尾，保证最近一次指定的稍后播
+      const pending = this.nextPlayQueue.findIndex((t) => t.id === track.id)
+      if (pending >= 0) this.nextPlayQueue.splice(pending, 1)
+      this.nextPlayQueue.push({ ...track })
+    },
+
+    /** 消费一条「下一首播放」；成功则已开始播放并返回 true */
+    consumeNextPlay(): boolean {
+      while (this.nextPlayQueue.length) {
+        const track = this.nextPlayQueue.shift()!
+        if (track.id === this.currentTrack?.id) continue
+        let idx = this.queue.findIndex((t) => t.id === track.id)
+        if (idx < 0) {
+          this.queue.push({ ...track })
+          idx = this.queue.length - 1
+        }
+        this.currentIndex = idx
+        void this.playCurrent()
+        return true
+      }
+      return false
     },
 
     /** 追加到播放列表末尾（不自动播放） */
@@ -428,6 +460,9 @@ export const usePlayerStore = defineStore('player', {
 
     next() {
       if (!this.queue.length) return
+      // 优先「下一首播放」，不受随机/顺序/循环影响
+      if (this.consumeNextPlay()) return
+
       if (this.mode === 'shuffle') {
         this.currentIndex = Math.floor(Math.random() * this.queue.length)
       } else if (this.mode === 'order') {
@@ -457,6 +492,11 @@ export const usePlayerStore = defineStore('player', {
     },
 
     onEnded() {
+      // 有「下一首播放」时，单曲循环也先让出
+      if (this.nextPlayQueue.length) {
+        this.next()
+        return
+      }
       if (this.mode === 'single') {
         void this.playCurrent()
         return

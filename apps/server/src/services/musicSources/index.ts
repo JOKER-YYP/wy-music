@@ -1,5 +1,5 @@
-import type { MusicSource, TrackDto } from '@wy-music/shared'
-import { MUSIC_SOURCES, isXmMusicSource } from '@wy-music/shared'
+import type { MusicSource, TrackDto, XmMusicSource } from '@wy-music/shared'
+import { MUSIC_SOURCES, XM_MUSIC_SOURCES, isXmMusicSource } from '@wy-music/shared'
 import { detailMigu, searchMigu } from './migu.js'
 import { detailVkeys, searchVkeys } from './vkeys.js'
 import { detailTang, searchTang } from './tang.js'
@@ -19,6 +19,14 @@ export type ParallelSearchResult = {
   sources: SourceSearchStat[]
 }
 
+function xmSearch(source: XmMusicSource) {
+  return (kw: string, num: number) => searchXm(source, kw, 1, num)
+}
+
+function xmDetail(source: XmMusicSource) {
+  return (id: string) => detailXm(source, id)
+}
+
 const searchFns: Record<
   MusicSource,
   (keyword: string, num: number) => Promise<MusicSearchHit[]>
@@ -27,10 +35,19 @@ const searchFns: Record<
   vkeys: (kw, num) => searchVkeys(kw, num, 1),
   tang: searchTang,
   kw: searchKw,
-  netease: (kw, num) => searchXm('netease', kw, 1, num),
-  qq: (kw, num) => searchXm('qq', kw, 1, num),
-  kugou: (kw, num) => searchXm('kugou', kw, 1, num),
-  kuwo: (kw, num) => searchXm('kuwo', kw, 1, num),
+  netease: xmSearch('netease'),
+  qq: xmSearch('qq'),
+  kugou: xmSearch('kugou'),
+  kuwo: xmSearch('kuwo'),
+  baidu: xmSearch('baidu'),
+  '1ting': xmSearch('1ting'),
+  xm_migu: xmSearch('xm_migu'),
+  lizhi: xmSearch('lizhi'),
+  qingting: xmSearch('qingting'),
+  ximalaya: xmSearch('ximalaya'),
+  '5singyc': xmSearch('5singyc'),
+  '5singfc': xmSearch('5singfc'),
+  kg: xmSearch('kg'),
 }
 
 const detailFns: Record<MusicSource, (id: string) => Promise<MusicDetail>> = {
@@ -38,10 +55,19 @@ const detailFns: Record<MusicSource, (id: string) => Promise<MusicDetail>> = {
   vkeys: detailVkeys,
   tang: detailTang,
   kw: detailKw,
-  netease: (id) => detailXm('netease', id),
-  qq: (id) => detailXm('qq', id),
-  kugou: (id) => detailXm('kugou', id),
-  kuwo: (id) => detailXm('kuwo', id),
+  netease: xmDetail('netease'),
+  qq: xmDetail('qq'),
+  kugou: xmDetail('kugou'),
+  kuwo: xmDetail('kuwo'),
+  baidu: xmDetail('baidu'),
+  '1ting': xmDetail('1ting'),
+  xm_migu: xmDetail('xm_migu'),
+  lizhi: xmDetail('lizhi'),
+  qingting: xmDetail('qingting'),
+  ximalaya: xmDetail('ximalaya'),
+  '5singyc': xmDetail('5singyc'),
+  '5singfc': xmDetail('5singfc'),
+  kg: xmDetail('kg'),
 }
 
 /** 多源并行搜索；单源失败不影响其它源 */
@@ -91,5 +117,5 @@ export async function resolveMusicDetail(
   return fn(id)
 }
 
-export { toSearchTrackDto, searchXm, detailXm }
+export { toSearchTrackDto, searchXm, detailXm, XM_MUSIC_SOURCES }
 export type { MusicDetail, MusicSearchHit }

@@ -10,6 +10,7 @@ import {
   makeExternalTrackId,
   MUSIC_SOURCES,
   parseExternalTrackId,
+  XM_API_TYPE,
 } from '@wy-music/shared'
 import { http } from './http'
 
@@ -181,7 +182,11 @@ async function fetchFormJsonBrowser<T>(
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const text = await res.text()
   if (!text.trim()) throw new Error('外部接口返回为空')
-  return JSON.parse(text) as T
+  const trimmed = text.trim()
+  if (trimmed.startsWith('<')) {
+    throw new Error('外部接口返回异常（非 JSON，上游可能故障）')
+  }
+  return JSON.parse(trimmed) as T
 }
 
 async function xmPost(form: {
@@ -211,12 +216,16 @@ async function searchXm(
   page: number,
   pageSize: number,
 ): Promise<ExtHit[]> {
+  // 全民K歌不支持按名称搜索
+  if (source === 'kg') return []
+
+  const apiType = XM_API_TYPE[source] || source
   const pagesNeeded = Math.max(1, Math.ceil(pageSize / XM_NATIVE_PAGE_SIZE))
   const start = (Math.max(1, page) - 1) * pagesNeeded + 1
   const pageNos = Array.from({ length: pagesNeeded }, (_, i) => start + i)
   const batches = await Promise.all(
     pageNos.map((p) =>
-      xmPost({ input: keyword, filter: 'name', type: source, page: p }).catch((e) => {
+      xmPost({ input: keyword, filter: 'name', type: apiType, page: p }).catch((e) => {
         if (pageNos.length === 1) throw e
         return [] as XmSong[]
       }),
@@ -239,7 +248,8 @@ async function searchXm(
 }
 
 async function detailXm(source: XmMusicSource, externalId: string): Promise<MusicDetailResult> {
-  const rows = await xmPost({ input: externalId, filter: 'id', type: source, page: 1 })
+  const apiType = XM_API_TYPE[source] || source
+  const rows = await xmPost({ input: externalId, filter: 'id', type: apiType, page: 1 })
   const row = rows[0]
   if (!row) throw new Error(`${source} 详情为空`)
   const musicUrl = String(row.url || '').trim()
@@ -470,6 +480,15 @@ export async function parallelExternalSearch(opts: {
     qq: searchXm('qq', kw, page, pageSize),
     kugou: searchXm('kugou', kw, page, pageSize),
     kuwo: searchXm('kuwo', kw, page, pageSize),
+    baidu: searchXm('baidu', kw, page, pageSize),
+    '1ting': searchXm('1ting', kw, page, pageSize),
+    xm_migu: searchXm('xm_migu', kw, page, pageSize),
+    lizhi: searchXm('lizhi', kw, page, pageSize),
+    qingting: searchXm('qingting', kw, page, pageSize),
+    ximalaya: searchXm('ximalaya', kw, page, pageSize),
+    '5singyc': searchXm('5singyc', kw, page, pageSize),
+    '5singfc': searchXm('5singfc', kw, page, pageSize),
+    kg: searchXm('kg', kw, page, pageSize),
   }
 
   const sources: SourceSearchStat[] = []

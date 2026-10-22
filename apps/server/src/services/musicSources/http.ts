@@ -136,6 +136,9 @@ export async function requestFormJson<T = unknown>(
   if (status >= 400) throw new Error(`外部接口返回 ${status}`)
   const trimmed = body.trim()
   if (!trimmed) throw new Error('外部接口返回为空')
+  if (trimmed.startsWith('<')) {
+    throw new Error('外部接口返回异常（非 JSON，上游可能故障）')
+  }
   try {
     return JSON.parse(trimmed) as T
   } catch {

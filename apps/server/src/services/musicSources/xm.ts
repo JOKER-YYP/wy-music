@@ -3,9 +3,13 @@
  * http://www.xm95522.com/mp3/
  */
 import type { XmMusicSource } from '@wy-music/shared'
-import { isXmMusicSource } from '@wy-music/shared'
+import { isXmMusicSource, XM_API_TYPE } from '@wy-music/shared'
 import { pickStr, requestFormJson } from './http.js'
 import type { MusicDetail, MusicSearchHit } from './types.js'
+
+function xmType(source: XmMusicSource): string {
+  return XM_API_TYPE[source] || source
+}
 
 const XM_API = 'http://www.xm95522.com/mp3/'
 /** 该站固定约 10 条/页 */
@@ -96,9 +100,13 @@ export async function searchXm(
   const start = (Math.max(1, page) - 1) * pagesNeeded + 1
   const pageNos = Array.from({ length: pagesNeeded }, (_, i) => start + i)
 
+  // 全民K歌不支持按名称搜索（站方说明），直接空结果
+  if (source === 'kg') return []
+
+  const apiType = xmType(source)
   const batches = await Promise.all(
     pageNos.map((p) =>
-      xmPost({ input: q, filter: 'name', type: source, page: p }).catch((e) => {
+      xmPost({ input: q, filter: 'name', type: apiType, page: p }).catch((e) => {
         if (pageNos.length === 1) throw e
         return [] as XmSong[]
       }),
@@ -114,7 +122,7 @@ export async function detailXm(source: XmMusicSource, externalId: string): Promi
   const id = String(externalId || '').trim()
   if (!id) throw new Error('缺少外部曲目 id')
 
-  const rows = await xmPost({ input: id, filter: 'id', type: source, page: 1 })
+  const rows = await xmPost({ input: id, filter: 'id', type: xmType(source), page: 1 })
   const row = rows[0]
   if (!row) throw new Error(`${source} 详情为空`)
   const musicUrl = pickStr(row.url)

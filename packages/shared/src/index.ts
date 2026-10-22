@@ -24,7 +24,12 @@ export interface UserPublic {
   createdAt: string
 }
 
-/** 外部音乐源（并行搜索；netease/qq/kugou/kuwo 走 xm95522 聚合） */
+/**
+ * 外部音乐源（并行搜索）
+ * - migu/vkeys/tang/kw：皮卡丘等独立接口
+ * - 其余：xm95522 / maicong 聚合（http://www.xm95522.com/mp3/）
+ * - xm_migu：聚合站咪咕（与源1 migu 区分，避免 type 冲突）
+ */
 export type MusicSource =
   | 'migu'
   | 'vkeys'
@@ -34,6 +39,15 @@ export type MusicSource =
   | 'qq'
   | 'kugou'
   | 'kuwo'
+  | 'baidu'
+  | '1ting'
+  | 'xm_migu'
+  | 'lizhi'
+  | 'qingting'
+  | 'ximalaya'
+  | '5singyc'
+  | '5singfc'
+  | 'kg'
 
 export const MUSIC_SOURCES: MusicSource[] = [
   'migu',
@@ -44,6 +58,15 @@ export const MUSIC_SOURCES: MusicSource[] = [
   'qq',
   'kugou',
   'kuwo',
+  'baidu',
+  '1ting',
+  'xm_migu',
+  'lizhi',
+  'qingting',
+  'ximalaya',
+  '5singyc',
+  '5singfc',
+  'kg',
 ]
 
 export const MUSIC_SOURCE_LABEL: Record<MusicSource, string> = {
@@ -55,12 +78,65 @@ export const MUSIC_SOURCE_LABEL: Record<MusicSource, string> = {
   qq: 'QQ',
   kugou: '酷狗',
   kuwo: '酷我',
+  baidu: '千千',
+  '1ting': '一听',
+  xm_migu: '咪咕',
+  lizhi: '荔枝',
+  qingting: '蜻蜓',
+  ximalaya: '喜马拉雅',
+  '5singyc': '5sing原创',
+  '5singfc': '5sing翻唱',
+  kg: '全民K歌',
 }
 
 /** xm95522 聚合接口承载的源 */
-export type XmMusicSource = 'netease' | 'qq' | 'kugou' | 'kuwo'
+export type XmMusicSource =
+  | 'netease'
+  | 'qq'
+  | 'kugou'
+  | 'kuwo'
+  | 'baidu'
+  | '1ting'
+  | 'xm_migu'
+  | 'lizhi'
+  | 'qingting'
+  | 'ximalaya'
+  | '5singyc'
+  | '5singfc'
+  | 'kg'
 
-export const XM_MUSIC_SOURCES: XmMusicSource[] = ['netease', 'qq', 'kugou', 'kuwo']
+export const XM_MUSIC_SOURCES: XmMusicSource[] = [
+  'netease',
+  'qq',
+  'kugou',
+  'kuwo',
+  'baidu',
+  '1ting',
+  'xm_migu',
+  'lizhi',
+  'qingting',
+  'ximalaya',
+  '5singyc',
+  '5singfc',
+  'kg',
+]
+
+/** 内部 MusicSource → xm95522 POST type 字段 */
+export const XM_API_TYPE: Record<XmMusicSource, string> = {
+  netease: 'netease',
+  qq: 'qq',
+  kugou: 'kugou',
+  kuwo: 'kuwo',
+  baidu: 'baidu',
+  '1ting': '1ting',
+  xm_migu: 'migu',
+  lizhi: 'lizhi',
+  qingting: 'qingting',
+  ximalaya: 'ximalaya',
+  '5singyc': '5singyc',
+  '5singfc': '5singfc',
+  kg: 'kg',
+}
 
 export function isXmMusicSource(source: string): source is XmMusicSource {
   return (XM_MUSIC_SOURCES as readonly string[]).includes(source)

@@ -193,19 +193,18 @@ async function onFilePicked(ev: Event) {
 
   try {
     const rows = await parseBatchSearchFile(file)
-    if (rows.length > 80) {
-      ElMessage.warning('单次最多 80 条，已截取前 80 条')
-    }
-    const limited = rows.slice(0, 80)
-    queries.value = limited
+    queries.value = rows
     hits.value = []
     selectedKeys.value = []
     failList.value = []
     cancelFlag.cancelled = false
     searching.value = true
-    progress.value = { total: limited.length, done: 0 }
+    progress.value = { total: rows.length, done: 0 }
+    if (rows.length > 50) {
+      ElMessage.info(`共 ${rows.length} 条，将逐条搜索，可随时取消`)
+    }
 
-    const list = await runBatchExternalSearch(limited, {
+    const list = await runBatchExternalSearch(rows, {
       // 每个有结果的源各留 3 首，保证全源都进列表
       perSource: 3,
       pageSize: 20,

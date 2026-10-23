@@ -47,6 +47,12 @@ const router = createRouter({
           meta: { public: true },
         },
         {
+          path: 'batch-search',
+          name: 'batch-search',
+          component: () => import('../views/BatchSearchView.vue'),
+          meta: { public: true },
+        },
+        {
           path: 'upload',
           name: 'upload',
           component: () => import('../views/UploadView.vue'),

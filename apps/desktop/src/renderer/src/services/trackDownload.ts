@@ -141,5 +141,122 @@ export async function downloadTrackToLibrary(track: TrackDto) {
   return imported
 }
 
+function joinDirFile(dir: string, fileName: string) {
+  const sep = /\\/.test(dir) || /^[a-zA-Z]:/.test(dir) ? '\\' : '/'
+  return `${dir.replace(/[\\/]+$/, '')}${sep}${fileName}`
+}
+
+/** 批量下载：选曲库或文件夹（文件夹内使用默认文件名，不弹另存为） */
+export async function pickBatchDownloadMode(): Promise<'library' | 'folder' | null> {
+  try {
+    await ElMessageBox.confirm(
+      '下载到曲库：写入服务器曲库，可在线播放\n下载到文件夹：保存到本机目录，文件名按默认规则',
+      '批量下载方式',
+      {
+        distinguishCancelAndClose: true,
+        confirmButtonText: '下载到曲库',
+        cancelButtonText: '下载到文件夹…',
+        type: 'info',
+        closeOnClickModal: false,
+      },
+    )
+    return 'library'
+  } catch (action) {
+    if (action === 'cancel') return 'folder'
+    return null
+  }
+}
+
+export type BatchDownloadFailItem = {
+  trackId: string
+  name: string
+  artists: string
+  error: string
+}
+
+export type BatchDownloadResult = {
+  ok: number
+  fail: number
+  failures: BatchDownloadFailItem[]
+}
+
+function failItem(track: TrackDto, error: unknown): BatchDownloadFailItem {
+  const msg =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : String((error as { message?: string })?.message || error || '未知错误')
+  return {
+    trackId: track.id,
+    name: track.name || '未命名',
+    artists: (track.artists || []).filter(Boolean).join(' / ') || '—',
+    error: msg.slice(0, 200),
+  }
+}
+
+export async function downloadTracksToLibrary(
+  tracks: TrackDto[],
+  onProgress?: (done: number, total: number, name: string) => void,
+): Promise<BatchDownloadResult> {
+  let ok = 0
+  const failures: BatchDownloadFailItem[] = []
+  const total = tracks.length
+  for (let i = 0; i < tracks.length; i++) {
+    const track = tracks[i]
+    onProgress?.(i, total, track.name)
+    try {
+      if (!isExternalTrack(track)) throw new Error('非外部曲目')
+      await importExternalToLibrary(track)
+      ok += 1
+    } catch (e) {
+      failures.push(failItem(track, e))
+    }
+  }
+  onProgress?.(total, total, '')
+  return { ok, fail: failures.length, failures }
+}
+
+/** 批量下载到文件夹：一次选目录，默认「歌手 - 歌名.mp3」 */
+export async function downloadTracksToFolder(
+  tracks: TrackDto[],
+  onProgress?: (done: number, total: number, name: string) => void,
+): Promise<BatchDownloadResult & { folder: string | null }> {
+  if (!isElectronApp() || !window.wyAPI?.selectFolder || !window.wyAPI?.downloadFile) {
+    throw new Error('请在桌面端使用文件夹下载')
+  }
+  const folder = await window.wyAPI.selectFolder()
+  if (!folder) return { ok: 0, fail: 0, failures: [], folder: null }
+
+  let ok = 0
+  const failures: BatchDownloadFailItem[] = []
+  const usedNames = new Set<string>()
+  const total = tracks.length
+
+  for (let i = 0; i < tracks.length; i++) {
+    const track = tracks[i]
+    onProgress?.(i, total, track.name)
+    try {
+      let fileName = suggestedDownloadName(track, '.mp3')
+      const lower = fileName.toLowerCase()
+      if (usedNames.has(lower)) {
+        const dot = fileName.lastIndexOf('.')
+        const base = dot > 0 ? fileName.slice(0, dot) : fileName
+        const ext = dot > 0 ? fileName.slice(dot) : '.mp3'
+        let n = 2
+        while (usedNames.has(`${base} (${n})${ext}`.toLowerCase())) n += 1
+        fileName = `${base} (${n})${ext}`
+      }
+      usedNames.add(fileName.toLowerCase())
+      await downloadTrackToPath(track, joinDirFile(folder, fileName))
+      ok += 1
+    } catch (e) {
+      failures.push(failItem(track, e))
+    }
+  }
+  onProgress?.(total, total, '')
+  return { ok, fail: failures.length, failures, folder }
+}
+
 // 保留导出，避免未使用告警（扩展名推断可供后续）
 export { guessExtFromUrl }

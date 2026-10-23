@@ -53,6 +53,15 @@
             />
           </Teleport>
         </div>
+        <button
+          type="button"
+          class="batch-search-btn"
+          title="批量搜歌"
+          @click="goBatchSearch"
+        >
+          <el-icon :size="14"><Document /></el-icon>
+          <span>批量搜歌</span>
+        </button>
       </div>
 
       <div class="topbar-right">
@@ -222,6 +231,7 @@ import {
   ArrowRight,
   ArrowUp,
   CircleClose,
+  Document,
   EditPen,
   Headset,
   Message,
@@ -474,6 +484,11 @@ function goSearch() {
   router.push({ path: '/search', query: q ? { keyword: q } : {} })
 }
 
+function goBatchSearch() {
+  closeSearchPanel()
+  router.push('/batch-search')
+}
+
 function onSuggestSearch(q: string) {
   keyword.value = q
   closeSearchPanel()
@@ -602,7 +617,8 @@ function onLogout() {
 }
 .topbar-left .brand,
 .topbar-left .hist-nav,
-.topbar-left .search-anchor {
+.topbar-left .search-anchor,
+.topbar-left .batch-search-btn {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
@@ -730,6 +746,25 @@ function onLogout() {
   position: relative;
   width: 240px;
   flex-shrink: 0;
+}
+.batch-search-btn {
+  height: 30px;
+  border: none;
+  border-radius: 15px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.16);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  line-height: 1;
+  &:hover {
+    background: rgba(0, 0, 0, 0.22);
+    color: #fff;
+  }
 }
 .search-wrap {
   height: 30px;

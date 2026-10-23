@@ -38,28 +38,41 @@
       <span v-if="selectedCount">· 已选 {{ selectedCount }}</span>
     </div>
 
-    <div v-if="sourceTags.length" class="source-tags">
-      <button
-        type="button"
-        class="source-tag"
-        :class="{ active: !filterSource }"
-        :disabled="downloading"
-        @click="onSourceTagClick(null)"
-      >
-        全部 {{ hits.length }}
-      </button>
-      <button
-        v-for="t in sourceTags"
-        :key="t.source"
-        type="button"
-        class="source-tag"
-        :class="{ active: filterSource === t.source, selected: isSourceFullySelected(t.source) }"
-        :disabled="downloading"
-        :title="`筛选并勾选「${t.label}」全部结果`"
-        @click="onSourceTagClick(t.source)"
-      >
-        {{ t.label }} {{ t.count }}
-      </button>
+    <div v-if="sourceTags.length" class="source-panel">
+      <div class="select-mode">
+        <span class="mode-label">勾选方式</span>
+        <el-radio-group v-model="selectMode" size="small" :disabled="downloading">
+          <el-radio-button value="all">当前标签全部</el-radio-button>
+          <el-radio-button value="first">每首歌第一条</el-radio-button>
+        </el-radio-group>
+      </div>
+      <div class="source-tags">
+        <button
+          type="button"
+          class="source-tag"
+          :class="{ active: !filterSource }"
+          :disabled="downloading"
+          @click="onSourceTagClick(null)"
+        >
+          全部 {{ hits.length }}
+        </button>
+        <button
+          v-for="t in sourceTags"
+          :key="t.source"
+          type="button"
+          class="source-tag"
+          :class="{ active: filterSource === t.source, selected: isSourceFullySelected(t.source) }"
+          :disabled="downloading"
+          :title="
+            selectMode === 'first'
+              ? `筛选「${t.label}」并勾选每首歌第一条`
+              : `筛选并勾选「${t.label}」全部结果`
+          "
+          @click="onSourceTagClick(t.source)"
+        >
+          {{ t.label }} {{ t.count }}
+        </button>
+      </div>
     </div>
 
     <div v-if="hits.length" class="toolbar">
@@ -206,6 +219,8 @@ const page = ref(1)
 const pageSize = ref(100)
 /** 当前筛选的来源；null 表示全部 */
 const filterSource = ref<string | null>(null)
+/** 标签勾选方式：全部 / 每首歌第一条 */
+const selectMode = ref<'all' | 'first'>('all')
 /** 同步表格勾选时忽略 selection-change，避免覆盖跨页选中 */
 let syncingSelection = false
 
@@ -262,26 +277,38 @@ function isSourceFullySelected(source: string) {
   return any
 }
 
-/** 点击来源标签：筛选该源，并一键勾选该源全部结果 */
-function onSourceTagClick(source: string | null) {
-  if (!source) {
-    filterSource.value = null
-    page.value = 1
-    void restorePageSelection()
-    return
+function collectKeysForTag(source: string | null, mode: 'all' | 'first'): Set<string> {
+  const scoped = source
+    ? hits.value.filter((h) => String(h.track.source || '') === source)
+    : hits.value
+
+  if (mode === 'all') {
+    return new Set(scoped.map((h) => h.rowKey))
   }
+
+  // 每首歌（清单行）在该范围内取匹配分最高的一条
+  const bestByQuery = new Map<number, BatchSearchHit>()
+  for (const h of scoped) {
+    const prev = bestByQuery.get(h.queryIndex)
+    if (!prev || h.score > prev.score) bestByQuery.set(h.queryIndex, h)
+  }
+  return new Set([...bestByQuery.values()].map((h) => h.rowKey))
+}
+
+/** 点击来源标签：筛选，并按勾选方式一键勾选 */
+function onSourceTagClick(source: string | null) {
   filterSource.value = source
   page.value = 1
 
-  const next = new Set<string>()
-  for (const h of hits.value) {
-    if (String(h.track.source || '') === source) next.add(h.rowKey)
-  }
+  const next = collectKeysForTag(source, selectMode.value)
   selectedKeySet.value = next
   void restorePageSelection()
 
-  const label = MUSIC_SOURCE_LABEL[source as MusicSource] || source
-  ElMessage.success(`已勾选「${label}」共 ${next.size} 首`)
+  const label = source
+    ? MUSIC_SOURCE_LABEL[source as MusicSource] || source
+    : '全部'
+  const modeTip = selectMode.value === 'first' ? '每首歌第一条' : '全部结果'
+  ElMessage.success(`「${label}」已勾选${modeTip}：${next.size} 首`)
 }
 
 function onDownloadTemplate() {
@@ -305,6 +332,7 @@ function clearResults() {
   failList.value = []
   page.value = 1
   filterSource.value = null
+  selectMode.value = 'all'
 }
 
 function clearSelection() {
@@ -545,11 +573,25 @@ async function onBatchDownload() {
   color: #666;
   margin-bottom: 10px;
 }
+.source-panel {
+  margin-bottom: 10px;
+}
+.select-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.mode-label {
+  font-size: 12px;
+  color: #888;
+  flex-shrink: 0;
+}
 .source-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
 }
 .source-tag {
   border: 1px solid #e5e5e5;

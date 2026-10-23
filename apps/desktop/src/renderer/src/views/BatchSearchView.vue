@@ -3,7 +3,9 @@
     <div class="page-head">
       <div>
         <h1>批量搜歌</h1>
-        <p class="sub">按 Excel 清单批量搜索外部源，勾选后下载到曲库或本地文件夹</p>
+        <p class="sub">
+          按 Excel 清单批量搜索；请尽量填写「歌手」列以优先命中原唱，翻唱/伴奏会降权
+        </p>
       </div>
       <div class="head-actions">
         <el-button round @click="onDownloadTemplate">下载导入模板</el-button>

@@ -117,25 +117,72 @@ export async function parseBatchSearchFile(file: File): Promise<BatchQueryRow[]>
   return out
 }
 
+/** 翻唱 / 非原版常见标记（命中则大幅降权） */
+const COVER_NOISE_RE =
+  /翻唱|cover|covers?|伴奏|消音|铃声|dj\b|remix|混音|抖音|快手|喊麦|改编版?|女声版|男声版|小孩|宝宝|钢琴版|古筝版|二胡版|小提琴版|吉他弹唱|弹唱|合奏版|卡点|增速|降调|夜芯|群星|未知歌手/i
+
+function compactArtist(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[\/、,&＆|｜]/g, '/')
+    .trim()
+}
+
+function artistMatchScore(queryArtist: string, trackArtists: string[]): number {
+  const q = compactArtist(queryArtist)
+  if (!q) return 0
+  const arts = (trackArtists || []).map(compactArtist).filter(Boolean)
+  const joined = arts.join('/')
+  if (!joined) return -25
+
+  if (arts.some((a) => a === q) || joined === q) return 140
+  // 周杰伦 / Jay Chou 等包含关系
+  if (arts.some((a) => a.includes(q) || q.includes(a)) || joined.includes(q)) return 95
+  // 多歌手清单：拆开比
+  const qParts = q.split('/').filter(Boolean)
+  if (qParts.length > 1 && qParts.every((p) => arts.some((a) => a.includes(p) || p.includes(a)))) {
+    return 110
+  }
+  // 填了原唱歌手但对不上 → 大概率翻唱，强降权
+  return -55
+}
+
+/**
+ * 匹配打分：优先歌名准确 + 原唱歌手一致，压制翻唱/伴奏/DJ 等
+ */
 function scoreTrack(track: TrackDto, name: string, artist: string): number {
-  const tn = (track.name || '').trim().toLowerCase()
+  const rawTitle = (track.name || '').trim()
+  const tn = rawTitle.toLowerCase()
   const n = name.trim().toLowerCase()
+  const arts = track.artists || []
+  const artsText = arts.join(' ')
   let s = 0
   if (!tn || !n) return 0
-  if (tn === n) s += 100
+
+  // 歌名
+  if (tn === n) s += 120
+  else if (tn.startsWith(n) && /^[\s(\[（【-]/.test(tn.slice(n.length) || ' ')) s += 95
   else if (tn.includes(n) || n.includes(tn)) s += 55
   else {
-    // 简单字符重叠
     const shorter = tn.length <= n.length ? tn : n
     const longer = tn.length > n.length ? tn : n
-    if (shorter.length >= 2 && longer.includes(shorter)) s += 30
+    if (shorter.length >= 2 && longer.includes(shorter)) s += 28
+    else return -10
   }
-  if (artist) {
-    const a = artist.toLowerCase()
-    const arts = (track.artists || []).join(' ').toLowerCase()
-    if (arts === a) s += 50
-    else if (arts.includes(a) || a.includes(arts)) s += 35
+
+  // 原唱歌手（Excel 填了歌手时权重最高）
+  if (artist.trim()) {
+    s += artistMatchScore(artist, arts)
   }
+
+  // 非原版噪音
+  const blob = `${rawTitle} ${artsText}`
+  if (COVER_NOISE_RE.test(blob)) s -= 90
+  if (/翻唱/i.test(blob)) s -= 40
+  // 歌名被加很长后缀，通常不是干净原版
+  if (tn.length > n.length + 12 && tn.includes(n)) s -= 15
+
   return s
 }
 

@@ -38,6 +38,30 @@
       <span v-if="selectedCount">· 已选 {{ selectedCount }}</span>
     </div>
 
+    <div v-if="sourceTags.length" class="source-tags">
+      <button
+        type="button"
+        class="source-tag"
+        :class="{ active: !filterSource }"
+        :disabled="downloading"
+        @click="onSourceTagClick(null)"
+      >
+        全部 {{ hits.length }}
+      </button>
+      <button
+        v-for="t in sourceTags"
+        :key="t.source"
+        type="button"
+        class="source-tag"
+        :class="{ active: filterSource === t.source, selected: isSourceFullySelected(t.source) }"
+        :disabled="downloading"
+        :title="`筛选并勾选「${t.label}」全部结果`"
+        @click="onSourceTagClick(t.source)"
+      >
+        {{ t.label }} {{ t.count }}
+      </button>
+    </div>
+
     <div v-if="hits.length" class="toolbar">
       <el-button
         type="danger"
@@ -115,7 +139,7 @@
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
-        :total="hits.length"
+        :total="filteredHits.length"
         :page-sizes="[50, 100, 200]"
         layout="total, sizes, prev, pager, next, jumper"
         background
@@ -138,7 +162,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { TrackDto } from '@wy-music/shared'
+import type { MusicSource, TrackDto } from '@wy-music/shared'
+import { MUSIC_SOURCES, MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import {
   downloadBatchSearchTemplate,
   parseBatchSearchFile,
@@ -179,6 +204,8 @@ const progress = ref<BatchQueryProgress>({ total: 0, done: 0 })
 const cancelFlag = { cancelled: false }
 const page = ref(1)
 const pageSize = ref(100)
+/** 当前筛选的来源；null 表示全部 */
+const filterSource = ref<string | null>(null)
 /** 同步表格勾选时忽略 selection-change，避免覆盖跨页选中 */
 let syncingSelection = false
 
@@ -189,10 +216,73 @@ const progressPct = computed(() => {
 
 const selectedCount = computed(() => selectedKeySet.value.size)
 
+const sourceTags = computed(() => {
+  const map = new Map<string, number>()
+  for (const h of hits.value) {
+    const src = String(h.track.source || '')
+    if (!src || src === 'local') continue
+    map.set(src, (map.get(src) || 0) + 1)
+  }
+  const ordered: { source: string; label: string; count: number }[] = []
+  for (const s of MUSIC_SOURCES) {
+    const count = map.get(s)
+    if (!count) continue
+    ordered.push({
+      source: s,
+      label: MUSIC_SOURCE_LABEL[s as MusicSource] || s,
+      count,
+    })
+    map.delete(s)
+  }
+  // 未在 MUSIC_SOURCES 中的兜底
+  for (const [source, count] of map) {
+    ordered.push({ source, label: source, count })
+  }
+  return ordered
+})
+
+const filteredHits = computed(() => {
+  if (!filterSource.value) return hits.value
+  return hits.value.filter((h) => String(h.track.source || '') === filterSource.value)
+})
+
 const pagedHits = computed(() => {
   const start = (page.value - 1) * pageSize.value
-  return hits.value.slice(start, start + pageSize.value)
+  return filteredHits.value.slice(start, start + pageSize.value)
 })
+
+function isSourceFullySelected(source: string) {
+  const selected = selectedKeySet.value
+  let any = false
+  for (const h of hits.value) {
+    if (String(h.track.source || '') !== source) continue
+    any = true
+    if (!selected.has(h.rowKey)) return false
+  }
+  return any
+}
+
+/** 点击来源标签：筛选该源，并一键勾选该源全部结果 */
+function onSourceTagClick(source: string | null) {
+  if (!source) {
+    filterSource.value = null
+    page.value = 1
+    void restorePageSelection()
+    return
+  }
+  filterSource.value = source
+  page.value = 1
+
+  const next = new Set<string>()
+  for (const h of hits.value) {
+    if (String(h.track.source || '') === source) next.add(h.rowKey)
+  }
+  selectedKeySet.value = next
+  void restorePageSelection()
+
+  const label = MUSIC_SOURCE_LABEL[source as MusicSource] || source
+  ElMessage.success(`已勾选「${label}」共 ${next.size} 首`)
+}
 
 function onDownloadTemplate() {
   downloadBatchSearchTemplate()
@@ -214,6 +304,7 @@ function clearResults() {
   downloadTip.value = ''
   failList.value = []
   page.value = 1
+  filterSource.value = null
 }
 
 function clearSelection() {
@@ -256,7 +347,7 @@ async function restorePageSelection() {
   syncingSelection = false
 }
 
-watch([page, pageSize], () => {
+watch([page, pageSize, filterSource], () => {
   void restorePageSelection()
 })
 
@@ -307,6 +398,7 @@ async function onFilePicked(ev: Event) {
     selectedKeySet.value = new Set()
     failList.value = []
     page.value = 1
+    filterSource.value = null
     cancelFlag.cancelled = false
     searching.value = true
     progress.value = { total: rows.length, done: 0 }
@@ -452,6 +544,42 @@ async function onBatchDownload() {
   font-size: 13px;
   color: #666;
   margin-bottom: 10px;
+}
+.source-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.source-tag {
+  border: 1px solid #e5e5e5;
+  background: #fafafa;
+  color: #666;
+  font-size: 12px;
+  line-height: 1;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover:not(:disabled) {
+    border-color: #ec4141;
+    color: #ec4141;
+  }
+  &.active {
+    border-color: #ec4141;
+    background: #ec4141;
+    color: #fff;
+  }
+  &.selected:not(.active) {
+    border-color: #f5a5a5;
+    background: #fff5f5;
+    color: #c45656;
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 }
 .toolbar {
   display: flex;

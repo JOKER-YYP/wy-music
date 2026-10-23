@@ -164,6 +164,8 @@ export async function runBatchExternalSearch(
     perSource?: number
     pageSize?: number
     onProgress?: (p: BatchQueryProgress) => void
+    /** 每完成一条清单查询回调一批结果（便于渐进渲染，避免最后一次性塞上万行） */
+    onHits?: (chunk: BatchSearchHit[]) => void
     signal?: { cancelled: boolean }
   },
 ): Promise<BatchSearchHit[]> {
@@ -214,17 +216,17 @@ export async function runBatchExternalSearch(
         // 展示时：匹配分高的在前，同分按源稳定排序
         picked.sort((a, b) => b.score - a.score)
 
-        for (const item of picked) {
-          hits.push({
-            rowKey: `${q.index}:${item.track.id}`,
-            queryIndex: q.index,
-            queryKeyword: q.keyword,
-            queryName: q.name,
-            queryArtist: q.artist,
-            track: item.track,
-            score: item.score,
-          })
-        }
+        const chunk: BatchSearchHit[] = picked.map((item) => ({
+          rowKey: `${q.index}:${item.track.id}`,
+          queryIndex: q.index,
+          queryKeyword: q.keyword,
+          queryName: q.name,
+          queryArtist: q.artist,
+          track: item.track,
+          score: item.score,
+        }))
+        hits.push(...chunk)
+        if (chunk.length) opts?.onHits?.(chunk)
       } catch {
         // 单条失败不中断整批
       } finally {

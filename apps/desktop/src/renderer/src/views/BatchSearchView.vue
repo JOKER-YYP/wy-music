@@ -33,9 +33,9 @@
       <el-button size="small" text type="danger" @click="cancelSearch">取消</el-button>
     </div>
 
-    <div v-if="queries.length && !searching" class="summary">
+    <div v-if="queries.length && (hits.length || searching)" class="summary">
       清单 {{ queries.length }} 条 · 结果 {{ hits.length }} 首
-      <span v-if="selectedKeys.length">· 已选 {{ selectedKeys.length }}</span>
+      <span v-if="selectedCount">· 已选 {{ selectedCount }}</span>
     </div>
 
     <div v-if="hits.length" class="toolbar">
@@ -43,11 +43,20 @@
         type="danger"
         round
         size="small"
-        :disabled="!selectedKeys.length || downloading"
+        :disabled="!selectedCount || downloading"
         :loading="downloading"
         @click="onBatchDownload"
       >
-        批量下载（已选 {{ selectedKeys.length }}）
+        批量下载（已选 {{ selectedCount }}）
+      </el-button>
+      <el-button round size="small" :disabled="downloading" @click="selectCurrentPage">
+        全选本页
+      </el-button>
+      <el-button round size="small" :disabled="downloading" @click="selectAllResults">
+        全选全部
+      </el-button>
+      <el-button round size="small" :disabled="downloading || !selectedCount" @click="clearSelection">
+        取消勾选
       </el-button>
       <el-button round size="small" :disabled="downloading" @click="clearResults">
         清空结果
@@ -69,9 +78,10 @@
 
     <el-table
       v-if="hits.length"
-      :data="hits"
+      ref="tableRef"
+      :data="pagedHits"
       row-key="rowKey"
-      height="calc(100vh - 280px)"
+      height="calc(100vh - 320px)"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" />
@@ -101,6 +111,18 @@
       </el-table-column>
     </el-table>
 
+    <div v-if="hits.length" class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="hits.length"
+        :page-sizes="[50, 100, 200]"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
+        small
+      />
+    </div>
+
     <el-empty
       v-else-if="!searching"
       :description="
@@ -114,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { TrackDto } from '@wy-music/shared'
 import {
@@ -141,19 +163,35 @@ const user = useUserStore()
 const ui = useUiStore()
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const tableRef = ref<{
+  clearSelection: () => void
+  toggleRowSelection: (row: BatchSearchHit, selected?: boolean) => void
+} | null>(null)
 const queries = ref<BatchQueryRow[]>([])
-const hits = ref<BatchSearchHit[]>([])
-const selectedKeys = ref<string[]>([])
+/** 大数据量用 shallowRef，避免深度响应拖垮页面 */
+const hits = shallowRef<BatchSearchHit[]>([])
+const selectedKeySet = ref<Set<string>>(new Set())
 const searching = ref(false)
 const downloading = ref(false)
 const downloadTip = ref('')
 const failList = ref<BatchDownloadFailItem[]>([])
 const progress = ref<BatchQueryProgress>({ total: 0, done: 0 })
 const cancelFlag = { cancelled: false }
+const page = ref(1)
+const pageSize = ref(100)
+/** 同步表格勾选时忽略 selection-change，避免覆盖跨页选中 */
+let syncingSelection = false
 
 const progressPct = computed(() => {
   if (!progress.value.total) return 0
   return Math.min(100, Math.round((progress.value.done / progress.value.total) * 100))
+})
+
+const selectedCount = computed(() => selectedKeySet.value.size)
+
+const pagedHits = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return hits.value.slice(start, start + pageSize.value)
 })
 
 function onDownloadTemplate() {
@@ -172,17 +210,83 @@ function cancelSearch() {
 function clearResults() {
   hits.value = []
   queries.value = []
-  selectedKeys.value = []
+  selectedKeySet.value = new Set()
   downloadTip.value = ''
   failList.value = []
+  page.value = 1
+}
+
+function clearSelection() {
+  selectedKeySet.value = new Set()
+  void restorePageSelection()
+}
+
+function selectCurrentPage() {
+  const next = new Set(selectedKeySet.value)
+  for (const row of pagedHits.value) next.add(row.rowKey)
+  selectedKeySet.value = next
+  void restorePageSelection()
+}
+
+function selectAllResults() {
+  selectedKeySet.value = new Set(hits.value.map((h) => h.rowKey))
+  void restorePageSelection()
+  ElMessage.success(`已全选 ${selectedKeySet.value.size} 首`)
 }
 
 function onSelectionChange(rows: BatchSearchHit[]) {
-  selectedKeys.value = rows.map((r) => r.rowKey)
+  if (syncingSelection) return
+  const pageKeys = new Set(pagedHits.value.map((h) => h.rowKey))
+  const next = new Set(selectedKeySet.value)
+  for (const k of pageKeys) next.delete(k)
+  for (const r of rows) next.add(r.rowKey)
+  selectedKeySet.value = next
 }
+
+async function restorePageSelection() {
+  await nextTick()
+  const table = tableRef.value
+  if (!table) return
+  syncingSelection = true
+  table.clearSelection()
+  const selected = selectedKeySet.value
+  for (const row of pagedHits.value) {
+    if (selected.has(row.rowKey)) table.toggleRowSelection(row, true)
+  }
+  syncingSelection = false
+}
+
+watch([page, pageSize], () => {
+  void restorePageSelection()
+})
 
 function playOne(track: TrackDto) {
   player.playTrack(track, [track])
+}
+
+let pendingHits: BatchSearchHit[] = []
+let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+function flushPendingHits() {
+  if (flushTimer) {
+    clearTimeout(flushTimer)
+    flushTimer = null
+  }
+  if (!pendingHits.length) return
+  const chunk = pendingHits
+  pendingHits = []
+  hits.value = hits.value.concat(chunk)
+}
+
+function queueHits(chunk: BatchSearchHit[]) {
+  if (!chunk.length) return
+  pendingHits.push(...chunk)
+  if (flushTimer) return
+  // 节流追加，避免每条查询都整表拷贝导致卡顿
+  flushTimer = setTimeout(() => {
+    flushTimer = null
+    flushPendingHits()
+  }, 400)
 }
 
 async function onFilePicked(ev: Event) {
@@ -195,8 +299,14 @@ async function onFilePicked(ev: Event) {
     const rows = await parseBatchSearchFile(file)
     queries.value = rows
     hits.value = []
-    selectedKeys.value = []
+    pendingHits = []
+    if (flushTimer) {
+      clearTimeout(flushTimer)
+      flushTimer = null
+    }
+    selectedKeySet.value = new Set()
     failList.value = []
+    page.value = 1
     cancelFlag.cancelled = false
     searching.value = true
     progress.value = { total: rows.length, done: 0 }
@@ -205,21 +315,25 @@ async function onFilePicked(ev: Event) {
     }
 
     const list = await runBatchExternalSearch(rows, {
-      // 每个有结果的源各留 3 首，保证全源都进列表
       perSource: 3,
       pageSize: 20,
       onProgress: (p) => {
         progress.value = { ...p }
       },
+      onHits: (chunk) => {
+        queueHits(chunk)
+      },
       signal: cancelFlag,
     })
+    flushPendingHits()
+    // 以最终结果为准（避免并发拼接顺序问题导致遗漏）
     hits.value = list
     if (cancelFlag.cancelled) {
       ElMessage.info(`已取消，当前得到 ${list.length} 首`)
     } else if (!list.length) {
       ElMessage.warning('未搜索到匹配结果')
     } else {
-      ElMessage.success(`完成，共 ${list.length} 首候选`)
+      ElMessage.success(`完成，共 ${list.length} 首候选（分页浏览）`)
     }
   } catch (e: any) {
     ElMessage.error(e?.message || '导入失败')
@@ -229,11 +343,11 @@ async function onFilePicked(ev: Event) {
 }
 
 async function onBatchDownload() {
-  const selected = hits.value.filter((h) => selectedKeys.value.includes(h.rowKey))
+  if (!selectedKeySet.value.size) return
+  const selected = hits.value.filter((h) => selectedKeySet.value.has(h.rowKey))
   if (!selected.length) return
 
   const tracks = selected.map((h) => h.track)
-  // 按 track.id 去重，避免同一首歌下两次
   const seen = new Set<string>()
   const unique: TrackDto[] = []
   for (const t of tracks) {
@@ -342,7 +456,7 @@ async function onBatchDownload() {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 10px;
   flex-wrap: wrap;
 }
@@ -371,6 +485,11 @@ async function onBatchDownload() {
   :deep(.el-table__cell) {
     color: #666;
   }
+}
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 4px;
 }
 .q-name {
   font-size: 13px;

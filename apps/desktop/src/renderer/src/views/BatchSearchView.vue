@@ -127,9 +127,29 @@
     <div v-if="unmatchedQueries.length" class="fail-panel unmatched-panel">
       <div class="fail-head">
         <span>未完全匹配 {{ unmatchedQueries.length }} 首（歌名或歌手不一致 / 无结果）</span>
-        <el-button size="small" text type="danger" @click="hideUnmatched = !hideUnmatched">
-          {{ hideUnmatched ? '展开' : '收起' }}
-        </el-button>
+        <div class="fail-actions">
+          <el-button
+            size="small"
+            round
+            :disabled="downloading || !unmatchedWithAltCount"
+            @click="selectAltsForUnmatched"
+          >
+            一键勾选换源（{{ unmatchedWithAltCount }}）
+          </el-button>
+          <el-button
+            size="small"
+            round
+            type="danger"
+            :disabled="downloading || !unmatchedWithAltCount"
+            :loading="downloading"
+            @click="downloadAltsForUnmatched"
+          >
+            换源下载
+          </el-button>
+          <el-button size="small" text type="danger" @click="hideUnmatched = !hideUnmatched">
+            {{ hideUnmatched ? '展开' : '收起' }}
+          </el-button>
+        </div>
       </div>
       <el-table
         v-if="!hideUnmatched"
@@ -142,18 +162,50 @@
         <el-table-column label="清单歌名" min-width="140" show-overflow-tooltip prop="name" />
         <el-table-column label="清单歌手" min-width="100" show-overflow-tooltip prop="artist" />
         <el-table-column label="说明" min-width="160" show-overflow-tooltip prop="reason" />
+        <el-table-column label="换源" width="88">
+          <template #default="{ row }">
+            <span v-if="row.hasAlt" class="alt-ok">可换</span>
+            <span v-else class="alt-no">无候选</span>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
 
     <div v-if="failList.length" class="fail-panel">
       <div class="fail-head">
         <span>下载失败 {{ failList.length }} 首</span>
-        <el-button size="small" text type="danger" @click="failList = []">关闭</el-button>
+        <div class="fail-actions">
+          <el-button
+            size="small"
+            round
+            :disabled="downloading || !failWithAltCount"
+            @click="selectAltsForFails"
+          >
+            一键勾选换源（{{ failWithAltCount }}）
+          </el-button>
+          <el-button
+            size="small"
+            round
+            type="danger"
+            :disabled="downloading || !failWithAltCount"
+            :loading="downloading"
+            @click="downloadAltsForFails"
+          >
+            换源下载
+          </el-button>
+          <el-button size="small" text type="danger" @click="failList = []">关闭</el-button>
+        </div>
       </div>
       <el-table :data="failList" size="small" max-height="220" class="fail-table">
         <el-table-column label="歌曲" min-width="140" show-overflow-tooltip prop="name" />
         <el-table-column label="歌手" min-width="100" show-overflow-tooltip prop="artists" />
-        <el-table-column label="失败原因" min-width="220" show-overflow-tooltip prop="error" />
+        <el-table-column label="失败原因" min-width="180" show-overflow-tooltip prop="error" />
+        <el-table-column label="换源" width="88">
+          <template #default="{ row }">
+            <span v-if="failHasAlt(row)" class="alt-ok">可换</span>
+            <span v-else class="alt-no">无其它源</span>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
 
@@ -334,11 +386,19 @@ const unmatchedQueries = computed(() => {
   for (const h of hits.value) {
     if (h.exactMatch) exactQuery.add(h.queryIndex)
   }
-  const out: { index: number; name: string; artist: string; reason: string }[] = []
+  const out: {
+    queryIndex: number
+    index: number
+    name: string
+    artist: string
+    reason: string
+    hasAlt: boolean
+  }[] = []
   for (const q of queries.value) {
     if (exactQuery.has(q.index)) continue
     const hasAny = hits.value.some((h) => h.queryIndex === q.index)
     out.push({
+      queryIndex: q.index,
       index: q.index + 1,
       name: q.name,
       artist: q.artist || '—',
@@ -347,10 +407,17 @@ const unmatchedQueries = computed(() => {
         : hasAny
           ? '有候选但无歌名+歌手完全一致'
           : '无搜索结果',
+      hasAlt: hasAny,
     })
   }
   return out
 })
+
+const unmatchedWithAltCount = computed(
+  () => unmatchedQueries.value.filter((q) => q.hasAlt).length,
+)
+
+const failWithAltCount = computed(() => failList.value.filter((f) => failHasAlt(f)).length)
 
 const filteredHits = computed(() => {
   let list = hits.value
@@ -372,7 +439,135 @@ function isBetterHit(a: BatchSearchHit, b: BatchSearchHit): boolean {
   const aLyric = trackHasLyric(a.track)
   const bLyric = trackHasLyric(b.track)
   if (aLyric !== bLyric) return aLyric
+  const aSrc = String(a.track.source || '')
+  const bSrc = String(b.track.source || '')
+  const pri = sourcePriority.value
+  const aP = pri.indexOf(aSrc)
+  const bP = pri.indexOf(bSrc)
+  const ap = aP < 0 ? 999 : aP
+  const bp = bP < 0 ? 999 : bP
+  if (ap !== bp) return ap < bp
   return a.score > b.score
+}
+
+/** 为某清单行挑换源候选：优先有词 → 源优先级 → 分数；可排除失败曲/源 */
+function pickBestAlt(
+  queryIndex: number,
+  opts?: { excludeTrackIds?: Set<string>; excludeSources?: Set<string> },
+): BatchSearchHit | null {
+  let candidates = hits.value.filter((h) => h.queryIndex === queryIndex)
+  if (opts?.excludeTrackIds?.size) {
+    candidates = candidates.filter((h) => !opts.excludeTrackIds!.has(h.track.id))
+  }
+  if (opts?.excludeSources?.size) {
+    candidates = candidates.filter(
+      (h) => !opts.excludeSources!.has(String(h.track.source || '')),
+    )
+  }
+  if (!candidates.length) return null
+
+  // 若还有完全匹配优先用完全匹配
+  const exact = candidates.filter((h) => h.exactMatch)
+  const pool = exact.length ? exact : candidates
+  let best: BatchSearchHit | null = null
+  for (const h of pool) {
+    if (!best || isBetterHit(h, best)) best = h
+  }
+  return best
+}
+
+function failHasAlt(row: BatchDownloadFailItem): boolean {
+  const qi =
+    row.queryIndex ??
+    hits.value.find((h) => h.track.id === row.trackId)?.queryIndex
+  if (qi == null) return false
+  const excludeTrackIds = new Set([row.trackId])
+  const excludeSources = row.source ? new Set([row.source]) : undefined
+  return Boolean(pickBestAlt(qi, { excludeTrackIds, excludeSources }))
+}
+
+function resolveFailQueryIndex(row: BatchDownloadFailItem): number | null {
+  if (row.queryIndex != null) return row.queryIndex
+  const hit = hits.value.find((h) => h.track.id === row.trackId)
+  return hit?.queryIndex ?? null
+}
+
+/** 未完全匹配：一键勾选各行最佳换源（优先有词） */
+function selectAltsForUnmatched() {
+  const keys = new Set<string>()
+  let skipped = 0
+  for (const q of unmatchedQueries.value) {
+    if (!q.hasAlt) {
+      skipped += 1
+      continue
+    }
+    const alt = pickBestAlt(q.queryIndex)
+    if (alt) keys.add(alt.rowKey)
+    else skipped += 1
+  }
+  if (!keys.size) {
+    ElMessage.warning('这些清单项没有可换源的候选')
+    return
+  }
+  suppressModeWatch = true
+  exactOnly.value = false
+  filterSource.value = null
+  pickedSources.value = []
+  selectedKeySet.value = keys
+  page.value = 1
+  void restorePageSelection().finally(() => {
+    suppressModeWatch = false
+  })
+  ElMessage.success(
+    `已勾选换源 ${keys.size} 首（优先有词）` + (skipped ? `，${skipped} 首无候选` : ''),
+  )
+}
+
+async function downloadAltsForUnmatched() {
+  selectAltsForUnmatched()
+  if (!selectedKeySet.value.size) return
+  await onBatchDownload()
+}
+
+/** 下载失败：排除失败曲/源，勾选其它源（优先有词） */
+function selectAltsForFails() {
+  const keys = new Set<string>()
+  let skipped = 0
+  for (const f of failList.value) {
+    const qi = resolveFailQueryIndex(f)
+    if (qi == null) {
+      skipped += 1
+      continue
+    }
+    const alt = pickBestAlt(qi, {
+      excludeTrackIds: new Set([f.trackId]),
+      excludeSources: f.source ? new Set([f.source]) : undefined,
+    })
+    if (alt) keys.add(alt.rowKey)
+    else skipped += 1
+  }
+  if (!keys.size) {
+    ElMessage.warning('失败项没有其它可换源的候选')
+    return
+  }
+  suppressModeWatch = true
+  exactOnly.value = false
+  filterSource.value = null
+  pickedSources.value = []
+  selectedKeySet.value = keys
+  page.value = 1
+  void restorePageSelection().finally(() => {
+    suppressModeWatch = false
+  })
+  ElMessage.success(
+    `已勾选换源 ${keys.size} 首（优先有词）` + (skipped ? `，${skipped} 首无其它源` : ''),
+  )
+}
+
+async function downloadAltsForFails() {
+  selectAltsForFails()
+  if (!selectedKeySet.value.size) return
+  await onBatchDownload()
 }
 
 /**
@@ -519,7 +714,11 @@ function onSourceTagClick(source: string) {
   }
 }
 
+/** 换源勾选时临时关闭，避免 exactOnly 切换把选中结果冲掉 */
+let suppressModeWatch = false
+
 watch([selectMode, exactOnly], () => {
+  if (suppressModeWatch) return
   if (!hits.value.length) return
   if (pickedSources.value.length) {
     applyPickedSelection()
@@ -706,6 +905,21 @@ async function onFilePicked(ev: Event) {
   }
 }
 
+function enrichFailures(
+  failures: BatchDownloadFailItem[],
+  selectedHits: BatchSearchHit[],
+): BatchDownloadFailItem[] {
+  const byId = new Map(selectedHits.map((h) => [h.track.id, h]))
+  return failures.map((f) => {
+    const hit = byId.get(f.trackId)
+    return {
+      ...f,
+      queryIndex: hit?.queryIndex ?? f.queryIndex,
+      source: hit ? String(hit.track.source || '') : f.source,
+    }
+  })
+}
+
 async function onBatchDownload() {
   if (!selectedKeySet.value.size) return
   const selected = hits.value.filter((h) => selectedKeySet.value.has(h.rowKey))
@@ -714,10 +928,13 @@ async function onBatchDownload() {
   const tracks = selected.map((h) => h.track)
   const seen = new Set<string>()
   const unique: TrackDto[] = []
-  for (const t of tracks) {
+  const uniqueHits: BatchSearchHit[] = []
+  for (const h of selected) {
+    const t = h.track
     if (!t?.id || seen.has(t.id)) continue
     seen.add(t.id)
     unique.push(t)
+    uniqueHits.push(h)
   }
 
   const mode = await pickBatchDownloadMode()
@@ -737,7 +954,7 @@ async function onBatchDownload() {
         downloadTip.value =
           done >= total ? '' : `曲库下载中 ${done + 1}/${total}${name ? ` · ${name}` : ''}`
       })
-      failList.value = failures
+      failList.value = enrichFailures(failures, uniqueHits)
       if (fail) ElMessage.warning(`曲库下载完成：成功 ${ok}，失败 ${fail}`)
       else ElMessage.success(`曲库下载完成：成功 ${ok}`)
     } else {
@@ -749,7 +966,7 @@ async function onBatchDownload() {
         },
       )
       if (!folder) return
-      failList.value = failures
+      failList.value = enrichFailures(failures, uniqueHits)
       if (fail) ElMessage.warning(`已保存到文件夹：成功 ${ok}，失败 ${fail}`)
       else ElMessage.success(`已保存到文件夹：成功 ${ok}`)
     }
@@ -856,6 +1073,20 @@ async function onBatchDownload() {
 }
 .unmatched-panel {
   border-color: rgba(236, 65, 65, 0.28);
+}
+.fail-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.alt-ok {
+  font-size: 12px;
+  color: #2f7d4a;
+}
+.alt-no {
+  font-size: 12px;
+  color: var(--wy-text-muted);
 }
 .match-tag {
   display: inline-flex;

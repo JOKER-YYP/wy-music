@@ -172,6 +172,10 @@ export type BatchDownloadFailItem = {
   name: string
   artists: string
   error: string
+  /** 批量搜歌清单行（换源用） */
+  queryIndex?: number
+  /** 失败时所用源 */
+  source?: string
 }
 
 export type BatchDownloadResult = {

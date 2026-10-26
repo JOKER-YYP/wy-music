@@ -172,6 +172,14 @@ export function isExactMatch(track: TrackDto, name: string, artist: string): boo
   return isNameExact(name, track.name || '') && isArtistExact(artist, track.artists || [])
 }
 
+/** 搜索结果是否已带有效歌词（空 /「暂无歌词」不算） */
+export function trackHasLyric(track: TrackDto): boolean {
+  const t = String(track.lyricText || '').trim()
+  if (!t) return false
+  if (/暂无歌词|无效歌词/.test(t) && t.length < 40) return false
+  return true
+}
+
 function artistMatchScore(queryArtist: string, trackArtists: string[]): number {
   const q = compactArtist(queryArtist)
   if (!q) return 0

@@ -55,7 +55,7 @@
         </label>
       </div>
       <p class="mode-hint">
-        「每首歌一首」：每条清单只勾一首；点选来源顺序即优先级（如先源2后源3，源2没有完全匹配则用源3）。再点可取消该源。
+        「每首歌一首」：每条清单只勾一首；有歌词的完全匹配优先，其次按点选来源顺序跨源兜底（如先源2后源3）。再点可取消该源。
       </p>
       <div class="source-tags">
         <button
@@ -180,11 +180,12 @@
           {{ (row.track.artists || []).join(' / ') || '—' }}
         </template>
       </el-table-column>
-      <el-table-column label="匹配" width="88">
+      <el-table-column label="匹配" width="120">
         <template #default="{ row }">
           <span :class="['match-tag', row.exactMatch ? 'exact' : 'partial']">
             {{ row.exactMatch ? '完全' : '部分' }}
           </span>
+          <span v-if="trackHasLyric(row.track)" class="match-tag lyric">有词</span>
         </template>
       </el-table-column>
       <el-table-column label="来源" width="100">
@@ -233,6 +234,7 @@ import {
   parseBatchSearchFile,
   runBatchExternalSearch,
   sourceLabel,
+  trackHasLyric,
   type BatchQueryProgress,
   type BatchQueryRow,
   type BatchSearchHit,
@@ -366,10 +368,17 @@ const pagedHits = computed(() => {
   return filteredHits.value.slice(start, start + pageSize.value)
 })
 
+function isBetterHit(a: BatchSearchHit, b: BatchSearchHit): boolean {
+  const aLyric = trackHasLyric(a.track)
+  const bLyric = trackHasLyric(b.track)
+  if (aLyric !== bLyric) return aLyric
+  return a.score > b.score
+}
+
 /**
  * 收集勾选 key。
  * - all：范围内全部（可仅完全匹配）
- * - first：每条清单只一首；按 sources 优先级跨源兜底（先点的源优先，没有再用后点的）
+ * - first：每条清单只一首；优先有歌词，再按 sources 优先级跨源兜底
  */
 function collectKeysForSources(
   sources: string[] | null,
@@ -399,7 +408,7 @@ function collectKeysForSources(
     scoped = scoped.filter((h) => allowed.has(String(h.track.source || '')))
   }
 
-  // queryIndex -> source -> best hit
+  // queryIndex -> source -> best hit（同源内也优先有歌词）
   const byQuery = new Map<number, Map<string, BatchSearchHit>>()
   for (const h of scoped) {
     const src = String(h.track.source || '')
@@ -410,22 +419,33 @@ function collectKeysForSources(
       byQuery.set(h.queryIndex, bySrc)
     }
     const prev = bySrc.get(src)
-    if (!prev || h.score > prev.score) bySrc.set(src, h)
+    if (!prev || isBetterHit(h, prev)) bySrc.set(src, h)
   }
 
   const keys = new Set<string>()
   for (const bySrc of byQuery.values()) {
     let chosen: BatchSearchHit | undefined
+    // 1) 优先：有歌词的完全匹配，按源优先级
     for (const src of priority) {
       const hit = bySrc.get(src)
-      if (hit) {
+      if (hit && trackHasLyric(hit.track)) {
         chosen = hit
         break
       }
     }
+    // 2) 否则：按源优先级取第一首可用
+    if (!chosen) {
+      for (const src of priority) {
+        const hit = bySrc.get(src)
+        if (hit) {
+          chosen = hit
+          break
+        }
+      }
+    }
     if (!chosen) {
       for (const hit of bySrc.values()) {
-        if (!chosen || hit.score > chosen.score) chosen = hit
+        if (!chosen || isBetterHit(hit, chosen)) chosen = hit
       }
     }
     if (chosen) keys.add(chosen.rowKey)
@@ -845,6 +865,7 @@ async function onBatchDownload() {
   border-radius: 4px;
   font-size: 12px;
   line-height: 1;
+  margin-right: 4px;
   &.exact {
     color: var(--wy-brand);
     background: var(--wy-brand-soft);
@@ -852,6 +873,10 @@ async function onBatchDownload() {
   &.partial {
     color: var(--wy-text-muted);
     background: var(--wy-surface-muted);
+  }
+  &.lyric {
+    color: #2f7d4a;
+    background: rgba(47, 125, 74, 0.1);
   }
 }
 .source-tags {

@@ -43,6 +43,8 @@ type ExtHit = {
   album?: string | null
   coverUrl?: string | null
   payTag?: string | null
+  /** 搜索接口若直接带回歌词则写入（如 xm 的 lrc） */
+  lyricText?: string | null
   /** migu 详情需要带回搜索时的 num */
   requestNum?: number
   keyword?: string
@@ -67,7 +69,7 @@ function toTrack(hit: ExtHit): TrackDto {
     album: hit.album ?? null,
     durationMs: 0,
     coverUrl: hit.coverUrl || null,
-    lyricText: null,
+    lyricText: hit.lyricText || null,
     status: 'published',
     uploaderId: '',
     playCount: 0,
@@ -242,6 +244,7 @@ async function searchXm(
       name,
       artists: [String(row.author || '').trim() || '未知歌手'],
       coverUrl: row.pic || null,
+      lyricText: normalizeXmLyric(row.lrc),
     })
   }
   return hits.slice(0, pageSize)

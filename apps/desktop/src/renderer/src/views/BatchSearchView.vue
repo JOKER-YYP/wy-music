@@ -47,19 +47,21 @@
         <span class="mode-label">勾选方式</span>
         <el-radio-group v-model="selectMode" size="small" :disabled="downloading">
           <el-radio-button value="all">来源全部</el-radio-button>
-          <el-radio-button value="first">每首歌一条</el-radio-button>
+          <el-radio-button value="first">每首歌一首</el-radio-button>
         </el-radio-group>
         <label class="exact-check" :class="{ disabled: downloading }">
           <input v-model="exactOnly" type="checkbox" :disabled="downloading" />
           仅完全匹配
         </label>
       </div>
-      <p class="mode-hint">点选来源可叠加勾选（再点取消）；开启「仅完全匹配」时只勾歌名+歌手一致的结果</p>
+      <p class="mode-hint">
+        「每首歌一首」：每条清单只勾一首；点选来源顺序即优先级（如先源2后源3，源2没有完全匹配则用源3）。再点可取消该源。
+      </p>
       <div class="source-tags">
         <button
           type="button"
           class="source-tag"
-          :class="{ active: !filterSource && !pickedSources.size }"
+          :class="{ active: !filterSource && !pickedSources.length }"
           :disabled="downloading"
           @click="onSelectAllSources"
         >
@@ -72,12 +74,19 @@
           class="source-tag"
           :class="{
             active: filterSource === t.source,
-            selected: pickedSources.has(t.source),
+            selected: pickedSourceSet.has(t.source),
           }"
           :disabled="downloading"
-          :title="`点选切换「${t.label}」勾选；可同时选多个源`"
+          :title="
+            selectMode === 'first'
+              ? `优先级；点选切换「${t.label}」`
+              : `点选叠加「${t.label}」全部结果`
+          "
           @click="onSourceTagClick(t.source)"
         >
+          <span v-if="selectMode === 'first' && pickedSourceSet.has(t.source)" class="prio">
+            {{ pickedSources.indexOf(t.source) + 1 }}
+          </span>
           {{ t.label }} {{ exactOnly ? t.exactCount : t.count }}
         </button>
       </div>
@@ -98,7 +107,13 @@
         全选本页
       </el-button>
       <el-button round size="small" :disabled="downloading" @click="selectAllResults">
-        {{ exactOnly ? '全选完全匹配' : '全选全部' }}
+        {{
+          exactOnly && selectMode === 'first'
+            ? '每首歌勾一首'
+            : exactOnly
+              ? '全选完全匹配'
+              : '全选全部'
+        }}
       </el-button>
       <el-button round size="small" :disabled="downloading || !selectedCount" @click="clearSelection">
         取消勾选
@@ -255,10 +270,10 @@ const page = ref(1)
 const pageSize = ref(100)
 /** 当前表格筛选的来源；null 表示全部（仅影响列表展示） */
 const filterSource = ref<string | null>(null)
-/** 已点选、参与勾选叠加的来源集合 */
-const pickedSources = ref<Set<string>>(new Set())
-/** 标签勾选方式：全部 / 每首歌一条 */
-const selectMode = ref<'all' | 'first'>('all')
+/** 已点选来源（顺序 = 跨源兜底优先级） */
+const pickedSources = ref<string[]>([])
+/** 标签勾选方式：全部 / 每首歌一首（跨源按优先级） */
+const selectMode = ref<'all' | 'first'>('first')
 /** 仅勾选歌名+歌手完全一致的结果 */
 const exactOnly = ref(true)
 const hideUnmatched = ref(false)
@@ -273,6 +288,14 @@ const progressPct = computed(() => {
 const selectedCount = computed(() => selectedKeySet.value.size)
 
 const exactHitCount = computed(() => hits.value.filter((h) => h.exactMatch).length)
+
+const pickedSourceSet = computed(() => new Set(pickedSources.value))
+
+/** 跨源优先级：点选顺序优先；未点选时用标签默认顺序 */
+const sourcePriority = computed(() => {
+  if (pickedSources.value.length) return [...pickedSources.value]
+  return sourceTags.value.map((t) => t.source)
+})
 
 const sourceTags = computed(() => {
   const map = new Map<string, { count: number; exactCount: number }>()
@@ -343,110 +366,145 @@ const pagedHits = computed(() => {
   return filteredHits.value.slice(start, start + pageSize.value)
 })
 
-function collectKeysForSources(sources: string[] | null, mode: 'all' | 'first', exact: boolean): Set<string> {
+/**
+ * 收集勾选 key。
+ * - all：范围内全部（可仅完全匹配）
+ * - first：每条清单只一首；按 sources 优先级跨源兜底（先点的源优先，没有再用后点的）
+ */
+function collectKeysForSources(
+  sources: string[] | null,
+  mode: 'all' | 'first',
+  exact: boolean,
+): Set<string> {
   let scoped = hits.value
-  if (sources?.length) {
-    const set = new Set(sources)
-    scoped = scoped.filter((h) => set.has(String(h.track.source || '')))
-  }
   if (exact) scoped = scoped.filter((h) => h.exactMatch)
 
   if (mode === 'all') {
+    if (sources?.length) {
+      const set = new Set(sources)
+      scoped = scoped.filter((h) => set.has(String(h.track.source || '')))
+    }
     return new Set(scoped.map((h) => h.rowKey))
   }
 
-  // 每首歌在范围内取一条：优先完全匹配，再比分数
-  const bestByQuery = new Map<number, BatchSearchHit>()
-  for (const h of scoped) {
-    const prev = bestByQuery.get(h.queryIndex)
-    if (!prev) {
-      bestByQuery.set(h.queryIndex, h)
-      continue
-    }
-    if (h.exactMatch && !prev.exactMatch) {
-      bestByQuery.set(h.queryIndex, h)
-      continue
-    }
-    if (h.exactMatch === prev.exactMatch && h.score > prev.score) {
-      bestByQuery.set(h.queryIndex, h)
-    }
+  const priority =
+    sources?.length
+      ? sources
+      : sourcePriority.value.length
+        ? sourcePriority.value
+        : ([...new Set(scoped.map((h) => String(h.track.source || '')).filter(Boolean))] as string[])
+
+  const allowed = sources?.length ? new Set(sources) : null
+  if (allowed) {
+    scoped = scoped.filter((h) => allowed.has(String(h.track.source || '')))
   }
-  return new Set([...bestByQuery.values()].map((h) => h.rowKey))
+
+  // queryIndex -> source -> best hit
+  const byQuery = new Map<number, Map<string, BatchSearchHit>>()
+  for (const h of scoped) {
+    const src = String(h.track.source || '')
+    if (!src) continue
+    let bySrc = byQuery.get(h.queryIndex)
+    if (!bySrc) {
+      bySrc = new Map()
+      byQuery.set(h.queryIndex, bySrc)
+    }
+    const prev = bySrc.get(src)
+    if (!prev || h.score > prev.score) bySrc.set(src, h)
+  }
+
+  const keys = new Set<string>()
+  for (const bySrc of byQuery.values()) {
+    let chosen: BatchSearchHit | undefined
+    for (const src of priority) {
+      const hit = bySrc.get(src)
+      if (hit) {
+        chosen = hit
+        break
+      }
+    }
+    if (!chosen) {
+      for (const hit of bySrc.values()) {
+        if (!chosen || hit.score > chosen.score) chosen = hit
+      }
+    }
+    if (chosen) keys.add(chosen.rowKey)
+  }
+  return keys
 }
 
 function applyPickedSelection(tip?: string) {
-  const sources = [...pickedSources.value]
-  const next = collectKeysForSources(
-    sources.length ? sources : null,
-    selectMode.value,
-    exactOnly.value,
-  )
+  const sources = pickedSources.value.length ? [...pickedSources.value] : null
+  const next = collectKeysForSources(sources, selectMode.value, exactOnly.value)
   selectedKeySet.value = next
   void restorePageSelection()
   if (tip) ElMessage.success(tip)
 }
 
-/** 点选「全部」：清空多源叠加，按当前模式勾选（可仅完全匹配） */
+function sourceLabelList(sources: string[]) {
+  return sources.map((s) => MUSIC_SOURCE_LABEL[s as MusicSource] || s).join(' → ')
+}
+
+/** 点选「全部」：清空优先级点选，按默认源顺序每首歌一首 / 或全选 */
 function onSelectAllSources() {
   filterSource.value = null
-  pickedSources.value = new Set()
+  pickedSources.value = []
   page.value = 1
   const next = collectKeysForSources(null, selectMode.value, exactOnly.value)
   selectedKeySet.value = next
   void restorePageSelection()
-  const tip = exactOnly.value
-    ? selectMode.value === 'first'
-      ? '已勾选全部来源下每首歌一条完全匹配'
-      : '已勾选全部完全匹配'
-    : selectMode.value === 'first'
-      ? '已勾选全部来源下每首歌一条'
-      : '已勾选全部结果'
+  const tip =
+    selectMode.value === 'first'
+      ? exactOnly.value
+        ? '已按默认源顺序，每首歌勾一首完全匹配'
+        : '已按默认源顺序，每首歌勾一首'
+      : exactOnly.value
+        ? '已勾选全部完全匹配'
+        : '已勾选全部结果'
   ElMessage.success(`${tip}：${next.size} 首`)
 }
 
-/** 点击来源标签：叠加/取消该源勾选，并筛选列表 */
+/** 点击来源：切换进优先级列表；「每首歌一首」时按点选顺序跨源兜底 */
 function onSourceTagClick(source: string) {
   filterSource.value = source
   page.value = 1
 
-  const nextPicked = new Set(pickedSources.value)
-  if (nextPicked.has(source)) nextPicked.delete(source)
-  else nextPicked.add(source)
+  const nextPicked = [...pickedSources.value]
+  const idx = nextPicked.indexOf(source)
+  if (idx >= 0) nextPicked.splice(idx, 1)
+  else nextPicked.push(source)
   pickedSources.value = nextPicked
 
-  const sources = [...nextPicked]
-  const next = collectKeysForSources(
-    sources.length ? sources : null,
-    selectMode.value,
-    exactOnly.value,
-  )
-  // 取消到空时不自动全选，避免误操作
-  selectedKeySet.value = sources.length ? next : new Set()
-  void restorePageSelection()
-
-  const label = MUSIC_SOURCE_LABEL[source as MusicSource] || source
-  if (!sources.length) {
+  if (!nextPicked.length) {
+    selectedKeySet.value = new Set()
+    void restorePageSelection()
     ElMessage.info('已取消来源勾选')
     return
   }
-  const names = sources
-    .map((s) => MUSIC_SOURCE_LABEL[s as MusicSource] || s)
-    .join('、')
-  const exactTip = exactOnly.value ? '完全匹配' : '结果'
-  ElMessage.success(
-    nextPicked.has(source)
-      ? `已叠加「${label}」· 当前源 ${names} · ${exactTip} ${next.size} 首`
-      : `已取消「${label}」· 当前源 ${names} · ${exactTip} ${next.size} 首`,
-  )
+
+  const next = collectKeysForSources(nextPicked, selectMode.value, exactOnly.value)
+  selectedKeySet.value = next
+  void restorePageSelection()
+
+  const label = MUSIC_SOURCE_LABEL[source as MusicSource] || source
+  if (selectMode.value === 'first') {
+    ElMessage.success(
+      `优先级 ${sourceLabelList(nextPicked)} · 每首歌一首${exactOnly.value ? '完全匹配' : ''} ${next.size} 首`,
+    )
+  } else {
+    ElMessage.success(
+      (idx >= 0 ? `已取消「${label}」· ` : `已叠加「${label}」· `) +
+        `当前 ${sourceLabelList(nextPicked)} · ${exactOnly.value ? '完全匹配' : '结果'} ${next.size} 首`,
+    )
+  }
 }
 
 watch([selectMode, exactOnly], () => {
   if (!hits.value.length) return
-  if (pickedSources.value.size) {
+  if (pickedSources.value.length) {
     applyPickedSelection()
-  } else if (exactOnly.value) {
-    // 打开仅完全匹配时，若不在多源模式，刷新全选完全匹配更直观
-    selectedKeySet.value = collectKeysForSources(null, selectMode.value, true)
+  } else {
+    selectedKeySet.value = collectKeysForSources(null, selectMode.value, exactOnly.value)
     void restorePageSelection()
   }
   page.value = 1
@@ -473,15 +531,15 @@ function clearResults() {
   failList.value = []
   page.value = 1
   filterSource.value = null
-  pickedSources.value = new Set()
-  selectMode.value = 'all'
+  pickedSources.value = []
+  selectMode.value = 'first'
   exactOnly.value = true
   hideUnmatched.value = false
 }
 
 function clearSelection() {
   selectedKeySet.value = new Set()
-  pickedSources.value = new Set()
+  pickedSources.value = []
   void restorePageSelection()
 }
 
@@ -493,14 +551,18 @@ function selectCurrentPage() {
 }
 
 function selectAllResults() {
-  selectedKeySet.value = collectKeysForSources(null, 'all', exactOnly.value)
-  pickedSources.value = new Set()
+  // 工具栏「全选」：完全匹配 + 每首歌一首时走跨源兜底，避免同一首勾多个源
+  const mode = exactOnly.value ? selectMode.value : 'all'
+  selectedKeySet.value = collectKeysForSources(null, mode, exactOnly.value)
+  pickedSources.value = []
   filterSource.value = null
   void restorePageSelection()
   ElMessage.success(
-    exactOnly.value
-      ? `已全选完全匹配 ${selectedKeySet.value.size} 首`
-      : `已全选 ${selectedKeySet.value.size} 首`,
+    exactOnly.value && selectMode.value === 'first'
+      ? `已按源顺序每首歌勾一首完全匹配：${selectedKeySet.value.size} 首`
+      : exactOnly.value
+        ? `已全选完全匹配 ${selectedKeySet.value.size} 首`
+        : `已全选 ${selectedKeySet.value.size} 首`,
   )
 }
 
@@ -578,7 +640,7 @@ async function onFilePicked(ev: Event) {
     failList.value = []
     page.value = 1
     filterSource.value = null
-    pickedSources.value = new Set()
+    pickedSources.value = []
     hideUnmatched.value = false
     cancelFlag.cancelled = false
     searching.value = true
@@ -601,10 +663,19 @@ async function onFilePicked(ev: Event) {
     flushPendingHits()
     // 以最终结果为准（避免并发拼接顺序问题导致遗漏）
     hits.value = list
+    // 默认：仅完全匹配 + 每首歌一首（跨源按默认顺序兜底）
+    if (list.length && exactOnly.value && selectMode.value === 'first') {
+      selectedKeySet.value = collectKeysForSources(null, 'first', true)
+      void restorePageSelection()
+    }
     if (cancelFlag.cancelled) {
       ElMessage.info(`已取消，当前得到 ${list.length} 首`)
     } else if (!list.length) {
       ElMessage.warning('未搜索到匹配结果')
+    } else if (exactOnly.value && selectMode.value === 'first') {
+      ElMessage.success(
+        `完成 ${list.length} 首候选 · 已按源顺序勾选完全匹配 ${selectedKeySet.value.size} 首`,
+      )
     } else {
       ElMessage.success(`完成，共 ${list.length} 首候选（分页浏览）`)
     }
@@ -798,7 +869,22 @@ async function onBatchDownload() {
   padding: 0 12px;
   border-radius: 14px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  .prio {
+    display: inline-grid;
+    place-items: center;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: 7px;
+    font-size: 10px;
+    font-weight: 700;
+    background: rgba(236, 65, 65, 0.15);
+    color: var(--wy-brand);
+  }
   &:hover:not(:disabled) {
     border-color: var(--wy-brand);
     color: var(--wy-brand);
@@ -808,6 +894,10 @@ async function onBatchDownload() {
     border-color: var(--wy-brand);
     background: var(--wy-brand);
     color: var(--wy-text-on-brand);
+    .prio {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
+    }
   }
   &.selected:not(.active) {
     border-color: rgba(236, 65, 65, 0.35);

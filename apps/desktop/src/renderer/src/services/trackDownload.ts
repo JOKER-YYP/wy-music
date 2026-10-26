@@ -23,7 +23,7 @@ function guessExtFromUrl(url: string) {
 
 export function suggestedDownloadName(track: TrackDto, ext = '.mp3') {
   const artist = (track.artists || []).filter(Boolean).join('、') || ''
-  const base = artist ? `${artist} - ${track.name}` : track.name
+  const base = artist ? `${track.name} - ${artist}` : track.name
   const safe = sanitizeFileName(base)
   return safe.toLowerCase().endsWith(ext.toLowerCase()) ? safe : `${safe}${ext}`
 }
@@ -217,7 +217,7 @@ export async function downloadTracksToLibrary(
   return { ok, fail: failures.length, failures }
 }
 
-/** 批量下载到文件夹：一次选目录，默认「歌手 - 歌名.mp3」 */
+/** 批量下载到文件夹：一次选目录，默认「歌名 - 歌手.mp3」 */
 export async function downloadTracksToFolder(
   tracks: TrackDto[],
   onProgress?: (done: number, total: number, name: string) => void,

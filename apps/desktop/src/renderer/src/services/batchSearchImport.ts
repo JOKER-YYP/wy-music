@@ -131,15 +131,22 @@ function compactArtist(s: string): string {
     .trim()
 }
 
+/**
+ * 歌名规范化：忽略大小写与空白，统一全角括号；
+ * 括号及括号内文字保留，必须一致才算完全匹配。
+ */
 function compactName(s: string): string {
   return s
     .toLowerCase()
+    .replace(/（/g, '(')
+    .replace(/）/g, ')')
+    .replace(/【/g, '[')
+    .replace(/】/g, ']')
     .replace(/\s+/g, '')
-    .replace(/[（(【\[].*?[）)\]】]/g, '')
     .trim()
 }
 
-/** 歌名完全一致（忽略空白/常见括号后缀） */
+/** 歌名完全一致（含括号及括号内文字） */
 function isNameExact(queryName: string, trackName: string): boolean {
   const q = compactName(queryName)
   const t = compactName(trackName)

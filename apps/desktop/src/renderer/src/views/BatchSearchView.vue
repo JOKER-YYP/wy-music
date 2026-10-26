@@ -4,7 +4,7 @@
       <div>
         <h1>批量搜歌</h1>
         <p class="sub">
-          按 Excel 清单批量搜索；请填写「歌手」以便完全匹配。可勾选「仅完全匹配」并同时点选多个来源
+          完全匹配：歌名须完全一致（含括号内容）且歌手一致。无完全匹配时可在下方列表展开挑选其它源
         </p>
       </div>
       <div class="head-actions">
@@ -55,7 +55,7 @@
         </label>
       </div>
       <p class="mode-hint">
-        「每首歌一首」：每条清单只勾一首；有歌词的完全匹配优先，其次按点选来源顺序跨源兜底（如先源2后源3）。再点可取消该源。
+        完全匹配要求歌名（含括号）与歌手都一致。「每首歌一首」优先有词，再按点选来源顺序跨源兜底。无完全匹配可在下方展开挑选。
       </p>
       <div class="source-tags">
         <button
@@ -155,17 +155,46 @@
         v-if="!hideUnmatched"
         :data="unmatchedQueries"
         size="small"
-        max-height="220"
-        class="fail-table"
+        max-height="420"
+        row-key="queryIndex"
+        class="fail-table unmatched-table"
       >
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div v-if="!row.hasAlt" class="alt-empty">无其它源候选</div>
+            <div v-else class="alt-list">
+              <div class="alt-list-tip">展开挑选其它源（可多选）；优先参考有词候选</div>
+              <label
+                v-for="h in altsForQuery(row.queryIndex)"
+                :key="h.rowKey"
+                class="alt-row"
+                :class="{ on: selectedKeySet.has(h.rowKey) }"
+              >
+                <input
+                  type="checkbox"
+                  :checked="selectedKeySet.has(h.rowKey)"
+                  :disabled="downloading"
+                  @change="onAltCheck(h, ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="alt-title" :title="h.track.name">{{ h.track.name }}</span>
+                <span class="alt-meta">
+                  {{ (h.track.artists || []).join(' / ') || '—' }}
+                </span>
+                <span class="alt-src">{{ sourceLabel(h.track) || '—' }}</span>
+                <span v-if="trackHasLyric(h.track)" class="match-tag lyric">有词</span>
+                <span v-else class="alt-no-lyric">无词</span>
+              </label>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="#" width="56" prop="index" />
         <el-table-column label="清单歌名" min-width="140" show-overflow-tooltip prop="name" />
         <el-table-column label="清单歌手" min-width="100" show-overflow-tooltip prop="artist" />
         <el-table-column label="说明" min-width="160" show-overflow-tooltip prop="reason" />
-        <el-table-column label="换源" width="88">
+        <el-table-column label="候选" width="72">
           <template #default="{ row }">
-            <span v-if="row.hasAlt" class="alt-ok">可换</span>
-            <span v-else class="alt-no">无候选</span>
+            <span v-if="row.altCount" class="alt-ok">{{ row.altCount }}</span>
+            <span v-else class="alt-no">0</span>
           </template>
         </el-table-column>
       </el-table>
@@ -383,8 +412,10 @@ const sourceTags = computed(() => {
 const unmatchedQueries = computed(() => {
   if (!queries.value.length) return []
   const exactQuery = new Set<number>()
+  const altCountByQuery = new Map<number, number>()
   for (const h of hits.value) {
     if (h.exactMatch) exactQuery.add(h.queryIndex)
+    altCountByQuery.set(h.queryIndex, (altCountByQuery.get(h.queryIndex) || 0) + 1)
   }
   const out: {
     queryIndex: number
@@ -393,10 +424,11 @@ const unmatchedQueries = computed(() => {
     artist: string
     reason: string
     hasAlt: boolean
+    altCount: number
   }[] = []
   for (const q of queries.value) {
     if (exactQuery.has(q.index)) continue
-    const hasAny = hits.value.some((h) => h.queryIndex === q.index)
+    const altCount = altCountByQuery.get(q.index) || 0
     out.push({
       queryIndex: q.index,
       index: q.index + 1,
@@ -404,10 +436,11 @@ const unmatchedQueries = computed(() => {
       artist: q.artist || '—',
       reason: !q.artist.trim()
         ? '清单未填歌手'
-        : hasAny
-          ? '有候选但无歌名+歌手完全一致'
+        : altCount
+          ? '有候选但无歌名（含括号）+歌手完全一致'
           : '无搜索结果',
-      hasAlt: hasAny,
+      hasAlt: altCount > 0,
+      altCount,
     })
   }
   return out
@@ -418,6 +451,32 @@ const unmatchedWithAltCount = computed(
 )
 
 const failWithAltCount = computed(() => failList.value.filter((f) => failHasAlt(f)).length)
+
+/** 某清单行的全部候选（有词优先，再按源/分数） */
+function altsForQuery(queryIndex: number): BatchSearchHit[] {
+  return hits.value
+    .filter((h) => h.queryIndex === queryIndex)
+    .slice()
+    .sort((a, b) => {
+      if (isBetterHit(a, b)) return -1
+      if (isBetterHit(b, a)) return 1
+      return 0
+    })
+}
+
+/** 展开列表里手动勾选某一候选 */
+function onAltCheck(hit: BatchSearchHit, checked: boolean) {
+  suppressModeWatch = true
+  exactOnly.value = false
+  filterSource.value = null
+  const next = new Set(selectedKeySet.value)
+  if (checked) next.add(hit.rowKey)
+  else next.delete(hit.rowKey)
+  selectedKeySet.value = next
+  void restorePageSelection().finally(() => {
+    suppressModeWatch = false
+  })
+}
 
 const filteredHits = computed(() => {
   let list = hits.value
@@ -1087,6 +1146,69 @@ async function onBatchDownload() {
 .alt-no {
   font-size: 12px;
   color: var(--wy-text-muted);
+}
+.alt-empty {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--wy-text-muted);
+}
+.alt-list {
+  padding: 4px 8px 10px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.alt-list-tip {
+  font-size: 12px;
+  color: var(--wy-text-muted);
+  margin-bottom: 4px;
+}
+.alt-row {
+  display: grid;
+  grid-template-columns: 18px minmax(120px, 1.4fr) minmax(80px, 1fr) 72px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--wy-text);
+  cursor: pointer;
+  background: var(--wy-surface);
+  border: 1px solid transparent;
+  input {
+    accent-color: var(--wy-brand);
+  }
+  &:hover {
+    background: var(--wy-brand-soft);
+  }
+  &.on {
+    border-color: rgba(236, 65, 65, 0.28);
+    background: var(--wy-brand-soft);
+  }
+}
+.alt-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.alt-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wy-text-secondary);
+}
+.alt-src {
+  color: var(--wy-text-muted);
+}
+.alt-no-lyric {
+  font-size: 11px;
+  color: var(--wy-text-muted);
+}
+.unmatched-table {
+  :deep(.el-table__expanded-cell) {
+    background: var(--wy-surface-muted);
+  }
 }
 .match-tag {
   display: inline-flex;

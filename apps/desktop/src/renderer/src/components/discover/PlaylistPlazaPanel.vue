@@ -94,7 +94,7 @@ const hotTracks = computed(() => (props.hotTracks || []).slice(0, 10))
 function coverStyle(p: PlazaPlaylist) {
   const url = mediaUrl(p.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,#ec4141)' }
+  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,var(--wy-brand))' }
 }
 function trackCover(t: TrackDto) {
   const url = mediaUrl(t.coverUrl)
@@ -145,15 +145,15 @@ onMounted(async () => {
 }
 .cat {
   border: none;
-  background: #f5f5f5;
-  color: #666;
+  background: var(--wy-surface-muted);
+  color: var(--wy-text-secondary);
   font-size: 13px;
   padding: 6px 14px;
   border-radius: 16px;
   cursor: pointer;
   &.active {
     background: #fdeeee;
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 600;
   }
 }
@@ -200,7 +200,7 @@ onMounted(async () => {
 .title {
   margin-top: 8px;
   font-size: 13px;
-  color: #333;
+  color: var(--wy-text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;

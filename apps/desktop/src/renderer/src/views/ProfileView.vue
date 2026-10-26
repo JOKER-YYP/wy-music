@@ -193,7 +193,7 @@ function coverStyle(p: PlaylistDto) {
   const url = mediaUrl(p.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
   if (p.isSystem) return { backgroundImage: 'linear-gradient(145deg,#2a2a2a,#111)' }
-  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,#ec4141)' }
+  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,var(--wy-brand))' }
 }
 
 async function load() {
@@ -226,7 +226,7 @@ onMounted(load)
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, #ec4141);
+  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
   background-size: cover;
   background-position: center;
   color: #fff;
@@ -254,7 +254,7 @@ onMounted(load)
 .edit-btn {
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   width: 28px;
   height: 28px;
@@ -263,14 +263,14 @@ onMounted(load)
   place-items: center;
   &:hover {
     background: #f2f2f2;
-    color: #666;
+    color: var(--wy-text-secondary);
   }
 }
 .lv {
   font-size: 11px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(90deg, #ff9a44, #ec4141);
+  background: linear-gradient(90deg, #ff9a44, var(--wy-brand));
   border-radius: 10px;
   padding: 2px 8px;
   line-height: 1.4;
@@ -280,9 +280,9 @@ onMounted(load)
   display: flex;
   gap: 20px;
   font-size: 13px;
-  color: #888;
+  color: var(--wy-text-muted);
   b {
-    color: #333;
+    color: var(--wy-text);
     font-weight: 600;
     margin-left: 4px;
   }
@@ -290,7 +290,7 @@ onMounted(load)
 .bio {
   margin-top: 8px;
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
 }
 .meta-line {
   margin-top: 8px;
@@ -311,11 +311,11 @@ onMounted(load)
   background: transparent;
   padding: 12px 2px 14px;
   font-size: 16px;
-  color: #666;
+  color: var(--wy-text-secondary);
   cursor: pointer;
   position: relative;
   &.active {
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 700;
     &::after {
       content: '';
@@ -324,7 +324,7 @@ onMounted(load)
       right: 0;
       bottom: 0;
       height: 3px;
-      background: #ec4141;
+      background: var(--wy-brand);
       border-radius: 2px;
     }
   }
@@ -338,11 +338,11 @@ onMounted(load)
   border: none;
   background: transparent;
   font-size: 13px;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   padding: 0;
   &.active {
-    color: #333;
+    color: var(--wy-text);
     font-weight: 600;
   }
 }
@@ -422,7 +422,7 @@ onMounted(load)
 .plist-name {
   margin-top: 10px;
   font-size: 13px;
-  color: #333;
+  color: var(--wy-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

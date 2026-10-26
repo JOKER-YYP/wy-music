@@ -58,7 +58,7 @@
         <div class="col-album">{{ row.album || '-' }}</div>
         <div class="col-like">
           <button class="like-btn" type="button" @click.stop="toggleLike(row)">
-            <el-icon :size="16" :color="row.liked ? '#ec4141' : '#bbb'">
+            <el-icon :size="16" :color="row.liked ? 'var(--wy-brand)' : 'var(--wy-text-muted)'">
               <StarFilled v-if="row.liked" />
               <Star v-else />
             </el-icon>
@@ -127,7 +127,7 @@ function trackCover(row: TrackDto) {
   const url = mediaUrl(row.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 }
 
 function isCurrent(row: TrackDto) {
@@ -216,7 +216,7 @@ watch(() => route.params.id, load)
 .desc {
   margin: 12px 0 0;
   font-size: 13px;
-  color: #888;
+  color: var(--wy-text-muted);
   line-height: 1.5;
   max-width: 480px;
 }
@@ -247,12 +247,12 @@ watch(() => route.params.id, load)
   background: transparent;
   padding: 12px 2px 14px;
   font-size: 14px;
-  color: #666;
+  color: var(--wy-text-secondary);
   cursor: pointer;
   &.active {
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 600;
-    box-shadow: inset 0 -2px 0 #ec4141;
+    box-shadow: inset 0 -2px 0 var(--wy-brand);
   }
   &:disabled {
     cursor: default;
@@ -267,8 +267,8 @@ watch(() => route.params.id, load)
   height: 30px;
   padding: 0 10px;
   border-radius: 15px;
-  background: #f5f5f5;
-  color: #999;
+  background: var(--wy-surface-muted);
+  color: var(--wy-text-muted);
   input {
     border: none;
     outline: none;
@@ -287,19 +287,19 @@ watch(() => route.params.id, load)
 }
 .table-head {
   height: 40px;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--wy-border);
   margin-top: 4px;
 }
 .song-row {
   height: 64px;
   border-radius: 6px;
   &:hover {
-    background: #f5f5f5;
+    background: var(--wy-surface-muted);
   }
   &.active .name {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .col-rank {
@@ -307,11 +307,11 @@ watch(() => route.params.id, load)
   place-items: center;
 }
 .num {
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 14px;
   font-weight: 600;
   &.top {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .col-title {
@@ -334,7 +334,7 @@ watch(() => route.params.id, load)
 }
 .name {
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -342,14 +342,14 @@ watch(() => route.params.id, load)
 .artists {
   margin-top: 4px;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .col-album {
   font-size: 13px;
-  color: #888;
+  color: var(--wy-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -373,7 +373,7 @@ watch(() => route.params.id, load)
 }
 .col-dur {
   font-size: 13px;
-  color: #999;
+  color: var(--wy-text-muted);
   text-align: right;
 }
 @media (max-width: 900px) {

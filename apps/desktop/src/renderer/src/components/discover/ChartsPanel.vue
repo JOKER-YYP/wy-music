@@ -78,7 +78,7 @@ const ui = useUiStore()
 function coverStyle(url?: string | null) {
   const u = mediaUrl(url)
   if (u) return { backgroundImage: `url(${u})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+  return { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 }
 
 function chartCover(chart: ChartItem) {
@@ -96,7 +96,7 @@ function recoStyle(c: ChartItem) {
       backgroundPosition: 'center',
     }
   }
-  return { background: c.color || 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+  return { background: c.color || 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 }
 
 function goDetail(id: string) {
@@ -178,10 +178,10 @@ onMounted(async () => {
   gap: 16px;
 }
 .official-card {
-  background: #fafafa;
+  background: var(--wy-surface-muted);
   border-radius: 12px;
   padding: 14px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--wy-border);
 }
 .official-head {
   display: flex;
@@ -195,7 +195,7 @@ onMounted(async () => {
   border-radius: 8px;
   background-size: cover;
   background-position: center;
-  background-color: #f0f0f0;
+  background-color: var(--wy-border);
   flex-shrink: 0;
 }
 .official-meta {
@@ -210,7 +210,7 @@ onMounted(async () => {
 }
 .official-tip {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .top3,
 .full-list {
@@ -230,27 +230,27 @@ onMounted(async () => {
   border-radius: 6px;
   padding: 0 4px;
   &:hover {
-    background: #f0f0f0;
+    background: var(--wy-border);
   }
 }
 .rank {
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-weight: 600;
   &.top {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .song {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #333;
+  color: var(--wy-text);
 }
 .artist {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
   text-align: right;
 }
@@ -262,11 +262,11 @@ onMounted(async () => {
   margin-top: 8px;
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
   cursor: pointer;
   &:hover {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 @media (max-width: 1000px) {

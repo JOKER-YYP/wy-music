@@ -155,7 +155,7 @@ const canSaveAs = computed(() => {
 const coverStyle = computed(() => {
   const url = mediaUrl(detail.value?.coverUrl || detail.value?.tracks?.[0]?.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+  return { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 })
 
 const createdText = computed(() => {
@@ -315,7 +315,7 @@ watch(
 .desc {
   margin-top: 10px;
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
   line-height: 1.5;
   max-width: 520px;
   display: -webkit-box;
@@ -334,8 +334,8 @@ watch(
   padding: 0 8px;
   border-radius: 11px;
   border: 1px solid #e8e8e8;
-  background: #fafafa;
-  color: #666;
+  background: var(--wy-surface-muted);
+  color: var(--wy-text-secondary);
   font-size: 12px;
   display: inline-flex;
   align-items: center;
@@ -343,7 +343,7 @@ watch(
 .icon-btn {
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   width: 28px;
   height: 28px;
@@ -352,7 +352,7 @@ watch(
   place-items: center;
   &:hover {
     background: #f2f2f2;
-    color: #666;
+    color: var(--wy-text-secondary);
   }
 }
 .owner {
@@ -361,13 +361,13 @@ watch(
   gap: 8px;
   margin-top: 14px;
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
 }
 .avatar {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #ec4141;
+  background: var(--wy-brand);
   color: #fff;
   display: grid;
   place-items: center;
@@ -375,7 +375,7 @@ watch(
   font-weight: 600;
 }
 .owner-name {
-  color: #333;
+  color: var(--wy-text);
 }
 .date {
   color: #aaa;
@@ -391,7 +391,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 4px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--wy-border);
   margin: 18px 0 8px;
   position: relative;
 }
@@ -400,7 +400,7 @@ watch(
   background: transparent;
   padding: 10px 14px;
   font-size: 14px;
-  color: #666;
+  color: var(--wy-text-secondary);
   cursor: pointer;
   position: relative;
   &.active {
@@ -413,7 +413,7 @@ watch(
       right: 14px;
       bottom: 0;
       height: 2px;
-      background: #ec4141;
+      background: var(--wy-brand);
       border-radius: 1px;
     }
   }
@@ -426,9 +426,9 @@ watch(
   height: 28px;
   padding: 0 10px;
   border-radius: 14px;
-  background: #f5f5f5;
+  background: var(--wy-surface-muted);
   .tab-search-icon {
-    color: #bbb;
+    color: var(--wy-text-muted);
     font-size: 14px;
   }
   input {
@@ -437,7 +437,7 @@ watch(
     outline: none;
     width: 120px;
     font-size: 12px;
-    color: #333;
+    color: var(--wy-text);
   }
 }
 .batch-title {

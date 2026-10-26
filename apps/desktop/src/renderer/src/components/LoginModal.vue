@@ -204,12 +204,12 @@ async function onRegister() {
   right: 12px;
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   padding: 4px;
   line-height: 1;
   &:hover {
-    color: #333;
+    color: var(--wy-text);
   }
 }
 .logo-wrap {
@@ -230,7 +230,7 @@ async function onRegister() {
   margin-top: 8px;
   font-size: 18px;
   font-weight: 700;
-  color: #ec4141;
+  color: var(--wy-brand);
   letter-spacing: 0.5px;
 }
 .tabs {
@@ -243,12 +243,12 @@ async function onRegister() {
   border: none;
   background: none;
   font-size: 15px;
-  color: #666;
+  color: var(--wy-text-secondary);
   cursor: pointer;
   padding: 6px 0;
   position: relative;
   &.active {
-    color: #333;
+    color: var(--wy-text);
     font-weight: 600;
     &::after {
       content: '';
@@ -258,7 +258,7 @@ async function onRegister() {
       width: 20px;
       height: 3px;
       border-radius: 2px;
-      background: #ec4141;
+      background: var(--wy-brand);
       transform: translateX(-50%);
     }
   }
@@ -275,9 +275,9 @@ async function onRegister() {
   border: 1px solid #e6e6e6;
   border-radius: 8px;
   padding: 0 10px;
-  background: #fafafa;
+  background: var(--wy-surface-muted);
   &:focus-within {
-    border-color: #ec4141;
+    border-color: var(--wy-brand);
     background: #fff;
   }
   input {
@@ -290,7 +290,7 @@ async function onRegister() {
   }
 }
 .field-icon {
-  color: #bbb;
+  color: var(--wy-text-muted);
   margin-right: 8px;
 }
 .eye {
@@ -307,7 +307,7 @@ async function onRegister() {
   align-items: center;
   justify-content: space-between;
   font-size: 12px;
-  color: #888;
+  color: var(--wy-text-muted);
 }
 .auto {
   display: flex;
@@ -315,7 +315,7 @@ async function onRegister() {
   gap: 6px;
   cursor: pointer;
   input {
-    accent-color: #ec4141;
+    accent-color: var(--wy-brand);
   }
 }
 .link {
@@ -330,7 +330,7 @@ async function onRegister() {
   height: 42px;
   border: none;
   border-radius: 21px;
-  background: #ec4141;
+  background: var(--wy-brand);
   color: #fff;
   font-size: 16px;
   font-weight: 600;
@@ -341,7 +341,7 @@ async function onRegister() {
     cursor: not-allowed;
   }
   &:hover:not(:disabled) {
-    background: #e03535;
+    background: var(--wy-brand-hover);
   }
 }
 .agree {
@@ -350,11 +350,11 @@ async function onRegister() {
   gap: 6px;
   margin-top: 16px;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   input {
     margin-top: 2px;
-    accent-color: #ec4141;
+    accent-color: var(--wy-brand);
   }
   a {
     color: #507daf;

@@ -131,7 +131,7 @@ const coverUrl = computed(() => mediaUrl(track.value?.coverUrl))
 const coverStyle = computed(() => ({
   backgroundImage: coverUrl.value
     ? `url(${coverUrl.value})`
-    : 'linear-gradient(135deg,#ec4141,#ff8a80)',
+    : 'linear-gradient(135deg,var(--wy-brand),#ff8a80)',
 }))
 const bgStyle = computed(() => ({
   backgroundImage: coverUrl.value
@@ -490,7 +490,7 @@ watch(
   padding: 0;
   &:hover,
   &.on {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
   .thumb {
     font-size: 13px;

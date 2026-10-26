@@ -156,15 +156,15 @@ onUnmounted(() => {
   background: transparent;
   padding: 10px 14px;
   font-size: 13px;
-  color: #333;
+  color: var(--wy-text);
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
   &:hover {
-    background: #f5f5f5;
+    background: var(--wy-surface-muted);
   }
   .check {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .submenu {
@@ -185,13 +185,13 @@ onUnmounted(() => {
     padding: 8px 14px;
     text-align: left;
     font-size: 13px;
-    color: #333;
+    color: var(--wy-text);
     cursor: pointer;
     white-space: nowrap;
     &:hover,
     &.on {
-      background: #f5f5f5;
-      color: #ec4141;
+      background: var(--wy-surface-muted);
+      color: var(--wy-brand);
     }
   }
 }

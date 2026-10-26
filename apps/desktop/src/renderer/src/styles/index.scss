@@ -1,11 +1,39 @@
 @import './iconfont.css';
 
 :root {
+  /* Brand (incumbent NetEase-inspired) */
   --el-color-primary: #ec4141;
+  --wy-brand: #ec4141;
+  --wy-brand-hover: #e03535;
+  --wy-brand-soft: rgba(236, 65, 65, 0.08);
+  --wy-brand-soft-strong: rgba(236, 65, 65, 0.14);
+
+  /* Surfaces */
   --wy-bg: #ffffff;
-  --wy-sidebar: #f5f5f7;
+  --wy-sidebar: #f7f7f9;
+  --wy-surface: #ffffff;
+  --wy-surface-muted: #f5f5f7;
+  --wy-border: #ebebed;
+  --wy-border-strong: #e0e0e4;
+
+  /* Text */
+  --wy-text: #1a1a1a;
+  --wy-text-secondary: #5c5c66;
+  --wy-text-muted: #8a8a96;
+  --wy-text-on-brand: #ffffff;
+
+  /* Layout */
   --wy-player-h: 68px;
   --wy-sidebar-w: 210px;
+  --wy-topbar-h: 54px;
+  --wy-radius-sm: 6px;
+  --wy-radius-md: 10px;
+  --wy-shadow-sm: 0 1px 2px rgba(16, 16, 24, 0.06), 0 4px 12px rgba(16, 16, 24, 0.04);
+
+  /* Focus / chrome */
+  --wy-focus-ring: 0 0 0 2px #fff, 0 0 0 4px rgba(236, 65, 65, 0.45);
+  --wy-scrollbar: #c8c8d0;
+  --wy-scrollbar-hover: #b0b0ba;
 }
 
 * {
@@ -18,9 +46,16 @@ body,
   margin: 0;
   height: 100%;
   overflow: hidden;
-  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family:
+    'Segoe UI',
+    'PingFang SC',
+    'Microsoft YaHei',
+    system-ui,
+    sans-serif;
   background: var(--wy-bg);
-  color: #1f1f1f;
+  color: var(--wy-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -28,17 +63,65 @@ a {
   text-decoration: none;
 }
 
+::selection {
+  background: var(--wy-brand-soft-strong);
+  color: var(--wy-text);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--wy-focus-ring);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d0d0d0;
-  border-radius: 4px;
+  background: var(--wy-scrollbar);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wy-scrollbar-hover);
+  background-clip: padding-box;
+  border: 2px solid transparent;
 }
 
 .el-button--danger {
-  --el-button-bg-color: #ec4141;
-  --el-button-border-color: #ec4141;
-  --el-button-hover-bg-color: #e03535;
-  --el-button-hover-border-color: #e03535;
+  --el-button-bg-color: var(--wy-brand);
+  --el-button-border-color: var(--wy-brand);
+  --el-button-hover-bg-color: var(--wy-brand-hover);
+  --el-button-hover-border-color: var(--wy-brand-hover);
+}
+
+.el-button:focus-visible {
+  box-shadow: var(--wy-focus-ring);
+}
+
+.el-table {
+  --el-table-header-bg-color: var(--wy-surface-muted);
+  --el-table-row-hover-bg-color: var(--wy-brand-soft);
+  --el-table-current-row-bg-color: var(--wy-brand-soft-strong);
+  --el-table-border-color: var(--wy-border);
+  color: var(--wy-text);
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--wy-brand) inset !important;
+}
+
+.el-tabs__item.is-active {
+  color: var(--wy-brand);
+}
+.el-tabs__active-bar {
+  background-color: var(--wy-brand);
+}
+.el-pagination.is-background .el-pager li.is-active {
+  background-color: var(--wy-brand);
 }

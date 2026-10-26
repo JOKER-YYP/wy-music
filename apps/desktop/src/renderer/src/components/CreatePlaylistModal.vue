@@ -96,7 +96,7 @@ function onConfirm() {
   width: 40px;
   line-height: 32px;
   font-size: 14px;
-  color: #666;
+  color: var(--wy-text-secondary);
 }
 .public-row {
   align-items: center;
@@ -109,7 +109,7 @@ function onConfirm() {
 }
 .tip {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   line-height: 1.4;
 }
 </style>

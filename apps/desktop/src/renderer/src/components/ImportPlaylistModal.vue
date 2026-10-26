@@ -300,7 +300,7 @@ async function onConfirm() {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--wy-border);
   h3 {
     margin: 0;
     font-size: 16px;
@@ -311,11 +311,11 @@ async function onConfirm() {
   border: 0;
   background: transparent;
   cursor: pointer;
-  color: #999;
+  color: var(--wy-text-muted);
   display: inline-flex;
   padding: 4px;
   &:hover {
-    color: #333;
+    color: var(--wy-text);
   }
 }
 .import-body {
@@ -327,7 +327,7 @@ async function onConfirm() {
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
-  background: #f5f5f5;
+  background: var(--wy-surface-muted);
   border-radius: 8px;
   padding: 8px 10px;
   :deep(.el-input__wrapper) {
@@ -337,7 +337,7 @@ async function onConfirm() {
 }
 .link-label {
   flex: none;
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 13px;
   width: 48px;
 }
@@ -346,14 +346,14 @@ async function onConfirm() {
   flex: none;
   border: 0;
   background: transparent;
-  color: #ec4141;
+  color: var(--wy-brand);
   cursor: pointer;
   font-size: 13px;
   padding: 0 4px;
 }
 .hint {
   margin: 4px 0 18px;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
 }
 .start-btn {
@@ -388,14 +388,14 @@ async function onConfirm() {
 }
 .platform {
   font-size: 12px;
-  color: #ec4141;
+  color: var(--wy-brand);
   background: rgba(236, 65, 65, 0.1);
   padding: 1px 6px;
   border-radius: 4px;
 }
 .source-stats {
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
 }
 .ok-text {
   color: #67c23a;
@@ -427,7 +427,7 @@ async function onConfirm() {
     align-items: baseline;
     padding: 4px 0;
     font-size: 13px;
-    border-bottom: 1px solid #f5f5f5;
+    border-bottom: 1px solid var(--wy-surface-muted);
   }
 }
 .song-name {
@@ -438,7 +438,7 @@ async function onConfirm() {
   white-space: nowrap;
 }
 .song-artist {
-  color: #999;
+  color: var(--wy-text-muted);
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -469,7 +469,7 @@ async function onConfirm() {
 }
 .public-tip {
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
 }
 .action-btns {
   display: flex;

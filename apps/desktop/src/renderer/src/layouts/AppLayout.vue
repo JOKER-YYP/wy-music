@@ -574,18 +574,18 @@ function onLogout() {
 <style scoped lang="scss">
 .layout {
   display: grid;
-  grid-template-columns: 210px 1fr;
-  grid-template-rows: 54px 1fr var(--wy-player-h);
+  grid-template-columns: var(--wy-sidebar-w) 1fr;
+  grid-template-rows: var(--wy-topbar-h) 1fr var(--wy-player-h);
   height: 100%;
   max-height: 100%;
   overflow: hidden;
-  background: #fff;
+  background: var(--wy-bg);
 }
 .topbar {
   grid-column: 1 / -1;
   grid-row: 1;
-  height: 54px;
-  background: #ec4141;
+  height: var(--wy-topbar-h);
+  background: var(--wy-brand);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -673,7 +673,7 @@ function onLogout() {
     width: 9px;
     height: 9px;
     border: 1px solid currentColor;
-    background: #ec4141;
+    background: var(--wy-brand);
   }
 }
 .win-x {
@@ -905,7 +905,7 @@ function onLogout() {
   padding: 0 4px;
   border-radius: 8px;
   background: #fff;
-  color: #ec4141;
+  color: var(--wy-brand);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
@@ -920,8 +920,8 @@ function onLogout() {
 .sidebar {
   grid-column: 1;
   grid-row: 2;
-  background: #f5f5f7;
-  border-right: 1px solid #ececec;
+  background: var(--wy-sidebar);
+  border-right: 1px solid var(--wy-border);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -938,7 +938,7 @@ function onLogout() {
 .nav-title {
   margin: 14px 10px 6px;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .mine-head {
   display: flex;
@@ -952,13 +952,13 @@ function onLogout() {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #aaa;
+  color: var(--wy-text-muted);
   display: grid;
   place-items: center;
   cursor: pointer;
   padding: 0;
   &:hover {
-    color: #666;
+    color: var(--wy-text-secondary);
     background: rgba(0, 0, 0, 0.05);
   }
 }
@@ -972,12 +972,12 @@ function onLogout() {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
   cursor: pointer;
   &:hover {
     background: rgba(0, 0, 0, 0.04);
-    color: #666;
+    color: var(--wy-text-secondary);
   }
 }
 .playlist-head {
@@ -994,16 +994,18 @@ function onLogout() {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 1px solid #ccc;
-  background: #fff;
-  color: #666;
+  border: 1px solid var(--wy-border-strong);
+  background: var(--wy-surface);
+  color: var(--wy-text-secondary);
   display: grid;
   place-items: center;
   cursor: pointer;
   padding: 0;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
   &:hover {
-    border-color: #ec4141;
-    color: #ec4141;
+    border-color: var(--wy-brand);
+    color: var(--wy-brand);
+    background: var(--wy-brand-soft);
   }
 }
 .nav-group {
@@ -1018,16 +1020,19 @@ function onLogout() {
   height: 38px;
   padding: 0 12px;
   border-radius: 8px;
-  color: #333;
+  color: var(--wy-text);
   font-size: 14px;
-  transition: background 0.15s;
-  &:hover {
-    background: rgba(0, 0, 0, 0.04);
+  transition: background 0.15s ease, color 0.15s ease;
+  &:hover:not(.active) {
+    background: var(--wy-brand-soft);
   }
   &.active {
-    background: #ec4141;
-    color: #fff;
+    background: var(--wy-brand);
+    color: var(--wy-text-on-brand);
     font-weight: 600;
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
   }
 }
 .playlist-item {
@@ -1038,12 +1043,12 @@ function onLogout() {
   height: 28px;
   border-radius: 4px;
   object-fit: cover;
-  background: linear-gradient(135deg, #ff8a80, #ec4141);
+  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
   flex-shrink: 0;
   display: block;
 }
 .plist-cover--empty {
-  background: linear-gradient(135deg, #ff8a80, #ec4141);
+  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
 }
 .plist-name {
   overflow: hidden;
@@ -1053,7 +1058,7 @@ function onLogout() {
 .empty-tip {
   padding: 6px 12px;
   font-size: 12px;
-  color: #bbb;
+  color: var(--wy-text-muted);
 }
 .main {
   grid-column: 2;
@@ -1063,7 +1068,7 @@ function onLogout() {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #fff;
+  background: var(--wy-bg);
 }
 .content {
   flex: 1;

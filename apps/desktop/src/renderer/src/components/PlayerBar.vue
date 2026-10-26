@@ -283,7 +283,7 @@ watch(
 const artists = computed(() => track.value?.artists?.join(' / ') || '')
 const coverStyle = computed(() => {
   const url = mediaUrl(track.value?.coverUrl)
-  return url ? `url(${url})` : 'linear-gradient(135deg,#ec4141,#ff8a80)'
+  return url ? `url(${url})` : 'linear-gradient(135deg,var(--wy-brand),#ff8a80)'
 })
 
 watch(
@@ -436,8 +436,8 @@ onBeforeUnmount(() => {
 .player-bar {
   grid-column: 1 / -1;
   height: var(--wy-player-h);
-  border-top: 1px solid #e8e8e8;
-  background: #fff;
+  border-top: 1px solid var(--wy-border);
+  background: var(--wy-surface);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -457,10 +457,10 @@ onBeforeUnmount(() => {
   bottom: calc(100% - 2px);
   padding: 4px 10px;
   border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  background: var(--wy-surface);
+  box-shadow: var(--wy-shadow-sm);
   font-size: 12px;
-  color: #333;
+  color: var(--wy-text);
   white-space: nowrap;
   pointer-events: none;
   z-index: 3;
@@ -475,10 +475,10 @@ onBeforeUnmount(() => {
   cursor: pointer;
   background: linear-gradient(
     to right,
-    #ec4141 0%,
-    #ec4141 var(--pct, 0%),
-    #ddd var(--pct, 0%),
-    #ddd 100%
+    var(--wy-brand) 0%,
+    var(--wy-brand) var(--pct, 0%),
+    var(--wy-border-strong) var(--pct, 0%),
+    var(--wy-border-strong) 100%
   );
   transition: height 0.12s ease;
   &:disabled {
@@ -507,7 +507,7 @@ onBeforeUnmount(() => {
   &:hover {
     &::-webkit-slider-thumb {
       background: #fff;
-      border: 2px solid #ec4141;
+      border: 2px solid var(--wy-brand);
       box-shadow: 0 0 0 1px rgba(236, 65, 65, 0.2);
       transform: scale(1.08);
     }
@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
   .hovered & {
     &::-moz-range-thumb {
       background: #fff;
-      border: 2px solid #ec4141;
+      border: 2px solid var(--wy-brand);
     }
   }
   &::-moz-range-track {
@@ -585,7 +585,7 @@ onBeforeUnmount(() => {
   .title {
     font-size: 13px;
     font-weight: 600;
-    color: #333;
+    color: var(--wy-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -594,7 +594,7 @@ onBeforeUnmount(() => {
   .artists {
     margin-top: 2px;
     font-size: 12px;
-    color: #999;
+    color: var(--wy-text-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -614,19 +614,19 @@ onBeforeUnmount(() => {
   gap: 3px;
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   padding: 0;
   font-size: 12px;
   &:hover,
   &.on {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
   .count {
     color: inherit;
     font-size: 12px;
     &.on {
-      color: #ec4141;
+      color: var(--wy-brand);
     }
   }
 }
@@ -641,7 +641,7 @@ onBeforeUnmount(() => {
   height: 32px;
   border: none;
   background: transparent;
-  color: #333;
+  color: var(--wy-text);
   border-radius: 50%;
   cursor: pointer;
   display: grid;
@@ -654,7 +654,7 @@ onBeforeUnmount(() => {
     line-height: 1;
   }
   &:hover:not(:disabled) {
-    color: #ec4141;
+    color: var(--wy-brand);
     background: rgba(236, 65, 65, 0.08);
   }
   &:disabled {
@@ -662,7 +662,7 @@ onBeforeUnmount(() => {
     cursor: default;
   }
   &.on {
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 700;
   }
 }
@@ -676,7 +676,7 @@ onBeforeUnmount(() => {
   height: 40px;
   border-radius: 50%;
   border: none;
-  background: #ec4141;
+  background: var(--wy-brand);
   color: #fff;
   cursor: pointer;
   display: grid;
@@ -719,10 +719,10 @@ onBeforeUnmount(() => {
   height: 18px;
   padding: 0 5px;
   margin-right: 4px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--wy-border-strong);
   border-radius: 3px;
   font-size: 11px;
-  color: #888;
+  color: var(--wy-text-muted);
   line-height: 1;
   user-select: none;
 }
@@ -731,7 +731,7 @@ onBeforeUnmount(() => {
 }
 .vol {
   width: 100%;
-  accent-color: #ec4141;
+  accent-color: var(--wy-brand);
   cursor: pointer;
 }
 </style>

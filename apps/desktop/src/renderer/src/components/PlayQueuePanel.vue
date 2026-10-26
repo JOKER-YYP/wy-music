@@ -143,7 +143,7 @@ function coverStyle(t: QueueTrack) {
   const u = mediaUrl(t.coverUrl)
   return u
     ? { backgroundImage: `url(${u})` }
-    : { backgroundImage: 'linear-gradient(135deg,#f3c4c4,#ec4141)' }
+    : { backgroundImage: 'linear-gradient(135deg,#f3c4c4,var(--wy-brand))' }
 }
 
 function formatDuration(ms?: number) {
@@ -220,12 +220,12 @@ async function clearAll() {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #333;
+  color: var(--wy-text);
 }
 
 .count {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   transform: translateY(-4px);
 }
 
@@ -245,12 +245,12 @@ async function clearAll() {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 12px;
   cursor: pointer;
   &:hover:not(:disabled) {
-    color: #333;
-    background: #f5f5f5;
+    color: var(--wy-text);
+    background: var(--wy-surface-muted);
   }
   &:disabled {
     opacity: 0.4;
@@ -262,7 +262,7 @@ async function clearAll() {
   flex: 1;
   display: grid;
   place-items: center;
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 13px;
 }
 
@@ -297,7 +297,7 @@ async function clearAll() {
   z-index: 2;
   padding: 0;
   &:hover {
-    background: #fafafa;
+    background: var(--wy-surface-muted);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   }
 }
@@ -306,14 +306,14 @@ async function clearAll() {
   position: relative;
   width: 14px;
   height: 14px;
-  border: 2px solid #666;
+  border: 2px solid var(--wy-text-secondary);
   border-radius: 50%;
   box-sizing: border-box;
   &::before,
   &::after {
     content: '';
     position: absolute;
-    background: #666;
+    background: var(--wy-text-secondary);
   }
   /* 上下准星 */
   &::before {
@@ -345,14 +345,14 @@ async function clearAll() {
   text-align: left;
   cursor: pointer;
   &:hover {
-    background: #f5f5f5;
+    background: var(--wy-surface-muted);
   }
   &.active {
-    background: #f5f5f5;
+    background: var(--wy-surface-muted);
     .name,
     .artists,
     .duration {
-      color: #ec4141;
+      color: var(--wy-brand);
     }
   }
 }
@@ -391,7 +391,7 @@ async function clearAll() {
 
 .name {
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -407,7 +407,7 @@ async function clearAll() {
 
 .artists {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -416,7 +416,7 @@ async function clearAll() {
 .duration {
   flex-shrink: 0;
   font-size: 12px;
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-variant-numeric: tabular-nums;
   padding-left: 8px;
 }

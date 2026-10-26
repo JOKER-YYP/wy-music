@@ -1,7 +1,6 @@
 <template>
   <div>
     <div class="head">
-      <h2>用户管理</h2>
       <el-input
         v-model="keyword"
         placeholder="搜索账号/昵称"
@@ -87,9 +86,9 @@ onMounted(load)
 <style scoped>
 .head {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .pager {
   margin-top: 16px;

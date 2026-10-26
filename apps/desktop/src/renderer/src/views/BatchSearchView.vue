@@ -541,7 +541,7 @@ async function onBatchDownload() {
 .sub {
   margin: 6px 0 0;
   font-size: 13px;
-  color: #888;
+  color: var(--wy-text-muted);
 }
 .head-actions {
   display: flex;
@@ -559,7 +559,7 @@ async function onBatchDownload() {
   padding: 12px 16px;
   margin-bottom: 14px;
   border-radius: 10px;
-  background: #fff5f5;
+  background: var(--wy-brand-soft);
   border: 1px solid rgba(236, 65, 65, 0.15);
   .el-progress {
     flex: 1;
@@ -567,12 +567,12 @@ async function onBatchDownload() {
 }
 .progress-text {
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
   min-width: 180px;
 }
 .summary {
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
   margin-bottom: 10px;
 }
 .source-panel {
@@ -587,7 +587,7 @@ async function onBatchDownload() {
 }
 .mode-label {
   font-size: 12px;
-  color: #888;
+  color: var(--wy-text-muted);
   flex-shrink: 0;
 }
 .source-tags {
@@ -596,29 +596,30 @@ async function onBatchDownload() {
   gap: 8px;
 }
 .source-tag {
-  border: 1px solid #e5e5e5;
-  background: #fafafa;
-  color: #666;
+  border: 1px solid var(--wy-border);
+  background: var(--wy-surface);
+  color: var(--wy-text-secondary);
   font-size: 12px;
   line-height: 1;
   height: 28px;
   padding: 0 12px;
   border-radius: 14px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
   &:hover:not(:disabled) {
-    border-color: #ec4141;
-    color: #ec4141;
+    border-color: var(--wy-brand);
+    color: var(--wy-brand);
+    background: var(--wy-brand-soft);
   }
   &.active {
-    border-color: #ec4141;
-    background: #ec4141;
-    color: #fff;
+    border-color: var(--wy-brand);
+    background: var(--wy-brand);
+    color: var(--wy-text-on-brand);
   }
   &.selected:not(.active) {
-    border-color: #f5a5a5;
-    background: #fff5f5;
-    color: #c45656;
+    border-color: rgba(236, 65, 65, 0.35);
+    background: var(--wy-brand-soft);
+    color: var(--wy-brand);
   }
   &:disabled {
     opacity: 0.55;
@@ -634,13 +635,13 @@ async function onBatchDownload() {
 }
 .dl-tip {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .fail-panel {
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #fff7f7;
+  background: var(--wy-brand-soft);
   border: 1px solid rgba(236, 65, 65, 0.2);
 }
 .fail-head {
@@ -650,12 +651,12 @@ async function onBatchDownload() {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #c45656;
+  color: var(--wy-brand-hover);
 }
 .fail-table {
   width: 100%;
   :deep(.el-table__cell) {
-    color: #666;
+    color: var(--wy-text-secondary);
   }
 }
 .pager {
@@ -665,11 +666,11 @@ async function onBatchDownload() {
 }
 .q-name {
   font-size: 13px;
-  color: #333;
+  color: var(--wy-text);
 }
 .q-artist {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   margin-top: 2px;
 }
 </style>

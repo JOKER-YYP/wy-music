@@ -50,7 +50,7 @@
         <div class="col-album">{{ row.album || '未知专辑' }}</div>
         <div class="col-like">
           <button class="like-btn" type="button" @click.stop="toggleLike(row)">
-            <el-icon :size="16" :color="row.liked ? '#ec4141' : '#bbb'">
+            <el-icon :size="16" :color="row.liked ? 'var(--wy-brand)' : 'var(--wy-text-muted)'">
               <StarFilled v-if="row.liked" />
               <Star v-else />
             </el-icon>
@@ -96,7 +96,7 @@ function trackCover(row: TrackDto) {
   const url = mediaUrl(row.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 }
 
 function isCurrent(row: TrackDto) {
@@ -165,7 +165,7 @@ onMounted(load)
   height: 200px;
   border-radius: 10px;
   flex-shrink: 0;
-  background: linear-gradient(160deg, #ff6b6b 0%, #ec4141 55%, #c72c2c 100%);
+  background: linear-gradient(160deg, #ff6b6b 0%, var(--wy-brand) 55%, #c72c2c 100%);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -204,7 +204,7 @@ onMounted(load)
 }
 .tip-badge {
   font-size: 11px;
-  color: #ec4141;
+  color: var(--wy-brand);
   background: rgba(236, 65, 65, 0.1);
   border: 1px solid rgba(236, 65, 65, 0.35);
   border-radius: 999px;
@@ -214,7 +214,7 @@ onMounted(load)
 .desc {
   margin: 14px 0 0;
   font-size: 13px;
-  color: #888;
+  color: var(--wy-text-muted);
   line-height: 1.5;
   max-width: 520px;
 }
@@ -236,18 +236,18 @@ onMounted(load)
 }
 .table-head {
   height: 40px;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--wy-border);
 }
 .song-row {
   height: 64px;
   border-radius: 6px;
   &:hover {
-    background: #f5f5f5;
+    background: var(--wy-surface-muted);
   }
   &.active .name {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .col-rank {
@@ -255,7 +255,7 @@ onMounted(load)
   place-items: center;
 }
 .num {
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 14px;
   font-weight: 600;
 }
@@ -279,7 +279,7 @@ onMounted(load)
 }
 .name {
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -287,14 +287,14 @@ onMounted(load)
 .artists {
   margin-top: 4px;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .col-album {
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -313,7 +313,7 @@ onMounted(load)
 }
 .col-dur {
   font-size: 13px;
-  color: #999;
+  color: var(--wy-text-muted);
   text-align: right;
 }
 </style>

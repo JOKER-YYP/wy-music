@@ -208,7 +208,7 @@ const coverStyle = computed(() => {
   const url = coverUrl.value
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 })
 const bgStyle = computed(() => {
   const url = coverUrl.value
@@ -515,7 +515,7 @@ watch(
   right: 8%;
   width: 8px;
   height: 42%;
-  background: linear-gradient(180deg, #ddd, #888);
+  background: linear-gradient(180deg, #ddd, var(--wy-text-muted));
   border-radius: 4px;
   transform-origin: top center;
   transform: rotate(-28deg);
@@ -532,7 +532,7 @@ watch(
     height: 22px;
     border-radius: 50%;
     background: #ccc;
-    box-shadow: inset 0 0 0 4px #999;
+    box-shadow: inset 0 0 0 4px var(--wy-text-muted);
   }
   &::after {
     content: '';
@@ -542,7 +542,7 @@ watch(
     transform: translateX(-50%);
     width: 14px;
     height: 18px;
-    background: #bbb;
+    background: var(--wy-text-muted);
     border-radius: 2px;
   }
   &.on {
@@ -561,7 +561,7 @@ watch(
   border-radius: 50%;
   background:
     radial-gradient(circle at center, #222 17%, #111 18%, transparent 19%),
-    repeating-radial-gradient(circle at center, #1a1a1a 0 2px, #0d0d0d 2px 4px);
+    repeating-radial-gradient(circle at center, var(--wy-text) 0 2px, #0d0d0d 2px 4px);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   display: grid;
   place-items: center;
@@ -740,7 +740,7 @@ watch(
   margin-bottom: 4px;
   input[type='range'] {
     width: 100%;
-    accent-color: #ec4141;
+    accent-color: var(--wy-brand);
   }
 }
 .np-bar-row {
@@ -796,7 +796,7 @@ watch(
     color: #fff;
   }
   &.on {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
   &.comment .badge {
     position: absolute;
@@ -806,7 +806,7 @@ watch(
     padding: 0 3px;
     font-size: 10px;
     line-height: 12px;
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 600;
     pointer-events: none;
     white-space: nowrap;
@@ -853,7 +853,7 @@ watch(
   height: 48px;
   border: none;
   border-radius: 50%;
-  background: #ec4141;
+  background: var(--wy-brand);
   color: #fff;
   display: grid;
   place-items: center;
@@ -864,7 +864,7 @@ watch(
     line-height: 1;
   }
   &:hover {
-    background: #e03535;
+    background: var(--wy-brand-hover);
   }
 }
 .np-right-tools {
@@ -876,7 +876,7 @@ watch(
     color: rgba(255, 255, 255, 0.85);
   }
   :deep(.dl-on) {
-    color: #ec4141 !important;
+    color: var(--wy-brand) !important;
   }
 }
 .np-fade-enter-active,

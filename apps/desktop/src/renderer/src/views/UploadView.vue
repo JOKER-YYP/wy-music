@@ -1073,7 +1073,7 @@ async function submitSingle() {
 }
 :deep(.el-table .is-playing-row) {
   td {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 :deep(.el-table .is-new-track-row) {
@@ -1089,7 +1089,7 @@ async function submitSingle() {
   border-radius: 3px;
 }
 .lib-new {
-  color: #ec4141;
+  color: var(--wy-brand);
   background: rgba(236, 65, 65, 0.12);
   font-weight: 600;
 }
@@ -1101,7 +1101,7 @@ async function submitSingle() {
   margin-left: 4px;
 }
 .tip {
-  color: #888;
+  color: var(--wy-text-muted);
   margin: 0 0 12px;
   font-size: 13px;
 }
@@ -1113,7 +1113,7 @@ async function submitSingle() {
   flex-wrap: wrap;
 }
 .folder-path {
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 12px;
   max-width: 420px;
   overflow: hidden;
@@ -1121,7 +1121,7 @@ async function submitSingle() {
   white-space: nowrap;
 }
 .count {
-  color: #ec4141;
+  color: var(--wy-brand);
   font-size: 13px;
 }
 .batch-bar {
@@ -1136,7 +1136,7 @@ async function submitSingle() {
   margin-left: auto;
 }
 .filter-count {
-  color: #888;
+  color: var(--wy-text-muted);
   font-size: 12px;
 }
 .name-artist-row {
@@ -1161,7 +1161,7 @@ async function submitSingle() {
   display: none;
 }
 .file-name {
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 13px;
 }
 .lyric-tools {
@@ -1181,14 +1181,14 @@ async function submitSingle() {
 .hint {
   margin-top: 6px;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   &.warn {
     color: #e6a23c;
   }
 }
 .progress-text {
   margin-top: 12px;
-  color: #666;
+  color: var(--wy-text-secondary);
 }
 .retry-hint {
   margin: 12px 0 8px;

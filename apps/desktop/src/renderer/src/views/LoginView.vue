@@ -84,7 +84,7 @@ async function onRegister() {
   background:
     radial-gradient(circle at 20% 20%, rgba(236, 65, 65, 0.18), transparent 40%),
     radial-gradient(circle at 80% 0%, rgba(255, 138, 128, 0.2), transparent 35%),
-    #f7f7f9;
+    var(--wy-sidebar);
 }
 .card {
   width: 380px;
@@ -94,12 +94,12 @@ async function onRegister() {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   h1 {
     margin: 0;
-    color: #ec4141;
+    color: var(--wy-brand);
     text-align: center;
   }
   .sub {
     text-align: center;
-    color: #888;
+    color: var(--wy-text-muted);
     margin: 8px 0 16px;
     font-size: 13px;
   }

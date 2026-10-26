@@ -285,7 +285,7 @@ function isMine(msg: UserNotificationDto) {
 function trackCoverStyle(trackId: string) {
   const url = mediaUrl(trackMap.value[trackId]?.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+  return { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 }
 
 function formatTime(iso: string) {
@@ -519,7 +519,7 @@ defineExpose({ refresh, loadUnread })
   width: 380px;
   max-width: calc(100vw - 24px);
   height: min(620px, calc(100vh - 90px));
-  background: #f7f7f9;
+  background: var(--wy-sidebar);
   backdrop-filter: blur(16px);
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
@@ -534,20 +534,20 @@ defineExpose({ refresh, loadUnread })
   gap: 2px;
   padding: 12px 12px 8px;
   flex-shrink: 0;
-  background: #f7f7f9;
+  background: var(--wy-sidebar);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 .msg-tab {
   position: relative;
   border: none;
   background: transparent;
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 13px;
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
   &.active {
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 700;
   }
   &:hover {
@@ -561,18 +561,18 @@ defineExpose({ refresh, loadUnread })
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #ec4141;
+  background: var(--wy-brand);
 }
 .read-all {
   margin-left: auto;
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
   cursor: pointer;
   padding: 4px 6px;
   &:hover {
-    color: #666;
+    color: var(--wy-text-secondary);
   }
 }
 .msg-list {
@@ -604,7 +604,7 @@ defineExpose({ refresh, loadUnread })
   height: 42px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: linear-gradient(135deg, #ff8a80, #ec4141);
+  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
   background-size: cover;
   background-position: center;
   color: #fff;
@@ -644,7 +644,7 @@ defineExpose({ refresh, loadUnread })
 .preview {
   margin-top: 4px;
   font-size: 12px;
-  color: #888;
+  color: var(--wy-text-muted);
   line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -659,7 +659,7 @@ defineExpose({ refresh, loadUnread })
   height: 8px;
   margin-top: -4px;
   border-radius: 50%;
-  background: #ec4141;
+  background: var(--wy-brand);
 }
 
 /* 聊天视图 */
@@ -679,7 +679,7 @@ defineExpose({ refresh, loadUnread })
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #333;
+  color: var(--wy-text);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -712,7 +712,7 @@ defineExpose({ refresh, loadUnread })
   &.mine {
     flex-direction: row-reverse;
     .bubble {
-      background: #ec4141;
+      background: var(--wy-brand);
       color: #fff;
       border-radius: 12px 4px 12px 12px;
     }
@@ -727,7 +727,7 @@ defineExpose({ refresh, loadUnread })
 }
 .bubble {
   background: #fff;
-  color: #333;
+  color: var(--wy-text);
   font-size: 13px;
   line-height: 1.55;
   padding: 10px 12px;
@@ -749,7 +749,7 @@ defineExpose({ refresh, loadUnread })
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
   max-width: 260px;
   &:hover {
-    background: #fafafa;
+    background: var(--wy-surface-muted);
   }
 }
 .song-cover {
@@ -777,7 +777,7 @@ defineExpose({ refresh, loadUnread })
 .song-tag {
   flex-shrink: 0;
   font-size: 10px;
-  color: #ec4141;
+  color: var(--wy-brand);
   background: rgba(236, 65, 65, 0.1);
   border-radius: 3px;
   padding: 1px 4px;
@@ -786,7 +786,7 @@ defineExpose({ refresh, loadUnread })
 .song-artist {
   margin-top: 4px;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -804,11 +804,11 @@ defineExpose({ refresh, loadUnread })
   resize: none;
   font-size: 13px;
   line-height: 1.5;
-  color: #333;
+  color: var(--wy-text);
   background: transparent;
   font-family: inherit;
   &::placeholder {
-    color: #bbb;
+    color: var(--wy-text-muted);
   }
 }
 .chat-input-bar {
@@ -827,12 +827,12 @@ defineExpose({ refresh, loadUnread })
   gap: 12px;
 }
 .muted-icon {
-  color: #bbb;
+  color: var(--wy-text-muted);
 }
 .send-btn {
   border: none;
   background: transparent;
-  color: #ec4141;
+  color: var(--wy-brand);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;

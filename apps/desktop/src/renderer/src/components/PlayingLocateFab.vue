@@ -40,7 +40,7 @@ const emit = defineEmits<{ click: [] }>()
   padding: 0;
   z-index: 50;
   &:hover {
-    background: #fafafa;
+    background: var(--wy-surface-muted);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   }
   &.page {
@@ -59,14 +59,14 @@ const emit = defineEmits<{ click: [] }>()
   position: relative;
   width: 14px;
   height: 14px;
-  border: 2px solid #666;
+  border: 2px solid var(--wy-text-secondary);
   border-radius: 50%;
   box-sizing: border-box;
   &::before,
   &::after {
     content: '';
     position: absolute;
-    background: #666;
+    background: var(--wy-text-secondary);
   }
   &::before {
     left: 50%;

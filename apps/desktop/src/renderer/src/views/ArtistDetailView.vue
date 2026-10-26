@@ -74,7 +74,7 @@
 
           <div class="col-like">
             <button class="like-btn" type="button" @click.stop="toggleLike(row)">
-              <el-icon :size="16" :color="row.liked ? '#ec4141' : '#bbb'">
+              <el-icon :size="16" :color="row.liked ? 'var(--wy-brand)' : 'var(--wy-text-muted)'">
                 <StarFilled v-if="row.liked" />
                 <Star v-else />
               </el-icon>
@@ -199,7 +199,7 @@ function trackCover(row: TrackDto) {
   const url = mediaUrl(row.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 }
 
 function albumCover(alb: AlbumItem) {
@@ -318,7 +318,7 @@ watch(() => route.params.name, load)
   width: 180px;
   height: 180px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, #ec4141);
+  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
   background-size: cover;
   background-position: center;
   flex-shrink: 0;
@@ -343,7 +343,7 @@ watch(() => route.params.name, load)
 .sub {
   margin-top: 10px;
   font-size: 13px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .actions {
   margin-top: 22px;
@@ -362,15 +362,15 @@ watch(() => route.params.name, load)
   background: transparent;
   padding: 14px 2px;
   font-size: 15px;
-  color: #666;
+  color: var(--wy-text-secondary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   &.active {
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 600;
-    box-shadow: inset 0 -2px 0 #ec4141;
+    box-shadow: inset 0 -2px 0 var(--wy-brand);
   }
 }
 .badge {
@@ -393,18 +393,18 @@ watch(() => route.params.name, load)
 }
 .table-head {
   height: 36px;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--wy-border);
 }
 .song-row {
   height: 64px;
   border-radius: 6px;
   &:hover {
-    background: #f5f5f5;
+    background: var(--wy-surface-muted);
   }
   &.active .name {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .col-idx {
@@ -412,11 +412,11 @@ watch(() => route.params.name, load)
   place-items: center;
 }
 .num {
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 14px;
   font-weight: 600;
   &.top {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .eq {
@@ -426,7 +426,7 @@ watch(() => route.params.name, load)
   height: 14px;
   i {
     width: 3px;
-    background: #ec4141;
+    background: var(--wy-brand);
     border-radius: 1px;
     animation: eq 0.8s ease-in-out infinite;
     &:nth-child(1) {
@@ -471,7 +471,7 @@ watch(() => route.params.name, load)
 }
 .name {
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -479,14 +479,14 @@ watch(() => route.params.name, load)
 .artists {
   margin-top: 4px;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .col-album {
   font-size: 13px;
-  color: #888;
+  color: var(--wy-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -510,7 +510,7 @@ watch(() => route.params.name, load)
 }
 .col-dur {
   font-size: 13px;
-  color: #999;
+  color: var(--wy-text-muted);
   text-align: right;
 }
 .album-grid,
@@ -556,7 +556,7 @@ watch(() => route.params.name, load)
   aspect-ratio: 1;
   margin: 0 auto;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, #ec4141);
+  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
   background-size: cover;
   background-position: center;
   color: #fff;
@@ -578,7 +578,7 @@ watch(() => route.params.name, load)
   }
   p {
     margin: 0;
-    color: #666;
+    color: var(--wy-text-secondary);
     line-height: 1.7;
     font-size: 14px;
   }
@@ -594,11 +594,11 @@ watch(() => route.params.name, load)
   }
   b {
     font-size: 22px;
-    color: #333;
+    color: var(--wy-text);
   }
   span {
     font-size: 12px;
-    color: #999;
+    color: var(--wy-text-muted);
   }
 }
 .placeholder {

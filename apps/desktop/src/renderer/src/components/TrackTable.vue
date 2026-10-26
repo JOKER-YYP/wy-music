@@ -47,7 +47,7 @@ const batchMode = ref(false)
 .batch-entry {
   border: none;
   background: transparent;
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 13px;
   display: inline-flex;
   align-items: center;
@@ -56,7 +56,7 @@ const batchMode = ref(false)
   padding: 4px 6px;
   border-radius: 4px;
   &:hover {
-    color: #ec4141;
+    color: var(--wy-brand);
     background: rgba(236, 65, 65, 0.06);
   }
 }

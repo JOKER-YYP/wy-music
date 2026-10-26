@@ -125,20 +125,20 @@ watch(letter, load)
 }
 .label {
   font-size: 13px;
-  color: #999;
+  color: var(--wy-text-muted);
   width: 48px;
 }
 .chip {
   border: none;
-  background: #f5f5f5;
-  color: #666;
+  background: var(--wy-surface-muted);
+  color: var(--wy-text-secondary);
   font-size: 13px;
   padding: 5px 14px;
   border-radius: 14px;
   cursor: pointer;
   &.active {
     background: #fdeeee;
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 600;
   }
 }
@@ -148,17 +148,17 @@ watch(letter, load)
   gap: 4px 10px;
   margin-top: 6px;
   padding-top: 10px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--wy-border);
 }
 .letter {
   border: none;
   background: transparent;
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 13px;
   cursor: pointer;
   padding: 2px 4px;
   &.active {
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 700;
   }
 }
@@ -179,7 +179,7 @@ watch(letter, load)
   aspect-ratio: 1;
   margin: 0 auto;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, #ec4141);
+  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
   background-size: cover;
   background-position: center;
   color: #fff;
@@ -194,7 +194,7 @@ watch(letter, load)
   margin-top: 12px;
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--wy-text);
 }
 .count {
   margin-top: 4px;

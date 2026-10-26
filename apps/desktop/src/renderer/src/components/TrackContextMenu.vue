@@ -117,17 +117,17 @@ function emitAction(action: string) {
     padding: 0 12px;
     border-radius: 6px;
     font-size: 13px;
-    color: #333;
+    color: var(--wy-text);
     cursor: pointer;
     .el-icon,
     .ctx-ico {
       font-size: 16px;
-      color: #666;
+      color: var(--wy-text-secondary);
       width: 16px;
       text-align: center;
     }
     &:hover:not(.sep):not(.disabled) {
-      background: #f5f5f5;
+      background: var(--wy-surface-muted);
     }
     &.sep {
       height: 1px;
@@ -141,9 +141,9 @@ function emitAction(action: string) {
       cursor: not-allowed;
     }
     &.danger {
-      color: #ec4141;
+      color: var(--wy-brand);
       .el-icon {
-        color: #ec4141;
+        color: var(--wy-brand);
       }
     }
   }

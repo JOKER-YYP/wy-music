@@ -115,7 +115,7 @@ watch(
 function coverStyle(p: PlaylistDto) {
   const url = mediaUrl(p.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,#ec4141)' }
+  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,var(--wy-brand))' }
 }
 
 function onCreate() {
@@ -196,7 +196,7 @@ async function onSelect(p: PlaylistDto) {
     margin: 0;
     font-size: 16px;
     font-weight: 600;
-    color: #333;
+    color: var(--wy-text);
   }
 }
 .close-btn {
@@ -205,7 +205,7 @@ async function onSelect(p: PlaylistDto) {
   top: 12px;
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   width: 32px;
   height: 32px;
@@ -213,8 +213,8 @@ async function onSelect(p: PlaylistDto) {
   display: grid;
   place-items: center;
   &:hover {
-    background: #f5f5f5;
-    color: #666;
+    background: var(--wy-surface-muted);
+    color: var(--wy-text-secondary);
   }
 }
 .sort-row {
@@ -226,12 +226,12 @@ async function onSelect(p: PlaylistDto) {
 .sort-btn {
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   font-size: 12px;
   cursor: pointer;
   padding: 4px 0;
   &.active {
-    color: #333;
+    color: var(--wy-text);
     font-weight: 600;
   }
 }
@@ -253,15 +253,15 @@ async function onSelect(p: PlaylistDto) {
   cursor: pointer;
   text-align: left;
   &:hover {
-    background: #f5f5f5;
+    background: var(--wy-surface-muted);
   }
 }
 .create-icon {
   width: 48px;
   height: 48px;
   border-radius: 6px;
-  background: #f0f0f0;
-  color: #666;
+  background: var(--wy-border);
+  color: var(--wy-text-secondary);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -282,18 +282,18 @@ async function onSelect(p: PlaylistDto) {
 }
 .item-name {
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .item-count {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .empty {
   text-align: center;
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 13px;
   padding: 40px 0;
 }

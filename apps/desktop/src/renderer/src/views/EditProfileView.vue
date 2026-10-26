@@ -258,7 +258,7 @@ h2 {
   margin: 0 0 28px;
   font-size: 22px;
   font-weight: 600;
-  color: #333;
+  color: var(--wy-text);
 }
 .form-wrap {
   display: flex;
@@ -281,7 +281,7 @@ h2 {
 label {
   width: 48px;
   flex-shrink: 0;
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 14px;
   line-height: 36px;
   text-align: right;
@@ -289,10 +289,10 @@ label {
 .input,
 .select,
 .textarea {
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--wy-border);
   border-radius: 8px;
   background: #f7f7f7;
-  color: #333;
+  color: var(--wy-text);
   font-size: 14px;
   outline: none;
   transition: border-color 0.15s, background 0.15s;
@@ -300,7 +300,7 @@ label {
 .input:focus,
 .select:focus,
 .textarea:focus {
-  border-color: #ec4141;
+  border-color: var(--wy-brand);
   background: #fff;
 }
 .input {
@@ -326,7 +326,7 @@ label {
   right: 10px;
   bottom: 8px;
   font-size: 12px;
-  color: #bbb;
+  color: var(--wy-text-muted);
 }
 .radios {
   display: flex;
@@ -339,12 +339,12 @@ label {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  color: #333;
+  color: var(--wy-text);
   font-size: 14px;
   line-height: 1;
 }
 .radio input {
-  accent-color: #ec4141;
+  accent-color: var(--wy-brand);
   width: 16px;
   height: 16px;
   margin: 0;
@@ -380,7 +380,7 @@ label {
   border: none;
 }
 .btn-save {
-  background: #ec4141;
+  background: var(--wy-brand);
   color: #fff;
 }
 .btn-save:disabled {
@@ -389,12 +389,12 @@ label {
 }
 .btn-cancel {
   background: #fff;
-  color: #333;
+  color: var(--wy-text);
   border: 1px solid #d9d9d9;
 }
 .btn-cancel:hover {
-  border-color: #ec4141;
-  color: #ec4141;
+  border-color: var(--wy-brand);
+  color: var(--wy-brand);
 }
 .right {
   width: 140px;
@@ -413,7 +413,7 @@ label {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: linear-gradient(145deg, #ff8a80, #ec4141);
+  background: linear-gradient(145deg, #ff8a80, var(--wy-brand));
   background-size: cover;
   background-position: center;
   color: #fff;

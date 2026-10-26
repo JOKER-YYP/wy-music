@@ -1,7 +1,6 @@
 <template>
   <div>
     <div class="head">
-      <h2>公共曲库管理</h2>
       <div class="filters">
         <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="onFilter">
           <el-option label="全部" value="" />
@@ -314,9 +313,9 @@ onMounted(load)
 <style scoped>
 .head {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -330,7 +329,7 @@ onMounted(load)
   justify-content: flex-end;
 }
 .meta {
-  color: #888;
+  color: var(--wy-text-muted);
   font-size: 13px;
 }
 </style>

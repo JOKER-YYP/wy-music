@@ -175,7 +175,7 @@ const artistCover = computed(() => {
   const url = mediaUrl(artistSummary.value?.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 })
 
 const matchedPlaylists = computed(() => {
@@ -187,7 +187,7 @@ const matchedPlaylists = computed(() => {
 function plistCover(p: PlaylistDto) {
   const url = mediaUrl(p.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,#ec4141)' }
+  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,var(--wy-brand))' }
 }
 
 function mergeTracks(prev: TrackDto[], next: TrackDto[]) {
@@ -382,11 +382,11 @@ watch(
   background: transparent;
   padding: 10px 2px 12px;
   font-size: 14px;
-  color: #666;
+  color: var(--wy-text-secondary);
   cursor: pointer;
   position: relative;
   &.active {
-    color: #ec4141;
+    color: var(--wy-brand);
     font-weight: 600;
     &::after {
       content: '';
@@ -395,7 +395,7 @@ watch(
       right: 0;
       bottom: 0;
       height: 2px;
-      background: #ec4141;
+      background: var(--wy-brand);
       border-radius: 1px;
     }
   }
@@ -419,13 +419,13 @@ watch(
   gap: 16px;
   padding: 12px;
   border-radius: 10px;
-  background: #fafafa;
+  background: var(--wy-surface-muted);
   margin-bottom: 20px;
   max-width: 420px;
   cursor: pointer;
   transition: background 0.15s;
   &:hover {
-    background: #f0f0f0;
+    background: var(--wy-border);
   }
 }
 .artist-avatar {
@@ -439,12 +439,12 @@ watch(
 .artist-label {
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--wy-text);
 }
 .artist-stats {
   margin-top: 6px;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .plist-row {
   display: grid;
@@ -472,7 +472,7 @@ watch(
 }
 .plist-count {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .load-more {
   display: flex;
@@ -481,7 +481,7 @@ watch(
 }
 .load-more-end {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .source-tips {
   display: flex;
@@ -489,14 +489,14 @@ watch(
   gap: 8px 12px;
   margin: 0 0 12px;
   font-size: 12px;
-  color: #888;
+  color: var(--wy-text-muted);
 }
 .source-tip {
   &.bad {
-    color: #c45656;
+    color: var(--wy-brand-hover);
   }
   &.pending {
-    color: #999;
+    color: var(--wy-text-muted);
   }
 }
 .source-err {

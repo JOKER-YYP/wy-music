@@ -234,18 +234,22 @@ onMounted(async () => {
   display: flex;
   gap: 22px;
   margin-bottom: 18px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--wy-border);
 }
 .subnav-item {
   border: none;
   background: none;
   padding: 10px 2px 12px;
   font-size: 15px;
-  color: #666;
+  color: var(--wy-text-secondary);
   cursor: pointer;
   position: relative;
+  transition: color 0.15s ease;
+  &:hover:not(.active) {
+    color: var(--wy-text);
+  }
   &.active {
-    color: #333;
+    color: var(--wy-text);
     font-weight: 700;
     font-size: 17px;
     &::after {
@@ -256,7 +260,7 @@ onMounted(async () => {
       width: 22px;
       height: 3px;
       border-radius: 2px;
-      background: #ec4141;
+      background: var(--wy-brand);
       transform: translateX(-50%);
     }
   }
@@ -309,10 +313,10 @@ onMounted(async () => {
   }
   .more {
     font-size: 13px;
-    color: #999;
+    color: var(--wy-text-muted);
     cursor: pointer;
     &:hover {
-      color: #ec4141;
+      color: var(--wy-brand);
     }
   }
 }
@@ -324,6 +328,10 @@ onMounted(async () => {
 .playlist-card {
   cursor: pointer;
   min-width: 0;
+  &:hover .cover {
+    box-shadow: 0 8px 20px rgba(16, 16, 24, 0.12);
+    transform: translateY(-2px);
+  }
 }
 .cover {
   position: relative;
@@ -333,6 +341,7 @@ onMounted(async () => {
   background-position: center;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 .play-count {
   position: absolute;
@@ -350,7 +359,7 @@ onMounted(async () => {
   height: 28px;
   border: none;
   border-radius: 50%;
-  background: rgba(236, 65, 65, 0.92);
+  background: var(--wy-brand);
   color: #fff;
   display: grid;
   place-items: center;
@@ -368,7 +377,7 @@ onMounted(async () => {
 .plist-name {
   margin-top: 8px;
   font-size: 13px;
-  color: #333;
+  color: var(--wy-text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;

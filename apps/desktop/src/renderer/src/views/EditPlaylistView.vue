@@ -223,7 +223,7 @@ const selectedTags = ref<string[]>([])
 const coverStyle = computed(() => {
   const url = previewUrl.value || mediaUrl(detail.value?.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ec4141,#ff8a80)' }
+  return { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
 })
 
 function parseTags(raw?: string | null) {
@@ -352,7 +352,7 @@ h2 {
   margin: 0 0 28px;
   font-size: 22px;
   font-weight: 600;
-  color: #333;
+  color: var(--wy-text);
 }
 .form-wrap {
   display: flex;
@@ -372,7 +372,7 @@ h2 {
     flex: 0 0 52px;
     text-align: right;
     font-size: 14px;
-    color: #666;
+    color: var(--wy-text-secondary);
   }
 }
 .field-top {
@@ -394,11 +394,11 @@ h2 {
   border: 1px solid #d9d9d9;
   border-radius: 4px;
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   outline: none;
   box-sizing: border-box;
   &:focus {
-    border-color: #ec4141;
+    border-color: var(--wy-brand);
   }
 }
 .name-count {
@@ -407,7 +407,7 @@ h2 {
   top: 50%;
   transform: translateY(-50%);
   font-size: 12px;
-  color: #bbb;
+  color: var(--wy-text-muted);
 }
 .textarea {
   width: 100%;
@@ -416,14 +416,14 @@ h2 {
   border: 1px solid #d9d9d9;
   border-radius: 4px;
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   outline: none;
   resize: vertical;
   box-sizing: border-box;
   font-family: inherit;
   line-height: 1.5;
   &:focus {
-    border-color: #ec4141;
+    border-color: var(--wy-brand);
   }
 }
 .desc-count {
@@ -431,7 +431,7 @@ h2 {
   right: 10px;
   bottom: 8px;
   font-size: 12px;
-  color: #bbb;
+  color: var(--wy-text-muted);
 }
 .tags-row {
   display: flex;
@@ -448,15 +448,15 @@ h2 {
 }
 .public-tip {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 .tag-chip {
   height: 28px;
   padding: 0 10px;
   border: 1px solid #f0a0a0;
   border-radius: 14px;
-  background: #fff5f5;
-  color: #ec4141;
+  background: var(--wy-brand-soft);
+  color: var(--wy-brand);
   font-size: 12px;
   cursor: pointer;
   display: inline-flex;
@@ -473,21 +473,21 @@ h2 {
   border: 1px solid #d9d9d9;
   border-radius: 4px;
   background: #fff;
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 13px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   &:hover {
-    border-color: #ec4141;
-    color: #ec4141;
+    border-color: var(--wy-brand);
+    color: var(--wy-brand);
   }
 }
 .tag-panel {
   .tag-tip {
     font-size: 12px;
-    color: #999;
+    color: var(--wy-text-muted);
     margin-bottom: 10px;
   }
 }
@@ -503,18 +503,18 @@ h2 {
   padding: 0 10px;
   border: 1px solid #e8e8e8;
   border-radius: 14px;
-  background: #fafafa;
-  color: #666;
+  background: var(--wy-surface-muted);
+  color: var(--wy-text-secondary);
   font-size: 12px;
   cursor: pointer;
   &:hover:not(:disabled) {
-    border-color: #ec4141;
-    color: #ec4141;
+    border-color: var(--wy-brand);
+    color: var(--wy-brand);
   }
   &.on {
-    border-color: #ec4141;
-    background: #fff5f5;
-    color: #ec4141;
+    border-color: var(--wy-brand);
+    background: var(--wy-brand-soft);
+    color: var(--wy-brand);
   }
   &.disabled,
   &:disabled {
@@ -538,7 +538,7 @@ h2 {
   border: none;
 }
 .btn-save {
-  background: #ec4141;
+  background: var(--wy-brand);
   color: #fff;
   &:disabled {
     opacity: 0.6;
@@ -547,11 +547,11 @@ h2 {
 }
 .btn-cancel {
   background: #fff;
-  color: #333;
+  color: var(--wy-text);
   border: 1px solid #d9d9d9;
   &:hover {
-    border-color: #ec4141;
-    color: #ec4141;
+    border-color: var(--wy-brand);
+    color: var(--wy-brand);
   }
 }
 .right {
@@ -578,7 +578,7 @@ h2 {
   height: 100%;
   background-size: cover;
   background-position: center;
-  background-color: #f5f5f5;
+  background-color: var(--wy-surface-muted);
 }
 .cover-mask {
   position: absolute;

@@ -1,15 +1,33 @@
 <template>
   <div class="login">
-    <el-card class="card">
-      <h2>WY Music 管理后台</h2>
-      <el-form @submit.prevent="onSubmit">
+    <el-card class="card" shadow="never">
+      <div class="brand">
+        <span class="mark">WY</span>
+        <div>
+          <h2>WY Music 管理后台</h2>
+          <p class="sub">审核曲库 · 管理用户</p>
+        </div>
+      </div>
+      <el-form class="form" @submit.prevent="onSubmit">
         <el-form-item>
-          <el-input v-model="account" placeholder="管理员账号" />
+          <el-input v-model="account" placeholder="管理员账号" size="large" />
         </el-form-item>
         <el-form-item>
-          <el-input v-model="password" type="password" show-password placeholder="密码" />
+          <el-input
+            v-model="password"
+            type="password"
+            show-password
+            placeholder="密码"
+            size="large"
+          />
         </el-form-item>
-        <el-button type="danger" native-type="submit" :loading="loading" style="width: 100%">
+        <el-button
+          type="danger"
+          native-type="submit"
+          size="large"
+          :loading="loading"
+          class="submit"
+        >
           登录
         </el-button>
       </el-form>
@@ -47,17 +65,56 @@ async function onSubmit() {
   height: 100%;
   display: grid;
   place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(236, 65, 65, 0.12), transparent 55%),
+    var(--wy-bg);
 }
 .card {
-  width: 380px;
+  width: min(400px, 100%);
+  border-radius: 14px;
+  border: 1px solid var(--wy-border);
+  box-shadow: var(--wy-shadow-sm);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--wy-brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 h2 {
-  text-align: center;
-  margin-top: 0;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--wy-text);
+}
+.sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--wy-text-muted);
+}
+.form :deep(.el-form-item) {
+  margin-bottom: 14px;
+}
+.submit {
+  width: 100%;
+  margin-top: 4px;
 }
 .hint {
-  margin-bottom: 0;
-  color: #999;
+  margin: 14px 0 0;
+  color: var(--wy-text-muted);
   font-size: 12px;
   text-align: center;
 }

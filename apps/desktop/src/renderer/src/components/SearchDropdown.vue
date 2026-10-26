@@ -305,13 +305,13 @@ defineExpose({ pushHistory })
 .sec-title {
   font-size: 14px;
   font-weight: 700;
-  color: #333;
+  color: var(--wy-text);
 }
 .icon-plain,
 .play-mini {
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   width: 26px;
   height: 26px;
@@ -320,7 +320,7 @@ defineExpose({ pushHistory })
   place-items: center;
   &:hover {
     background: #f2f2f2;
-    color: #666;
+    color: var(--wy-text-secondary);
   }
 }
 .tags {
@@ -343,7 +343,7 @@ defineExpose({ pushHistory })
   white-space: nowrap;
   &:hover {
     background: #ebebeb;
-    color: #333;
+    color: var(--wy-text);
   }
 }
 .tag-more {
@@ -383,17 +383,17 @@ defineExpose({ pushHistory })
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
-  color: #bbb;
+  color: var(--wy-text-muted);
   text-align: center;
   &.top {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .rank-text {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: #333;
+  color: var(--wy-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -402,7 +402,7 @@ defineExpose({ pushHistory })
   flex-shrink: 0;
   font-size: 10px;
   color: #fff;
-  background: #ec4141;
+  background: var(--wy-brand);
   border-radius: 3px;
   padding: 0 3px;
   line-height: 14px;
@@ -410,7 +410,7 @@ defineExpose({ pushHistory })
 .badge-up {
   flex-shrink: 0;
   font-size: 12px;
-  color: #ec4141;
+  color: var(--wy-brand);
   font-weight: 700;
 }
 .suggest-row {
@@ -426,18 +426,18 @@ defineExpose({ pushHistory })
   cursor: pointer;
   text-align: left;
   &:hover {
-    background: #f5f5f5;
+    background: var(--wy-surface-muted);
   }
 }
 .suggest-icon {
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 14px;
 }
 .suggest-text {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: #333;
+  color: var(--wy-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -450,7 +450,7 @@ defineExpose({ pushHistory })
   border-radius: 4px;
 }
 .tag-hot {
-  color: #ec4141;
+  color: var(--wy-brand);
   background: rgba(236, 65, 65, 0.12);
 }
 .tag-lyric {

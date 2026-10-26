@@ -130,7 +130,7 @@
 
       <div class="col-like">
         <button class="like-btn" type="button" @click.stop="toggleLike(row)">
-          <el-icon :size="16" :color="row.liked ? '#ec4141' : '#bbb'">
+          <el-icon :size="16" :color="row.liked ? 'var(--wy-brand)' : 'var(--wy-text-muted)'">
             <StarFilled v-if="row.liked" />
             <Star v-else />
           </el-icon>
@@ -314,7 +314,7 @@ function coverStyle(t: TrackDto) {
   const u = mediaUrl(t.coverUrl)
   return u
     ? { backgroundImage: `url(${u})` }
-    : { background: 'linear-gradient(135deg,#f3c4c4,#ec4141)' }
+    : { background: 'linear-gradient(135deg,#f3c4c4,var(--wy-brand))' }
 }
 
 function qualityTag(t: TrackDto): string | null {
@@ -555,7 +555,7 @@ async function onMenuAction(action: string) {
   height: 40px;
   border: none;
   border-radius: 50%;
-  background: #ec4141;
+  background: var(--wy-brand);
   color: #fff;
   display: grid;
   place-items: center;
@@ -566,23 +566,26 @@ async function onMenuAction(action: string) {
     cursor: not-allowed;
   }
   &:not(:disabled):hover {
-    background: #e03535;
+    background: var(--wy-brand-hover);
   }
 }
 .batch-btn {
   height: 32px;
   padding: 0 14px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--wy-border-strong);
   border-radius: 16px;
-  background: #fff;
-  color: #333;
+  background: var(--wy-surface);
+  color: var(--wy-text);
   font-size: 13px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   &:hover:not(:disabled) {
-    background: #f5f5f5;
+    background: var(--wy-brand-soft);
+    border-color: rgba(236, 65, 65, 0.35);
+    color: var(--wy-brand);
   }
   &:disabled {
     opacity: 0.45;
@@ -592,13 +595,13 @@ async function onMenuAction(action: string) {
 .batch-done {
   border: none;
   background: transparent;
-  color: #666;
+  color: var(--wy-text-secondary);
   font-size: 14px;
   cursor: pointer;
   padding: 6px 8px;
   flex-shrink: 0;
   &:hover {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .table-head,
@@ -617,12 +620,12 @@ async function onMenuAction(action: string) {
 .table-head {
   height: 36px;
   font-size: 12px;
-  color: #999;
-  border-bottom: 1px solid #f0f0f0;
+  color: var(--wy-text-muted);
+  border-bottom: 1px solid var(--wy-border);
 }
 .col-select-label {
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
 }
 .col-check {
   display: grid;
@@ -630,7 +633,7 @@ async function onMenuAction(action: string) {
   input {
     width: 16px;
     height: 16px;
-    accent-color: #ec4141;
+    accent-color: var(--wy-brand);
     cursor: pointer;
   }
 }
@@ -638,8 +641,9 @@ async function onMenuAction(action: string) {
   height: 56px;
   border-radius: 6px;
   cursor: default;
+  transition: background 0.12s ease;
   &:hover {
-    background: #f5f5f5;
+    background: var(--wy-brand-soft);
     .row-actions {
       display: flex;
     }
@@ -651,13 +655,13 @@ async function onMenuAction(action: string) {
     }
   }
   &.checked {
-    background: #f5f5f5;
+    background: var(--wy-brand-soft-strong);
   }
   &.active .name,
   &.playing .name,
   &.active .artists,
   &.playing .artists {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
 }
 .is-batch .song-row {
@@ -674,7 +678,7 @@ async function onMenuAction(action: string) {
   height: 28px;
   padding: 0;
   cursor: pointer;
-  color: #999;
+  color: var(--wy-text-muted);
   display: grid;
   place-items: center;
 }
@@ -685,7 +689,7 @@ async function onMenuAction(action: string) {
 .play-ico {
   display: none;
   font-size: 16px;
-  color: #666;
+  color: var(--wy-text-secondary);
   line-height: 1;
 }
 .batch-play-ico {
@@ -701,7 +705,7 @@ async function onMenuAction(action: string) {
   i {
     display: block;
     width: 2px;
-    background: #ec4141;
+    background: var(--wy-brand);
     border-radius: 1px;
     animation: eq 0.8s ease-in-out infinite;
     &:nth-child(1) {
@@ -754,7 +758,7 @@ async function onMenuAction(action: string) {
 }
 .name {
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -770,14 +774,14 @@ async function onMenuAction(action: string) {
     border: none;
     border-radius: 50%;
     background: transparent;
-    color: #666;
+    color: var(--wy-text-secondary);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     &:hover {
       background: #ebebeb;
-      color: #333;
+      color: var(--wy-text);
     }
   }
   .disabled-act {
@@ -803,14 +807,14 @@ async function onMenuAction(action: string) {
 }
 .artists {
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .col-album {
   font-size: 13px;
-  color: #666;
+  color: var(--wy-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -834,7 +838,7 @@ async function onMenuAction(action: string) {
 }
 .col-dur {
   font-size: 13px;
-  color: #999;
+  color: var(--wy-text-muted);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }

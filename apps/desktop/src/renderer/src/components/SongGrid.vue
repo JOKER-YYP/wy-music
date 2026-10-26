@@ -37,7 +37,7 @@
           <el-icon><Download /></el-icon>
         </button>
         <button type="button" title="喜欢" @click.stop="onLike(track)">
-          <el-icon :color="track.liked ? '#ec4141' : undefined">
+          <el-icon :color="track.liked ? 'var(--wy-brand)' : undefined">
             <StarFilled v-if="track.liked" />
             <Star v-else />
           </el-icon>
@@ -191,7 +191,7 @@ function coverStyle(t: TrackDto) {
   const u = mediaUrl(t.coverUrl)
   return u
     ? { backgroundImage: `url(${u})` }
-    : { background: 'linear-gradient(135deg,#f3c4c4,#ec4141)' }
+    : { background: 'linear-gradient(135deg,#f3c4c4,var(--wy-brand))' }
 }
 
 function isExternal(t: TrackDto) {
@@ -342,7 +342,7 @@ function closeMenu() {
 }
 
 .song-row:hover {
-  background: #f5f5f5;
+  background: var(--wy-surface-muted);
 }
 
 .cover-btn {
@@ -391,7 +391,7 @@ function closeMenu() {
 .name {
   display: block;
   font-size: 14px;
-  color: #333;
+  color: var(--wy-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -403,11 +403,11 @@ function closeMenu() {
   gap: 6px;
   min-width: 0;
   font-size: 12px;
-  color: #999;
+  color: var(--wy-text-muted);
 }
 
 .heart {
-  color: #ec4141;
+  color: var(--wy-brand);
   font-size: 12px;
   line-height: 1;
   flex-shrink: 0;
@@ -439,7 +439,7 @@ function closeMenu() {
 }
 
 .badge-origin {
-  color: #ec4141;
+  color: var(--wy-brand);
   border: 1px solid rgba(236, 65, 65, 0.45);
   background: rgba(236, 65, 65, 0.06);
 }
@@ -468,7 +468,7 @@ function closeMenu() {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #666;
+  color: var(--wy-text-secondary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -477,7 +477,7 @@ function closeMenu() {
 
 .hover-actions button:hover {
   background: #ebebeb;
-  color: #333;
+  color: var(--wy-text);
 }
 
 .disabled-act {
@@ -509,15 +509,15 @@ function closeMenu() {
   padding: 9px 12px;
   border-radius: 6px;
   font-size: 13px;
-  color: #333;
+  color: var(--wy-text);
   cursor: pointer;
 }
 
 .ctx-menu button:hover {
-  background: #f5f5f5;
+  background: var(--wy-surface-muted);
 }
 
 .ctx-menu button.danger {
-  color: #ec4141;
+  color: var(--wy-brand);
 }
 </style>

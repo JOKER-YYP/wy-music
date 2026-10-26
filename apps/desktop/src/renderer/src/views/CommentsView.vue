@@ -125,7 +125,7 @@ const coverStyle = computed(() => {
   return {
     backgroundImage: url
       ? `url(${url})`
-      : 'linear-gradient(135deg,#ec4141,#ff8a80)',
+      : 'linear-gradient(135deg,var(--wy-brand),#ff8a80)',
   }
 })
 
@@ -307,8 +307,8 @@ watch(sentinel, setupObserver)
   .tag {
     flex-shrink: 0;
     font-size: 12px;
-    color: #ec4141;
-    border: 1px solid #ec4141;
+    color: var(--wy-brand);
+    border: 1px solid var(--wy-brand);
     border-radius: 3px;
     padding: 1px 6px;
   }
@@ -327,7 +327,7 @@ watch(sentinel, setupObserver)
   flex-wrap: wrap;
   gap: 18px;
   font-size: 13px;
-  color: #888;
+  color: var(--wy-text-muted);
 }
 .section-title {
   margin: 0 0 14px;
@@ -336,14 +336,14 @@ watch(sentinel, setupObserver)
   sup {
     margin-left: 4px;
     font-size: 12px;
-    color: #999;
+    color: var(--wy-text-muted);
     font-weight: 500;
   }
 }
 .composer-box {
   border: 1px solid #e8e8e8;
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--wy-surface-muted);
   padding: 12px 14px 10px;
   margin-bottom: 28px;
   textarea {
@@ -355,10 +355,10 @@ watch(sentinel, setupObserver)
     font-size: 14px;
     line-height: 1.5;
     font-family: inherit;
-    color: #333;
+    color: var(--wy-text);
     box-sizing: border-box;
     &::placeholder {
-      color: #bbb;
+      color: var(--wy-text-muted);
     }
   }
 }
@@ -370,19 +370,19 @@ watch(sentinel, setupObserver)
 }
 .limit {
   font-size: 12px;
-  color: #bbb;
+  color: var(--wy-text-muted);
 }
 .hot-title {
   margin: 0 0 12px;
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--wy-text);
 }
 .item {
   display: flex;
   gap: 14px;
   padding: 18px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--wy-border);
 }
 .avatar {
   width: 40px;
@@ -411,7 +411,7 @@ watch(sentinel, setupObserver)
   margin: 8px 0 10px;
   font-size: 14px;
   line-height: 1.6;
-  color: #333;
+  color: var(--wy-text);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -433,7 +433,7 @@ watch(sentinel, setupObserver)
 .op {
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -442,10 +442,10 @@ watch(sentinel, setupObserver)
   padding: 0;
   &:hover,
   &.on {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
   &.danger:hover {
-    color: #ec4141;
+    color: var(--wy-brand);
   }
   .thumb {
     font-size: 13px;
@@ -465,19 +465,19 @@ watch(sentinel, setupObserver)
   input {
     flex: 1;
     height: 32px;
-    border: 1px solid #e5e5e5;
+    border: 1px solid var(--wy-border);
     border-radius: 16px;
     padding: 0 12px;
     outline: none;
     font-size: 13px;
     &:focus {
-      border-color: #ec4141;
+      border-color: var(--wy-brand);
     }
   }
 }
 .more {
   text-align: center;
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 12px;
   padding: 16px;
 }

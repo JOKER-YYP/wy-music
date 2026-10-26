@@ -1,9 +1,9 @@
 <template>
-  <div>
-    <h2>仪表盘</h2>
+  <div class="dash">
+    <p class="lead">曲库与用户运营概览</p>
     <el-row :gutter="16">
-      <el-col :span="4" v-for="item in cards" :key="item.label">
-        <el-card shadow="hover">
+      <el-col :xs="12" :sm="8" :md="4" v-for="item in cards" :key="item.label">
+        <el-card class="stat-card" shadow="never">
           <div class="num">{{ item.value }}</div>
           <div class="label">{{ item.label }}</div>
         </el-card>
@@ -34,13 +34,35 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.dash {
+  max-width: 1100px;
+}
+.lead {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--wy-text-muted);
+}
+.stat-card {
+  margin-bottom: 16px;
+  border-radius: var(--wy-radius-md);
+  border: 1px solid var(--wy-border);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-card:hover {
+  border-color: rgba(236, 65, 65, 0.35);
+  box-shadow: var(--wy-shadow-sm);
+}
 .num {
   font-size: 28px;
   font-weight: 700;
-  color: #ec4141;
+  letter-spacing: -0.02em;
+  color: var(--wy-brand);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
 }
 .label {
-  color: #666;
+  color: var(--wy-text-secondary);
   margin-top: 8px;
+  font-size: 13px;
 }
 </style>

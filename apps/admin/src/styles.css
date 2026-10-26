@@ -1,14 +1,89 @@
 :root {
   --el-color-primary: #ec4141;
+  --wy-brand: #ec4141;
+  --wy-brand-hover: #e03535;
+  --wy-brand-soft: rgba(236, 65, 65, 0.08);
+  --wy-brand-soft-strong: rgba(236, 65, 65, 0.14);
+
+  --wy-bg: #f3f4f7;
+  --wy-surface: #ffffff;
+  --wy-border: #e6e8ee;
+  --wy-text: #1a1a1a;
+  --wy-text-secondary: #5c5c66;
+  --wy-text-muted: #8a8a96;
+  --wy-radius-sm: 6px;
+  --wy-radius-md: 10px;
+  --wy-shadow-sm: 0 1px 2px rgba(16, 16, 24, 0.05), 0 8px 24px rgba(16, 16, 24, 0.04);
+  --wy-focus-ring: 0 0 0 2px #fff, 0 0 0 4px rgba(236, 65, 65, 0.45);
+  --wy-scrollbar: #c8c8d0;
+  --wy-aside-w: 220px;
 }
+
 * {
   box-sizing: border-box;
 }
+
 html,
 body,
 #app {
   margin: 0;
   height: 100%;
-  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: #f5f7fa;
+  font-family:
+    'Segoe UI',
+    'PingFang SC',
+    'Microsoft YaHei',
+    system-ui,
+    sans-serif;
+  background: var(--wy-bg);
+  color: var(--wy-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--wy-brand-soft-strong);
+  color: var(--wy-text);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--wy-focus-ring);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--wy-scrollbar);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.el-button--danger {
+  --el-button-bg-color: var(--wy-brand);
+  --el-button-border-color: var(--wy-brand);
+  --el-button-hover-bg-color: var(--wy-brand-hover);
+  --el-button-hover-border-color: var(--wy-brand-hover);
+}
+
+.el-card {
+  border-radius: var(--wy-radius-md);
+  border-color: var(--wy-border);
+}
+
+.el-table {
+  --el-table-header-bg-color: var(--wy-surface);
+  --el-table-row-hover-bg-color: var(--wy-brand-soft);
+  --el-table-border-color: var(--wy-border);
+}
+
+.el-tabs__item.is-active {
+  color: var(--wy-brand);
+}
+.el-tabs__active-bar {
+  background-color: var(--wy-brand);
+}
+.el-pagination.is-background .el-pager li.is-active {
+  background-color: var(--wy-brand);
 }

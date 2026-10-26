@@ -160,7 +160,7 @@ const coverStyle = computed(() => {
   return {
     backgroundImage: url
       ? `url(${url})`
-      : 'linear-gradient(135deg,#ec4141,#ff8a80)',
+      : 'linear-gradient(135deg,var(--wy-brand),#ff8a80)',
   }
 })
 
@@ -321,7 +321,7 @@ onUnmounted(() => {
 .title {
   font-size: 13px;
   font-weight: 600;
-  color: #333;
+  color: var(--wy-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -330,7 +330,7 @@ onUnmounted(() => {
 .artists {
   margin-top: 2px;
   font-size: 11px;
-  color: #999;
+  color: var(--wy-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -365,7 +365,7 @@ onUnmounted(() => {
   text-align: center;
   padding: 8px 6px;
   border-radius: 10px;
-  background: #fafafa;
+  background: var(--wy-surface-muted);
   -webkit-app-region: no-drag;
   overscroll-behavior: contain;
 }
@@ -375,7 +375,7 @@ onUnmounted(() => {
   min-height: 120px;
   display: grid;
   place-items: center;
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 13px;
 }
 
@@ -386,10 +386,10 @@ onUnmounted(() => {
   color: #aaa;
   transition: color 0.2s, font-size 0.2s, transform 0.2s;
   &.near {
-    color: #888;
+    color: var(--wy-text-muted);
   }
   &.active {
-    color: #ec4141;
+    color: var(--wy-brand);
     font-size: 15px;
     font-weight: 700;
   }
@@ -400,7 +400,7 @@ onUnmounted(() => {
   height: 26px;
   border: none;
   background: transparent;
-  color: #666;
+  color: var(--wy-text-secondary);
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -412,12 +412,12 @@ onUnmounted(() => {
   }
   &:hover {
     background: #f3f3f3;
-    color: #333;
+    color: var(--wy-text);
   }
   &.play {
     width: 30px;
     height: 30px;
-    background: #ec4141;
+    background: var(--wy-brand);
     color: #fff;
     .iconfont {
       font-size: 18px;
@@ -440,17 +440,17 @@ onUnmounted(() => {
   -webkit-app-region: no-drag;
   background: linear-gradient(
     to right,
-    #ec4141 0%,
-    #ec4141 var(--pct, 0%),
-    #e5e5e5 var(--pct, 0%),
-    #e5e5e5 100%
+    var(--wy-brand) 0%,
+    var(--wy-brand) var(--pct, 0%),
+    var(--wy-border) var(--pct, 0%),
+    var(--wy-border) 100%
   );
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #ec4141;
+    background: var(--wy-brand);
     border: none;
   }
   &:disabled {
@@ -474,14 +474,14 @@ onUnmounted(() => {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #bbb;
+  color: var(--wy-text-muted);
   cursor: pointer;
   display: grid;
   place-items: center;
   padding: 0;
   &:hover {
-    background: #f0f0f0;
-    color: #666;
+    background: var(--wy-border);
+    color: var(--wy-text-secondary);
   }
 }
 </style>

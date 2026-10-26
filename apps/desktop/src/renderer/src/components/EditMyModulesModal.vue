@@ -202,28 +202,28 @@ function onDrop(zone: Zone, index: number) {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #999;
+  color: var(--wy-text-muted);
   cursor: pointer;
   display: grid;
   place-items: center;
 }
 .close:hover {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--wy-surface-muted);
+  color: var(--wy-text-secondary);
 }
 
 .title {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  color: #333;
+  color: var(--wy-text);
   text-align: center;
 }
 
 .hint {
   margin: 10px 0 18px;
   font-size: 13px;
-  color: #999;
+  color: var(--wy-text-muted);
   text-align: center;
 }
 
@@ -256,12 +256,12 @@ function onDrop(zone: Zone, index: number) {
   flex: 1;
   min-width: 0;
   font-size: 15px;
-  color: #333;
+  color: var(--wy-text);
 }
 
 .fixed-tag {
   font-size: 12px;
-  color: #bbb;
+  color: var(--wy-text-muted);
   padding-right: 6px;
 }
 
@@ -287,7 +287,7 @@ function onDrop(zone: Zone, index: number) {
   height: 44px;
   border: 1px dashed #ddd;
   border-radius: 8px;
-  color: #bbb;
+  color: var(--wy-text-muted);
   font-size: 13px;
   display: grid;
   place-items: center;
@@ -300,13 +300,13 @@ function onDrop(zone: Zone, index: number) {
   height: 40px;
   border: none;
   border-radius: 20px;
-  background: #ec4141;
+  background: var(--wy-brand);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
 .done:hover {
-  background: #e03535;
+  background: var(--wy-brand-hover);
 }
 </style>

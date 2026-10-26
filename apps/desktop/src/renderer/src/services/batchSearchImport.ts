@@ -19,6 +19,8 @@ export type BatchSearchHit = {
   queryArtist: string
   track: TrackDto
   score: number
+  /** 歌名与歌手均与清单一致（规范化后） */
+  exactMatch: boolean
 }
 
 export type BatchQueryProgress = {
@@ -127,6 +129,47 @@ function compactArtist(s: string): string {
     .replace(/\s+/g, '')
     .replace(/[\/、,&＆|｜]/g, '/')
     .trim()
+}
+
+function compactName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[（(【\[].*?[）)\]】]/g, '')
+    .trim()
+}
+
+/** 歌名完全一致（忽略空白/常见括号后缀） */
+function isNameExact(queryName: string, trackName: string): boolean {
+  const q = compactName(queryName)
+  const t = compactName(trackName)
+  if (!q || !t) return false
+  return q === t
+}
+
+/**
+ * 歌手完全一致：清单歌手与曲目歌手（或组合）规范化后相等。
+ * 清单未填歌手时，不视为完全匹配。
+ */
+function isArtistExact(queryArtist: string, trackArtists: string[]): boolean {
+  const q = compactArtist(queryArtist)
+  if (!q) return false
+  const arts = (trackArtists || []).map(compactArtist).filter(Boolean)
+  if (!arts.length) return false
+  const joined = arts.join('/')
+  if (arts.some((a) => a === q) || joined === q) return true
+  // 多歌手：拆分后集合一致（顺序无关）
+  const qParts = [...new Set(q.split('/').filter(Boolean))].sort()
+  const aParts = [...new Set(arts)].sort()
+  if (qParts.length > 1 && qParts.length === aParts.length && qParts.every((p, i) => p === aParts[i])) {
+    return true
+  }
+  return false
+}
+
+/** 歌名 + 歌手均为完全匹配 */
+export function isExactMatch(track: TrackDto, name: string, artist: string): boolean {
+  return isNameExact(name, track.name || '') && isArtistExact(artist, track.artists || [])
 }
 
 function artistMatchScore(queryArtist: string, trackArtists: string[]): number {
@@ -271,6 +314,7 @@ export async function runBatchExternalSearch(
           queryArtist: q.artist,
           track: item.track,
           score: item.score,
+          exactMatch: isExactMatch(item.track, q.name, q.artist),
         }))
         hits.push(...chunk)
         if (chunk.length) opts?.onHits?.(chunk)

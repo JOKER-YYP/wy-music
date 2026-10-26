@@ -73,6 +73,13 @@ a {
   box-shadow: var(--wy-focus-ring);
 }
 
+/* Native fields use their own border / parent focus styles — avoid double red ring */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  box-shadow: none;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

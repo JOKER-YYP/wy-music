@@ -272,13 +272,14 @@ async function onRegister() {
   display: flex;
   align-items: center;
   height: 42px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid var(--wy-border);
   border-radius: 8px;
   padding: 0 10px;
   background: var(--wy-surface-muted);
+  transition: border-color 0.15s ease, background 0.15s ease;
   &:focus-within {
     border-color: var(--wy-brand);
-    background: #fff;
+    background: var(--wy-surface);
   }
   input {
     flex: 1;
@@ -287,6 +288,13 @@ async function onRegister() {
     background: transparent;
     font-size: 14px;
     min-width: 0;
+    color: var(--wy-text);
+    box-shadow: none;
+    &:focus,
+    &:focus-visible {
+      outline: none;
+      box-shadow: none;
+    }
   }
 }
 .field-icon {

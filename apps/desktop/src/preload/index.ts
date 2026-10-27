@@ -121,6 +121,21 @@ const wyAPI = {
   fetchFormJson: (url: string, form: Record<string, string | number>) =>
     ipcRenderer.invoke('net:fetchFormJson', url, form) as Promise<unknown>,
 
+  /** 下歌吧下载依赖的夸克网盘登录态 */
+  quarkHasLogin: () => ipcRenderer.invoke('quark:hasLogin') as Promise<boolean>,
+  quarkOpenLogin: () => ipcRenderer.invoke('quark:openLogin') as Promise<boolean>,
+  quarkEnsureLogin: () => ipcRenderer.invoke('quark:ensureLogin') as Promise<boolean>,
+  quarkLogout: () => ipcRenderer.invoke('quark:logout') as Promise<boolean>,
+  quarkResolveShare: (shareUrl: string) =>
+    ipcRenderer.invoke('quark:resolveShare', shareUrl) as Promise<{ url: string; fileName: string }>,
+  quarkDownloadFile: (payload: { url: string; destPath: string }) =>
+    ipcRenderer.invoke('quark:downloadFile', payload) as Promise<{ ok: boolean; path: string }>,
+  onQuarkLoginChanged: (handler: (ok: boolean) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, ok: boolean) => handler(Boolean(ok))
+    ipcRenderer.on('quark:loginChanged', listener)
+    return () => ipcRenderer.removeListener('quark:loginChanged', listener)
+  },
+
   // 桌面小组件
   toggleMiniPlayer: () =>
     ipcRenderer.invoke('mini:toggle') as Promise<{ open: boolean }>,

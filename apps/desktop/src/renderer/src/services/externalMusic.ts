@@ -58,6 +58,10 @@ export type MusicDetailResult = {
   artists?: string[]
   album?: string | null
   link?: string | null
+  /** 网盘原始文件名（下歌吧/夸克） */
+  fileName?: string | null
+  /** 需用夸克会话下载直链 */
+  viaQuark?: boolean
 }
 
 function toTrack(hit: ExtHit): TrackDto {
@@ -402,6 +406,107 @@ async function searchKw(kw: string, page: number, limit: number): Promise<ExtHit
     }))
 }
 
+const LIUMINGYE_API = 'https://so.liumingye.cn'
+
+/** 下歌吧：so.liumingye.cn —— 搜索有结果，播放/下载走夸克/百度网盘 */
+async function searchLiumingye(kw: string, page: number): Promise<ExtHit[]> {
+  const url =
+    `${LIUMINGYE_API}/api/music/search?q=${encodeURIComponent(kw)}` +
+    `&page=${encodeURIComponent(String(Math.max(1, page)))}`
+  const json = await fetchJson<{
+    data?: {
+      id?: string
+      title?: string
+      artist?: string
+      album?: string
+      cover?: string
+      quality?: string[]
+    }[]
+  }>(url)
+  const rows = Array.isArray(json?.data) ? json.data : []
+  return rows
+    .filter((it) => it.id && it.title)
+    .map((it) => {
+      const qualities = Array.isArray(it.quality) ? it.quality.map(String) : []
+      const hasQuark = qualities.some((q) => /夸克/.test(q))
+      return {
+        source: 'liumingye' as const,
+        externalId: String(it.id),
+        name: String(it.title),
+        artists: [String(it.artist || '').trim() || '未知歌手'],
+        album: it.album || null,
+        coverUrl: it.cover || null,
+        // 无夸克链接时标百度，下载时会明确报错
+        payTag: qualities.length ? qualities.join(' / ') : hasQuark ? null : '仅百度网盘',
+      }
+    })
+}
+
+function pickLiumingyeQuarkShare(
+  downloads: { url?: string; quality?: string }[],
+): { url: string; quality: string } | null {
+  const list = downloads.filter((d) => d.url && /pan\.quark\.cn\/s\//i.test(String(d.url)))
+  if (!list.length) return null
+  const score = (q: string) => {
+    if (/夸克MP3/i.test(q)) return 40
+    if (/夸克FLAC/i.test(q)) return 30
+    if (/夸克WAV/i.test(q)) return 20
+    if (/夸克/i.test(q)) return 10
+    return 0
+  }
+  list.sort((a, b) => score(String(b.quality || '')) - score(String(a.quality || '')))
+  return { url: String(list[0].url), quality: String(list[0].quality || '夸克') }
+}
+
+async function detailLiumingye(externalId: string): Promise<MusicDetailResult> {
+  const url = `${LIUMINGYE_API}/api/music/${encodeURIComponent(externalId)}`
+  const j = await fetchJson<{
+    id?: string
+    title?: string
+    artist?: string
+    album?: string
+    cover?: string
+    lyrics?: string
+    playUrl?: string
+    downloads?: { url?: string; quality?: string }[]
+  }>(url)
+  const playUrl = String(j.playUrl || '').trim()
+  if (playUrl) {
+    return {
+      musicUrl: playUrl,
+      coverUrl: j.cover || null,
+      lyricText: normalizeXmLyric(j.lyrics),
+      name: j.title || undefined,
+      artists: j.artist ? [String(j.artist)] : undefined,
+      album: j.album || null,
+    }
+  }
+  const picked = pickLiumingyeQuarkShare(j.downloads || [])
+  if (!picked) {
+    const hasBaidu = (j.downloads || []).some((d) => /pan\.baidu\.com/i.test(String(d.url || '')))
+    throw new Error(
+      hasBaidu
+        ? '该资源仅有百度网盘链接，暂不支持自动下载（请换夸克音质或其它源）'
+        : '下歌吧未返回可下载的夸克分享链接',
+    )
+  }
+  if (!window.wyAPI?.quarkResolveShare) {
+    throw new Error('请在桌面端下载下歌吧资源')
+  }
+  const resolved = await window.wyAPI.quarkResolveShare(picked.url)
+  return {
+    musicUrl: resolved.url,
+    coverUrl: j.cover || null,
+    lyricText: normalizeXmLyric(j.lyrics),
+    name: j.title || undefined,
+    artists: j.artist ? [String(j.artist)] : undefined,
+    album: j.album || null,
+    fileName: resolved.fileName,
+    viaQuark: true,
+    link: picked.url,
+  }
+}
+
 export type ParallelSearchResult = {
   list: TrackDto[]
   sources: SourceSearchStat[]
@@ -479,6 +584,7 @@ export async function parallelExternalSearch(opts: {
     vkeys: searchVkeys(kw, page, pageSize),
     tang: searchTang(kw, cumulative),
     kw: searchKw(kw, page, pageSize),
+    liumingye: searchLiumingye(kw, page),
     netease: searchXm('netease', kw, page, pageSize),
     qq: searchXm('qq', kw, page, pageSize),
     kugou: searchXm('kugou', kw, page, pageSize),
@@ -552,6 +658,10 @@ export async function resolveExternalDetail(
 ): Promise<MusicDetailResult> {
   if (isXmMusicSource(source)) {
     return detailXm(source, externalId)
+  }
+
+  if (source === 'liumingye') {
+    return detailLiumingye(externalId)
   }
 
   if (source === 'migu') {

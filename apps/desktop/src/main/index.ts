@@ -21,6 +21,14 @@ import http from 'http'
 import FormData from 'form-data'
 import axios from 'axios'
 import { decodeLyricBytes, resolveTrackMeta } from '@wy-music/shared'
+import {
+  downloadWithQuarkSession,
+  ensureQuarkLogin,
+  hasQuarkLogin,
+  logoutQuark,
+  openQuarkLoginWindow,
+  resolveQuarkShareDownload,
+} from './quarkPan'
 
 /** 外部音乐源域名：允许忽略过期证书（如酷我 kw-api） */
 const MUSIC_API_HOSTS = new Set([
@@ -34,6 +42,8 @@ const MUSIC_API_HOSTS = new Set([
   'api.cenguigui.cn',
   'www.xm95522.com',
   'xm95522.com',
+  'so.liumingye.cn',
+  's3.liumingye.cn',
 ])
 
 function fetchMusicApiText(
@@ -1390,6 +1400,25 @@ app.whenReady().then(() => {
       } catch {
         throw new Error(`外部接口非 JSON：${body.slice(0, 60)}`)
       }
+    },
+  )
+
+  /** 下歌吧 / 夸克网盘：登录态与分享直链 */
+  ipcMain.handle('quark:hasLogin', () => hasQuarkLogin())
+  ipcMain.handle('quark:openLogin', () => openQuarkLoginWindow(mainWindow))
+  ipcMain.handle('quark:ensureLogin', () => ensureQuarkLogin(mainWindow))
+  ipcMain.handle('quark:logout', () => logoutQuark())
+  ipcMain.handle('quark:resolveShare', async (_e, shareUrl: string) => {
+    return resolveQuarkShareDownload(String(shareUrl || ''), mainWindow)
+  })
+  ipcMain.handle(
+    'quark:downloadFile',
+    async (_e, payload: { url: string; destPath: string }) => {
+      const url = String(payload?.url || '').trim()
+      const destPath = String(payload?.destPath || '').trim()
+      if (!url || !destPath) throw new Error('缺少下载参数')
+      await downloadWithQuarkSession(url, destPath)
+      return { ok: true as const, path: destPath }
     },
   )
 

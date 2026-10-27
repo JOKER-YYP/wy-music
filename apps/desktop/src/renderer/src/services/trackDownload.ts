@@ -70,6 +70,8 @@ export async function chooseLocalSavePath(track: TrackDto): Promise<string | nul
 async function resolveDownloadSource(track: TrackDto): Promise<{
   url: string
   lyricText?: string | null
+  viaQuark?: boolean
+  fileName?: string | null
 }> {
   if (isExternalTrack(track)) {
     const parsed =
@@ -83,6 +85,8 @@ async function resolveDownloadSource(track: TrackDto): Promise<{
     return {
       url: detail.musicUrl,
       lyricText: detail.lyricText,
+      viaQuark: detail.viaQuark,
+      fileName: detail.fileName,
     }
   }
   if (!localStorage.getItem('accessToken')) {
@@ -94,6 +98,24 @@ async function resolveDownloadSource(track: TrackDto): Promise<{
   }
 }
 
+function extFromFileName(name?: string | null) {
+  const m = String(name || '')
+    .toLowerCase()
+    .match(/\.(mp3|flac|wav|m4a|aac)$/)
+  return m ? `.${m[1]}` : null
+}
+
+/** 若目标扩展名与网盘文件不一致，按实际扩展名改写路径 */
+function alignDestExt(destPath: string, preferredExt: string | null) {
+  if (!preferredExt) return destPath
+  const cur = destPath.match(/\.[^.\\/]+$/)?.[0]?.toLowerCase()
+  if (cur === preferredExt) return destPath
+  if (/\.(mp3|flac|wav|m4a|aac)$/i.test(destPath)) {
+    return destPath.replace(/\.[^.\\/]+$/, preferredExt)
+  }
+  return `${destPath}${preferredExt}`
+}
+
 /** 下载到已选定的本机路径 */
 export async function downloadTrackToPath(
   track: TrackDto,
@@ -103,18 +125,29 @@ export async function downloadTrackToPath(
     throw new Error('请在桌面端使用自定义下载')
   }
   const source = await resolveDownloadSource(track)
-  await window.wyAPI.downloadFile({ url: source.url, destPath })
+  const preferredExt =
+    extFromFileName(source.fileName) || guessExtFromUrl(source.url)
+  const finalPath = alignDestExt(destPath, preferredExt)
+
+  if (source.viaQuark) {
+    if (!window.wyAPI.quarkDownloadFile) {
+      throw new Error('请在桌面端下载下歌吧资源')
+    }
+    await window.wyAPI.quarkDownloadFile({ url: source.url, destPath: finalPath })
+  } else {
+    await window.wyAPI.downloadFile({ url: source.url, destPath: finalPath })
+  }
 
   const lyric = String(source.lyricText || '').trim()
   if (lyric && window.wyAPI.writeTextFile) {
-    const lrcPath = destPath.replace(/\.[^.]+$/, '') + '.lrc'
+    const lrcPath = finalPath.replace(/\.[^.]+$/, '') + '.lrc'
     try {
       await window.wyAPI.writeTextFile({ path: lrcPath, text: lyric })
     } catch {
       /* 歌词失败不阻断 */
     }
   }
-  return destPath
+  return finalPath
 }
 
 /** 自定义路径：先选位置，再下载（供调用方控制 loading） */
@@ -128,6 +161,9 @@ export async function downloadTrackToLocalFile(track: TrackDto): Promise<string 
 export async function downloadTrackToLibrary(track: TrackDto) {
   if (!isExternalTrack(track)) {
     throw new Error('曲库歌曲请使用自定义路径下载到本地')
+  }
+  if (track.source === 'liumingye') {
+    throw new Error('下歌吧资源依赖夸克网盘，请使用「下载到文件夹」')
   }
   if (!localStorage.getItem('accessToken')) {
     throw new Error('请先登录')
@@ -196,6 +232,7 @@ function failItem(track: TrackDto, error: unknown): BatchDownloadFailItem {
     name: track.name || '未命名',
     artists: (track.artists || []).filter(Boolean).join(' / ') || '—',
     error: msg.slice(0, 200),
+    source: track.source && track.source !== 'local' ? String(track.source) : undefined,
   }
 }
 
@@ -211,6 +248,9 @@ export async function downloadTracksToLibrary(
     onProgress?.(i, total, track.name)
     try {
       if (!isExternalTrack(track)) throw new Error('非外部曲目')
+      if (track.source === 'liumingye') {
+        throw new Error('下歌吧资源依赖夸克网盘，请改用「下载到文件夹」')
+      }
       await importExternalToLibrary(track)
       ok += 1
     } catch (e) {

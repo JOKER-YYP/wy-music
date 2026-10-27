@@ -5,6 +5,7 @@ import { detailVkeys, searchVkeys } from './vkeys.js'
 import { detailTang, searchTang } from './tang.js'
 import { detailKw, searchKw } from './kw.js'
 import { detailXm, searchXm } from './xm.js'
+import { detailLiumingye, searchLiumingye } from './liumingye.js'
 import { toSearchTrackDto, type MusicDetail, type MusicSearchHit } from './types.js'
 
 export type SourceSearchStat = {
@@ -35,6 +36,7 @@ const searchFns: Record<
   vkeys: (kw, num) => searchVkeys(kw, num, 1),
   tang: searchTang,
   kw: searchKw,
+  liumingye: searchLiumingye,
   netease: xmSearch('netease'),
   qq: xmSearch('qq'),
   kugou: xmSearch('kugou'),
@@ -55,6 +57,7 @@ const detailFns: Record<MusicSource, (id: string) => Promise<MusicDetail>> = {
   vkeys: detailVkeys,
   tang: detailTang,
   kw: detailKw,
+  liumingye: detailLiumingye,
   netease: xmDetail('netease'),
   qq: xmDetail('qq'),
   kugou: xmDetail('kugou'),

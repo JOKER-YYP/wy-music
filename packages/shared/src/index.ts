@@ -48,12 +48,15 @@ export type MusicSource =
   | '5singyc'
   | '5singfc'
   | 'kg'
+  /** 下歌吧 so.liumingye.cn（网盘直链，桌面端需夸克登录） */
+  | 'liumingye'
 
 export const MUSIC_SOURCES: MusicSource[] = [
   'migu',
   'vkeys',
   'tang',
   'kw',
+  'liumingye',
   'netease',
   'qq',
   'kugou',
@@ -74,6 +77,7 @@ export const MUSIC_SOURCE_LABEL: Record<MusicSource, string> = {
   vkeys: '源2',
   tang: '源3',
   kw: '源4',
+  liumingye: '下歌吧',
   netease: '网易',
   qq: 'QQ',
   kugou: '酷狗',

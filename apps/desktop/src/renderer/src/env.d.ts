@@ -93,6 +93,16 @@ declare global {
         url: string,
         form: Record<string, string | number>,
       ) => Promise<unknown>
+      quarkHasLogin?: () => Promise<boolean>
+      quarkOpenLogin?: () => Promise<boolean>
+      quarkEnsureLogin?: () => Promise<boolean>
+      quarkLogout?: () => Promise<boolean>
+      quarkResolveShare?: (shareUrl: string) => Promise<{ url: string; fileName: string }>
+      quarkDownloadFile?: (payload: {
+        url: string
+        destPath: string
+      }) => Promise<{ ok: boolean; path: string }>
+      onQuarkLoginChanged?: (handler: (ok: boolean) => void) => () => void
       toggleMiniPlayer?: () => Promise<{ open: boolean }>
       closeMiniPlayer?: () => Promise<boolean>
       isMiniPlayerOpen?: () => Promise<boolean>

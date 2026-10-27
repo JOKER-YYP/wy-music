@@ -62,6 +62,29 @@
           <el-icon :size="14"><Document /></el-icon>
           <span>批量搜歌</span>
         </button>
+        <button
+          type="button"
+          class="quark-login-btn"
+          :class="{ logged: quarkLoggedIn }"
+          :title="
+            quarkLoggedIn
+              ? '已登录，点击可退出夸克网盘'
+              : '登录夸克网盘（可用 App 扫码）'
+          "
+          :disabled="quarkLoginLoading"
+          @click="onQuarkLoginClick"
+        >
+          <span class="quark-dot" />
+          <span>
+            {{
+              quarkLoginLoading
+                ? '处理中…'
+                : quarkLoggedIn
+                  ? '退出夸克'
+                  : '登录夸克'
+            }}
+          </span>
+        </button>
       </div>
 
       <div class="topbar-right">
@@ -334,9 +357,14 @@ onMounted(() => {
   myModules.restore()
   user.restore()
   void refreshMaximized()
+  void refreshQuarkLogin()
   unsubMaximized = window.wyAPI?.onWindowMaximized?.((v) => {
     isMaximized.value = v
   }) || null
+  unsubQuarkLogin =
+    window.wyAPI?.onQuarkLoginChanged?.((ok) => {
+      quarkLoggedIn.value = ok
+    }) || null
   if (!user.accessToken) {
     ui.openLogin('login')
   } else {
@@ -351,6 +379,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   unsubMaximized?.()
   unsubMaximized = null
+  unsubQuarkLogin?.()
+  unsubQuarkLogin = null
   document.removeEventListener('mousedown', onDocPointerDown)
   window.removeEventListener('resize', updateSearchPanelPos)
 })
@@ -489,6 +519,72 @@ function goBatchSearch() {
   router.push('/batch-search')
 }
 
+const quarkLoggedIn = ref(false)
+const quarkLoginLoading = ref(false)
+let unsubQuarkLogin: (() => void) | null = null
+
+async function refreshQuarkLogin() {
+  if (!window.wyAPI?.quarkHasLogin) {
+    quarkLoggedIn.value = false
+    return
+  }
+  try {
+    quarkLoggedIn.value = await window.wyAPI.quarkHasLogin()
+  } catch {
+    quarkLoggedIn.value = false
+  }
+}
+
+async function onQuarkLoginClick() {
+  if (quarkLoggedIn.value) {
+    await onQuarkLogout()
+    return
+  }
+  if (!window.wyAPI?.quarkOpenLogin) {
+    ElMessage.warning('请在桌面端登录夸克网盘')
+    return
+  }
+  quarkLoginLoading.value = true
+  try {
+    const ok = await window.wyAPI.quarkOpenLogin()
+    quarkLoggedIn.value = ok
+    if (ok) ElMessage.success('夸克网盘已登录')
+    else ElMessage.warning('未检测到登录，请扫码或账号登录后等待窗口自动关闭')
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '打开夸克登录失败')
+  } finally {
+    quarkLoginLoading.value = false
+    await refreshQuarkLogin()
+  }
+}
+
+async function onQuarkLogout() {
+  if (!window.wyAPI?.quarkLogout) {
+    ElMessage.warning('请在桌面端退出夸克网盘')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('退出后下载下歌吧资源需重新登录，确定退出？', '退出夸克网盘', {
+      confirmButtonText: '退出',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  quarkLoginLoading.value = true
+  try {
+    await window.wyAPI.quarkLogout()
+    quarkLoggedIn.value = false
+    ElMessage.success('已退出夸克网盘')
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '退出失败')
+  } finally {
+    quarkLoginLoading.value = false
+    await refreshQuarkLogin()
+  }
+}
+
 function onSuggestSearch(q: string) {
   keyword.value = q
   closeSearchPanel()
@@ -618,7 +714,8 @@ function onLogout() {
 .topbar-left .brand,
 .topbar-left .hist-nav,
 .topbar-left .search-anchor,
-.topbar-left .batch-search-btn {
+.topbar-left .batch-search-btn,
+.topbar-left .quark-login-btn {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
@@ -764,6 +861,43 @@ function onLogout() {
   &:hover {
     background: rgba(0, 0, 0, 0.22);
     color: #fff;
+  }
+}
+.quark-login-btn {
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 15px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  line-height: 1;
+  &:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.2);
+    color: #fff;
+  }
+  &:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+  &.logged {
+    border-color: rgba(103, 194, 58, 0.55);
+    background: rgba(103, 194, 58, 0.22);
+  }
+  .quark-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.45);
+    flex-shrink: 0;
+  }
+  &.logged .quark-dot {
+    background: #67c23a;
   }
 }
 .search-wrap {

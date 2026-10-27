@@ -4,7 +4,7 @@
       <div>
         <h1>批量搜歌</h1>
         <p class="sub">
-          完全匹配：歌名须完全一致（含括号内容）且歌手一致。无完全匹配时可在下方列表展开挑选其它源
+          歌名（含括号）与歌手都一致才算完全匹配；其余结果可在下方展开挑选其它源
         </p>
       </div>
       <div class="head-actions">
@@ -55,7 +55,7 @@
         </label>
       </div>
       <p class="mode-hint">
-        完全匹配要求歌名（含括号）与歌手都一致。「每首歌一首」优先有词，再按点选来源顺序跨源兜底。无完全匹配可在下方展开挑选。
+        「每首歌一首」优先有词，再按点选来源顺序跨源兜底；点选序号即优先级
       </p>
       <div class="source-tags">
         <button
@@ -126,7 +126,7 @@
 
     <div v-if="unmatchedQueries.length" class="fail-panel unmatched-panel">
       <div class="fail-head">
-        <span>未完全匹配 {{ unmatchedQueries.length }} 首（歌名或歌手不一致 / 无结果）</span>
+        <span>未完全匹配 {{ unmatchedQueries.length }} 首</span>
         <div class="fail-actions">
           <el-button
             size="small"
@@ -1040,7 +1040,7 @@ async function onBatchDownload() {
 
 <style scoped lang="scss">
 .batch-page {
-  padding: 8px 4px 24px;
+  padding: 4px 2px 20px;
   min-height: 100%;
 }
 .page-head {
@@ -1048,18 +1048,21 @@ async function onBatchDownload() {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   h1 {
     margin: 0;
     font-size: 22px;
     font-weight: 700;
-    color: #222;
+    color: var(--wy-text);
+    letter-spacing: 0.2px;
   }
 }
 .sub {
   margin: 6px 0 0;
   font-size: 13px;
+  line-height: 1.45;
   color: var(--wy-text-muted);
+  max-width: 52ch;
 }
 .head-actions {
   display: flex;
@@ -1073,28 +1076,45 @@ async function onBatchDownload() {
 .progress-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 16px;
-  margin-bottom: 14px;
-  border-radius: 10px;
+  gap: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: var(--wy-radius-md);
   background: var(--wy-brand-soft);
-  border: 1px solid rgba(236, 65, 65, 0.15);
+  border: 1px solid rgba(236, 65, 65, 0.16);
+  box-shadow: var(--wy-shadow-sm);
   .el-progress {
     flex: 1;
+    min-width: 120px;
   }
 }
 .progress-text {
   font-size: 13px;
   color: var(--wy-text-secondary);
-  min-width: 180px;
+  min-width: 160px;
+  flex-shrink: 0;
 }
 .summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 2px;
   font-size: 13px;
   color: var(--wy-text-secondary);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: var(--wy-radius-sm);
+  background: var(--wy-surface-muted);
+  border: 1px solid var(--wy-border);
+  span {
+    white-space: nowrap;
+  }
 }
 .source-panel {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  padding: 12px 12px 10px;
+  border-radius: var(--wy-radius-md);
+  background: var(--wy-surface);
+  border: 1px solid var(--wy-border);
 }
 .select-mode {
   display: flex;
@@ -1105,7 +1125,8 @@ async function onBatchDownload() {
 }
 .mode-label {
   font-size: 12px;
-  color: var(--wy-text-muted);
+  font-weight: 600;
+  color: var(--wy-text-secondary);
   flex-shrink: 0;
 }
 .exact-check {
@@ -1124,36 +1145,40 @@ async function onBatchDownload() {
   input {
     accent-color: var(--wy-brand);
   }
+  &:focus-within {
+    outline: none;
+  }
 }
 .mode-hint {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--wy-text-muted);
-}
-.unmatched-panel {
-  border-color: rgba(236, 65, 65, 0.28);
 }
 .fail-actions {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .alt-ok {
   font-size: 12px;
-  color: #2f7d4a;
+  font-weight: 600;
+  color: var(--wy-brand);
+  font-variant-numeric: tabular-nums;
 }
 .alt-no {
   font-size: 12px;
   color: var(--wy-text-muted);
 }
 .alt-empty {
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 12px;
   color: var(--wy-text-muted);
 }
 .alt-list {
-  padding: 4px 8px 10px 36px;
+  padding: 6px 10px 12px 28px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1161,29 +1186,34 @@ async function onBatchDownload() {
 .alt-list-tip {
   font-size: 12px;
   color: var(--wy-text-muted);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .alt-row {
   display: grid;
-  grid-template-columns: 18px minmax(120px, 1.4fr) minmax(80px, 1fr) 72px auto;
+  grid-template-columns: 18px minmax(100px, 1.5fr) minmax(72px, 1fr) 68px auto;
   gap: 8px;
   align-items: center;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 7px 10px;
+  border-radius: var(--wy-radius-sm);
   font-size: 12px;
   color: var(--wy-text);
   cursor: pointer;
   background: var(--wy-surface);
-  border: 1px solid transparent;
+  border: 1px solid var(--wy-border);
+  transition: background 0.12s ease, border-color 0.12s ease;
   input {
     accent-color: var(--wy-brand);
   }
   &:hover {
     background: var(--wy-brand-soft);
+    border-color: rgba(236, 65, 65, 0.28);
   }
   &.on {
-    border-color: rgba(236, 65, 65, 0.28);
-    background: var(--wy-brand-soft);
+    border-color: rgba(236, 65, 65, 0.4);
+    background: var(--wy-brand-soft-strong);
+  }
+  &:focus-within {
+    box-shadow: var(--wy-focus-ring);
   }
 }
 .alt-title {
@@ -1208,6 +1238,7 @@ async function onBatchDownload() {
 .unmatched-table {
   :deep(.el-table__expanded-cell) {
     background: var(--wy-surface-muted);
+    padding: 0 !important;
   }
 }
 .match-tag {
@@ -1222,14 +1253,16 @@ async function onBatchDownload() {
   &.exact {
     color: var(--wy-brand);
     background: var(--wy-brand-soft);
+    font-weight: 600;
   }
   &.partial {
     color: var(--wy-text-muted);
     background: var(--wy-surface-muted);
   }
   &.lyric {
-    color: #2f7d4a;
-    background: rgba(47, 125, 74, 0.1);
+    color: var(--wy-brand);
+    background: var(--wy-brand-soft);
+    font-weight: 600;
   }
 }
 .source-tags {
@@ -1239,7 +1272,7 @@ async function onBatchDownload() {
 }
 .source-tag {
   border: 1px solid var(--wy-border);
-  background: var(--wy-surface);
+  background: var(--wy-surface-muted);
   color: var(--wy-text-secondary);
   font-size: 12px;
   line-height: 1;
@@ -1260,7 +1293,7 @@ async function onBatchDownload() {
     border-radius: 7px;
     font-size: 10px;
     font-weight: 700;
-    background: rgba(236, 65, 65, 0.15);
+    background: var(--wy-brand-soft-strong);
     color: var(--wy-brand);
   }
   &:hover:not(:disabled) {
@@ -1268,19 +1301,23 @@ async function onBatchDownload() {
     color: var(--wy-brand);
     background: var(--wy-brand-soft);
   }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
+  }
   &.active {
     border-color: var(--wy-brand);
     background: var(--wy-brand);
     color: var(--wy-text-on-brand);
     .prio {
       background: rgba(255, 255, 255, 0.25);
-      color: #fff;
+      color: var(--wy-text-on-brand);
     }
   }
   &.selected:not(.active) {
-    border-color: rgba(236, 65, 65, 0.35);
+    border-color: rgba(236, 65, 65, 0.4);
     background: var(--wy-brand-soft);
     color: var(--wy-brand);
+    font-weight: 600;
   }
   &:disabled {
     opacity: 0.55;
@@ -1291,7 +1328,7 @@ async function onBatchDownload() {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 .dl-tip {
@@ -1300,22 +1337,33 @@ async function onBatchDownload() {
 }
 .fail-panel {
   margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 12px;
+  border-radius: var(--wy-radius-md);
   background: var(--wy-brand-soft);
   border: 1px solid rgba(236, 65, 65, 0.2);
 }
+.unmatched-panel {
+  background: var(--wy-surface-muted);
+  border: 1px solid var(--wy-border);
+  .fail-head {
+    color: var(--wy-text);
+  }
+}
 .fail-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 10px;
   font-size: 13px;
   font-weight: 600;
   color: var(--wy-brand-hover);
+  line-height: 1.35;
 }
 .fail-table {
   width: 100%;
+  border-radius: var(--wy-radius-sm);
+  overflow: hidden;
   :deep(.el-table__cell) {
     color: var(--wy-text-secondary);
   }

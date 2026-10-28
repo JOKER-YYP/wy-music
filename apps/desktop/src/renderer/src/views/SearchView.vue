@@ -2,6 +2,8 @@
   <div v-loading="loading" class="search-page">
     <h1 class="keyword">{{ keyword || '搜索' }}</h1>
 
+    <SearchSourcePicker v-model="enabledSources" class="source-picker-block" />
+
     <div class="tabs">
       <button
         v-for="t in tabs"
@@ -106,16 +108,20 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { VideoPlay } from '@element-plus/icons-vue'
 import type { MusicSource, PlaylistDto, TrackDto } from '@wy-music/shared'
-import { MUSIC_SOURCES, MUSIC_SOURCE_LABEL } from '@wy-music/shared'
+import { MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import { http, mediaUrl } from '../services/http'
 import { parallelExternalSearch, type SourceSearchStat } from '../services/externalMusic'
+import { loadSearchSources, saveSearchSources } from '../services/searchSources'
 import { usePlayerStore } from '../stores/player'
 import { usePlaylistStore } from '../stores/playlist'
 import { useUserStore } from '../stores/user'
 import SongGrid from '../components/SongGrid.vue'
+import SearchSourcePicker from '../components/SearchSourcePicker.vue'
 
 /** 与皮卡丘站默认一致：每源每次 20 首 */
 const PAGE_SIZE = 20
+
+const enabledSources = ref<MusicSource[]>(loadSearchSources())
 
 const route = useRoute()
 const router = useRouter()
@@ -221,7 +227,7 @@ async function fetchLocal(nextPage: number) {
 }
 
 function initPendingSourceStats(): SourceSearchStat[] {
-  return MUSIC_SOURCES.map((source) => ({
+  return enabledSources.value.map((source) => ({
     source,
     ok: true,
     count: 0,
@@ -289,6 +295,7 @@ async function fetchPage(nextPage: number, append: boolean) {
       pageSize: PAGE_SIZE,
       page: nextPage,
       cumulativeLimit,
+      sources: [...enabledSources.value],
       onSource: (chunk) => {
         if (token !== seq) return
         patchSourceStat({
@@ -358,6 +365,20 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  enabledSources,
+  (list) => {
+    saveSearchSources(list)
+    if (!keyword.value) return
+    tracks.value = []
+    page.value = 1
+    hasMore.value = false
+    sourceStats.value = []
+    void fetchPage(1, false)
+  },
+  { deep: true },
+)
 </script>
 
 <style scoped lang="scss">
@@ -369,6 +390,12 @@ watch(
   font-size: 28px;
   font-weight: 700;
   color: #222;
+}
+.source-picker-block {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--wy-surface-muted);
 }
 .tabs {
   display: flex;

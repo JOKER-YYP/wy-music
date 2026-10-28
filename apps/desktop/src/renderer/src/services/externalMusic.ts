@@ -558,6 +558,30 @@ function sliceHitsForPage(
  * - 传入 onSource 时：谁先完成谁先回调，便于渐进渲染
  * - 单源超时（默认 15s）后记为失败，不影响其它源
  */
+function searchBySource(
+  source: MusicSource,
+  kw: string,
+  page: number,
+  pageSize: number,
+  cumulative: number,
+): Promise<ExtHit[]> {
+  switch (source) {
+    case 'migu':
+      return searchMigu(kw, cumulative)
+    case 'vkeys':
+      return searchVkeys(kw, page, pageSize)
+    case 'tang':
+      return searchTang(kw, cumulative)
+    case 'kw':
+      return searchKw(kw, page, pageSize)
+    case 'liumingye':
+      return searchLiumingye(kw, page)
+    default:
+      if (isXmMusicSource(source)) return searchXm(source, kw, page, pageSize)
+      return Promise.resolve([])
+  }
+}
+
 export async function parallelExternalSearch(opts: {
   keyword: string
   /** 每源本次数（migu/qq 为累计 limit；vkeys/kw 为每页条数） */
@@ -568,6 +592,8 @@ export async function parallelExternalSearch(opts: {
   cumulativeLimit?: number
   /** 单源超时毫秒，默认 15000 */
   timeoutMs?: number
+  /** 要搜的源；默认全部 */
+  sources?: MusicSource[]
   /** 单个源完成后的回调（先到先回调） */
   onSource?: (chunk: SourceSearchChunk) => void
 }): Promise<ParallelSearchResult> {
@@ -578,35 +604,24 @@ export async function parallelExternalSearch(opts: {
   const page = Math.max(1, opts.page || 1)
   const cumulative = Math.max(pageSize, opts.cumulativeLimit || pageSize)
   const timeoutMs = opts.timeoutMs ?? 15_000
-
-  const tasks: Record<MusicSource, Promise<ExtHit[]>> = {
-    migu: searchMigu(kw, cumulative),
-    vkeys: searchVkeys(kw, page, pageSize),
-    tang: searchTang(kw, cumulative),
-    kw: searchKw(kw, page, pageSize),
-    liumingye: searchLiumingye(kw, page),
-    netease: searchXm('netease', kw, page, pageSize),
-    qq: searchXm('qq', kw, page, pageSize),
-    kugou: searchXm('kugou', kw, page, pageSize),
-    kuwo: searchXm('kuwo', kw, page, pageSize),
-    baidu: searchXm('baidu', kw, page, pageSize),
-    '1ting': searchXm('1ting', kw, page, pageSize),
-    xm_migu: searchXm('xm_migu', kw, page, pageSize),
-    lizhi: searchXm('lizhi', kw, page, pageSize),
-    qingting: searchXm('qingting', kw, page, pageSize),
-    ximalaya: searchXm('ximalaya', kw, page, pageSize),
-    '5singyc': searchXm('5singyc', kw, page, pageSize),
-    '5singfc': searchXm('5singfc', kw, page, pageSize),
-    kg: searchXm('kg', kw, page, pageSize),
-  }
+  const activeSources = (
+    opts.sources?.length
+      ? MUSIC_SOURCES.filter((s) => opts.sources!.includes(s))
+      : [...MUSIC_SOURCES]
+  ) as MusicSource[]
+  if (!activeSources.length) return { list: [], sources: [], hasMore: false }
 
   const sources: SourceSearchStat[] = []
   const list: TrackDto[] = []
 
   await Promise.all(
-    MUSIC_SOURCES.map(async (source) => {
+    activeSources.map(async (source) => {
       try {
-        const raw = await withTimeout(tasks[source], timeoutMs, source)
+        const raw = await withTimeout(
+          searchBySource(source, kw, page, pageSize, cumulative),
+          timeoutMs,
+          source,
+        )
         const { pageHits, hasMore } = sliceHitsForPage(source, raw, page, pageSize, cumulative)
         const tracks = pageHits.map(toTrack)
         sources.push({ source, ok: true, count: tracks.length, hasMore, pending: false })
@@ -620,16 +635,17 @@ export async function parallelExternalSearch(opts: {
     }),
   )
 
-  // 保持与 MUSIC_SOURCES 顺序一致，便于 UI 展示
-  const ordered = MUSIC_SOURCES.map(
-    (s) => sources.find((x) => x.source === s) || {
-      source: s,
-      ok: false,
-      count: 0,
-      hasMore: false,
-      error: '未知错误',
-      pending: false,
-    },
+  // 保持与勾选源顺序一致（对齐 MUSIC_SOURCES）
+  const ordered = activeSources.map(
+    (s) =>
+      sources.find((x) => x.source === s) || {
+        source: s,
+        ok: false,
+        count: 0,
+        hasMore: false,
+        error: '未知错误',
+        pending: false,
+      },
   )
 
   return { list, sources: ordered, hasMore: ordered.some((s) => s.hasMore) }

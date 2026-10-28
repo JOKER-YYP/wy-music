@@ -22,6 +22,12 @@
       </div>
     </div>
 
+    <SearchSourcePicker
+      v-model="enabledSources"
+      class="source-picker-block"
+      :disabled="searching || downloading"
+    />
+
     <div v-if="searching" class="progress-card">
       <div class="progress-text">
         正在搜索 {{ progress.done }}/{{ progress.total }}
@@ -360,6 +366,8 @@ import {
   pickBatchDownloadMode,
   type BatchDownloadFailItem,
 } from '../services/trackDownload'
+import { loadSearchSources, saveSearchSources } from '../services/searchSources'
+import SearchSourcePicker from '../components/SearchSourcePicker.vue'
 import { usePlayerStore } from '../stores/player'
 import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
@@ -367,6 +375,15 @@ import { useUserStore } from '../stores/user'
 const player = usePlayerStore()
 const user = useUserStore()
 const ui = useUiStore()
+
+const enabledSources = ref<MusicSource[]>(loadSearchSources())
+watch(
+  enabledSources,
+  (list) => {
+    saveSearchSources(list)
+  },
+  { deep: true },
+)
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const tableRef = ref<{
@@ -979,6 +996,7 @@ async function onFilePicked(ev: Event) {
     const list = await runBatchExternalSearch(rows, {
       perSource: 3,
       pageSize: 20,
+      sources: [...enabledSources.value],
       onProgress: (p) => {
         progress.value = { ...p }
       },
@@ -1091,6 +1109,12 @@ async function onBatchDownload() {
 .batch-page {
   padding: 4px 2px 20px;
   min-height: 100%;
+}
+.source-picker-block {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--wy-surface-muted);
 }
 .page-head {
   display: flex;

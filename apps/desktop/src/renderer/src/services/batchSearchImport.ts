@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import type { TrackDto } from '@wy-music/shared'
+import type { MusicSource, TrackDto } from '@wy-music/shared'
 import { MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import { parallelExternalSearch } from './externalMusic'
 
@@ -268,6 +268,8 @@ export async function runBatchExternalSearch(
     /** 每个源保留条数，默认 2 */
     perSource?: number
     pageSize?: number
+    /** 要搜的源；默认全部 */
+    sources?: MusicSource[]
     onProgress?: (p: BatchQueryProgress) => void
     /** 每完成一条清单查询回调一批结果（便于渐进渲染，避免最后一次性塞上万行） */
     onHits?: (chunk: BatchSearchHit[]) => void
@@ -301,6 +303,7 @@ export async function runBatchExternalSearch(
           pageSize,
           cumulativeLimit: pageSize,
           timeoutMs: 15_000,
+          sources: opts?.sources,
         })
 
         // 按源分组，各源取匹配度最高的 perSource 首

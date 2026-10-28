@@ -166,7 +166,56 @@ let mainWindowCollapsed = false
 let taskbarToggleLock = false
 /** 最近一次由任务栏主动切换的时间 */
 let lastTaskbarToggleAt = 0
-const TASKBAR_TOGGLE_LOCK_MS = 450
+const TASKBAR_TOGGLE_LOCK_MS = 600
+/**
+ * 最近一次「用户点击任务栏」激活预览窗的时间（WM 钩子，作辅助信号）
+ * 注意：点任务栏按钮时钩子经常收不到，主判定用 isCursorOnTaskbar()
+ */
+let lastTaskbarClickActivateAt = 0
+const TASKBAR_CLICK_ACTIVATE_MS = 1200
+const WM_ACTIVATE = 0x0006
+const WA_CLICKACTIVE = 2
+const WM_MOUSEACTIVATE = 0x0021
+
+function wasRecentTaskbarClick(ms = TASKBAR_CLICK_ACTIVATE_MS) {
+  return Date.now() - lastTaskbarClickActivateAt < ms
+}
+
+function markTaskbarUserClick() {
+  lastTaskbarClickActivateAt = Date.now()
+}
+
+/** 光标是否在任务栏区域（屏幕工作区外的条带）——点任务栏图标时几乎必在 */
+function isCursorOnTaskbar() {
+  try {
+    const point = screen.getCursorScreenPoint()
+    for (const display of screen.getAllDisplays()) {
+      const { bounds, workArea } = display
+      if (
+        point.x < bounds.x ||
+        point.x >= bounds.x + bounds.width ||
+        point.y < bounds.y ||
+        point.y >= bounds.y + bounds.height
+      ) {
+        continue
+      }
+      const inWork =
+        point.x >= workArea.x &&
+        point.x < workArea.x + workArea.width &&
+        point.y >= workArea.y &&
+        point.y < workArea.y + workArea.height
+      if (!inWork) return true
+    }
+  } catch {
+    /* ignore */
+  }
+  return false
+}
+
+/** 是否像用户点任务栏（光标在任务栏 或 近期钩子命中） */
+function isLikelyTaskbarUserAction() {
+  return isCursorOnTaskbar() || wasRecentTaskbarClick()
+}
 
 const DESKTOP_LYRIC_H = 100
 const DESKTOP_LYRIC_MENU_W = 300
@@ -201,34 +250,92 @@ async function coverToDataUrl(coverUrl?: string | null) {
   }
 }
 
+/** 避免 setBounds 触发的 moved 再次调整 */
+let taskbarPreviewPinning = false
+/** 任务栏「关闭窗口」时允许销毁预览窗 */
+let taskbarPreviewAllowClose = false
+
+/**
+ * 预览窗放主屏右侧外侧（勿放工作区内，否则会闪白块）。
+ * 显示前先把透明度设为 0，避免 Windows 拉回可视区时露馅。
+ */
 function placeTaskbarPreviewWindow(win: BrowserWindow) {
   const displays = screen.getAllDisplays()
   const primary = screen.getPrimaryDisplay()
   const size = TASKBAR_PREVIEW_SIZE
+  const b = primary.bounds
 
   const overlapsAny = (x: number, y: number) =>
     displays.some((d) => {
-      const b = d.bounds
-      return x < b.x + b.width && x + size > b.x && y < b.y + b.height && y + size > b.y
+      const db = d.bounds
+      return x < db.x + db.width && x + size > db.x && y < db.y + db.height && y + size > db.y
     })
 
-  // 优先放主屏左侧外侧；若多屏占用该区域，改放到所有屏下方外侧
-  // 预览窗仅供任务栏「鼠标悬停」缩略图，必须始终在屏外，避免点击时被 Windows 拉回桌面
-  let x = primary.bounds.x - size - 80
-  let y = primary.bounds.y + Math.max(0, Math.floor((primary.bounds.height - size) / 2))
+  // 贴边外侧，方便 DWM 抓缩略图；比甩到很远更稳
+  let x = b.x + b.width + 16
+  let y = b.y + Math.max(0, Math.floor((b.height - size) / 2))
   if (overlapsAny(x, y)) {
-    const maxBottom = Math.max(...displays.map((d) => d.bounds.y + d.bounds.height))
-    x = primary.bounds.x + Math.max(0, Math.floor((primary.bounds.width - size) / 2))
-    y = maxBottom + 80
+    x = b.x + Math.max(0, Math.floor((b.width - size) / 2))
+    y = b.y + b.height + 16
+    if (overlapsAny(x, y)) {
+      const maxBottom = Math.max(...displays.map((d) => d.bounds.y + d.bounds.height))
+      y = maxBottom + 16
+    }
   }
-  win.setBounds({ x, y, width: size, height: size })
+
+  const apply = () => {
+    try {
+      win.setOpacity(0)
+      win.setBounds({ x, y, width: size, height: size })
+      win.setIgnoreMouseEvents(true, { forward: true })
+      win.setOpacity(0)
+    } catch {
+      /* ignore */
+    }
+  }
+  if (taskbarPreviewPinning) {
+    apply()
+    return
+  }
+  taskbarPreviewPinning = true
+  try {
+    apply()
+  } finally {
+    setTimeout(() => {
+      taskbarPreviewPinning = false
+    }, 80)
+  }
 }
 
-/** 强制预览窗留在屏外（点击任务栏时 Windows 可能把窗体拽回可见区） */
 function keepTaskbarPreviewOffscreen(win?: BrowserWindow | null) {
   const w = win || taskbarPreviewWindow
   if (!w || w.isDestroyed()) return
   placeTaskbarPreviewWindow(w)
+}
+
+/** 悬停缩略图：先透明 → 就位屏外 → showInactive（避免左上角闪白块） */
+function ensureTaskbarPreviewAlive(win?: BrowserWindow | null) {
+  const w = win || taskbarPreviewWindow
+  if (!w || w.isDestroyed()) return
+  try {
+    w.setOpacity(0)
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (w.isMinimized()) w.restore()
+  } catch {
+    /* ignore */
+  }
+  keepTaskbarPreviewOffscreen(w)
+  try {
+    w.setOpacity(0)
+    w.showInactive()
+    w.setOpacity(0)
+  } catch {
+    /* ignore */
+  }
+  keepTaskbarPreviewOffscreen(w)
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -546,10 +653,22 @@ function createWindow() {
 
   win.on('closed', () => {
     mainWindow = null
+    taskbarPreviewAllowClose = true
     if (taskbarPreviewWindow && !taskbarPreviewWindow.isDestroyed()) {
-      taskbarPreviewWindow.destroy()
+      try {
+        taskbarPreviewWindow.destroy()
+      } catch {
+        /* ignore */
+      }
       taskbarPreviewWindow = null
     }
+    if (miniWindow && !miniWindow.isDestroyed()) {
+      miniWindow.close()
+    }
+    if (desktopLyricWindow && !desktopLyricWindow.isDestroyed()) {
+      desktopLyricWindow.close()
+    }
+    closeDesktopLyricMenu()
   })
 
   const emitMaximized = () => {
@@ -574,17 +693,6 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
-  })
-
-  win.on('closed', () => {
-    mainWindow = null
-    if (miniWindow && !miniWindow.isDestroyed()) {
-      miniWindow.close()
-    }
-    if (desktopLyricWindow && !desktopLyricWindow.isDestroyed()) {
-      desktopLyricWindow.close()
-    }
-    closeDesktopLyricMenu()
   })
 
   loadRenderer(win)
@@ -742,7 +850,7 @@ function guessMime(ext: string) {
   }
 }
 
-function resolveAppIcon() {
+function resolveAppIconPath() {
   const candidates = [
     join(__dirname, '../../resources/icon.ico'),
     join(__dirname, '../../resources/icon.png'),
@@ -752,9 +860,16 @@ function resolveAppIcon() {
   for (const p of candidates) {
     if (!existsSync(p)) continue
     const img = nativeImage.createFromPath(p)
-    if (!img.isEmpty()) return img
+    if (!img.isEmpty()) return p
   }
   return undefined
+}
+
+function resolveAppIcon() {
+  const p = resolveAppIconPath()
+  if (!p) return undefined
+  const img = nativeImage.createFromPath(p)
+  return img.isEmpty() ? undefined : img
 }
 
 const thumbarIconCache = new Map<string, Electron.NativeImage>()
@@ -981,8 +1096,8 @@ function focusMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore()
   if (!mainWindow.isVisible()) mainWindow.show()
   mainWindow.focus()
-  // 主窗前置后，确保封面预览窗仍在屏外（仅悬停缩略图用）
-  keepTaskbarPreviewOffscreen()
+  // 主窗前置后，确保封面预览窗仍可用于悬停缩略图
+  ensureTaskbarPreviewAlive()
   return true
 }
 
@@ -990,7 +1105,7 @@ function collapseMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return false
   mainWindowCollapsed = true
   mainWindow.hide()
-  keepTaskbarPreviewOffscreen()
+  ensureTaskbarPreviewAlive()
   return true
 }
 
@@ -1017,10 +1132,20 @@ function toggleMainFromTaskbar() {
   return true
 }
 
-function isOurWindowFocused() {
-  const focused = BrowserWindow.getFocusedWindow()
-  if (!focused || focused.isDestroyed()) return false
-  return focused === mainWindow || focused === taskbarPreviewWindow
+/**
+ * 预览窗 focus/minimize 合并入口（同一次点击常两个事件都来，只处理一次）
+ * - 主窗已收起：仅在「像点了任务栏」时展开，避免其它窗口收纳误弹
+ * - 主窗已打开：允许收起（第二次点任务栏），不再强求光标判定
+ * 收起后主窗 hide 可能再次触发预览窗 focus，靠 lock 挡住，避免马上又被打开
+ */
+function onTaskbarPreviewActivate() {
+  if (thumbarClickGuard || taskbarToggleLock) return
+  if (Date.now() - lastTaskbarToggleAt < TASKBAR_TOGGLE_LOCK_MS) return
+  if (isMainWindowCollapsed()) {
+    if (!isLikelyTaskbarUserAction()) return
+  }
+  toggleMainFromTaskbar()
+  ensureTaskbarPreviewAlive()
 }
 
 function playerTitle(state: typeof lastPlayerState) {
@@ -1084,6 +1209,7 @@ function applyTaskbarPlayerState(state: typeof lastPlayerState) {
   if (process.platform !== 'win32') return
   const win = taskbarPreviewWindow
   if (!win || win.isDestroyed()) return
+  ensureTaskbarPreviewAlive(win)
   win.setTitle(title)
   updateThumbarButtons(state)
   const coverKey = `${Boolean(state?.hasTrack)}|${absolutizeMediaUrl(state?.coverUrl)}`
@@ -1115,7 +1241,9 @@ function createTaskbarPreviewWindow() {
     focusable: true,
     title: 'WY Music',
     icon: appIcon,
-    backgroundColor: '#1a1a1a',
+    // 透明底：万一被系统短暂拉回屏幕也不闪白块
+    transparent: true,
+    backgroundColor: '#00000000',
     hasShadow: false,
     paintWhenInitiallyHidden: true,
     webPreferences: {
@@ -1129,8 +1257,23 @@ function createTaskbarPreviewWindow() {
     },
   })
   taskbarPreviewWindow = win
+  taskbarPreviewAllowClose = false
+  try {
+    win.setOpacity(0)
+  } catch {
+    /* ignore */
+  }
   keepTaskbarPreviewOffscreen(win)
   win.setMenuBarVisibility(false)
+  try {
+    win.setAppDetails({
+      appId: 'com.wy-music.desktop',
+      appIconPath: resolveAppIconPath(),
+      relaunchDisplayName: 'WY Music',
+    })
+  } catch {
+    /* ignore */
+  }
 
   const htmlCandidates = [
     join(__dirname, '../../resources/taskbar-preview.html'),
@@ -1149,16 +1292,14 @@ function createTaskbarPreviewWindow() {
 
   const reveal = () => {
     if (win.isDestroyed()) return
-    // 只用 showInactive，避免预览窗抢焦点弹出到桌面
-    keepTaskbarPreviewOffscreen(win)
-    win.showInactive()
-    keepTaskbarPreviewOffscreen(win)
+    ensureTaskbarPreviewAlive(win)
     lastThumbarKey = ''
     lastSentPreviewCover = ''
     updateThumbarButtons(lastPlayerState, true)
     if (lastPlayerState) void paintTaskbarCover(lastPlayerState)
     setTimeout(() => updateThumbarButtons(lastPlayerState, true), 500)
     setTimeout(() => updateThumbarButtons(lastPlayerState, true), 1500)
+    setTimeout(() => ensureTaskbarPreviewAlive(win), 800)
   }
 
   win.webContents.once('did-finish-load', reveal)
@@ -1166,45 +1307,68 @@ function createTaskbarPreviewWindow() {
     if (!win.isDestroyed() && !win.isVisible()) reveal()
   })
 
-  // 任何可能导致预览窗出现在桌面的事件，都立刻推回屏外
-  const pinOffscreen = () => keepTaskbarPreviewOffscreen(win)
-  win.on('show', pinOffscreen)
-  win.on('restore', pinOffscreen)
-  win.on('moved', pinOffscreen)
-  win.on('resize', pinOffscreen)
+  const pinInvisible = () => {
+    if (taskbarPreviewPinning) return
+    keepTaskbarPreviewOffscreen(win)
+  }
+  win.on('show', pinInvisible)
+  win.on('restore', () => ensureTaskbarPreviewAlive(win))
+  win.on('moved', pinInvisible)
+  win.on('resize', pinInvisible)
 
-  // 单击任务栏（预览窗获得焦点）→ 立即切换主窗，无需再点第二次
+  try {
+    win.hookWindowMessage(WM_ACTIVATE, (wParam) => {
+      try {
+        const value = Buffer.isBuffer(wParam)
+          ? wParam.length >= 4
+            ? wParam.readUInt32LE(0)
+            : wParam.readUInt16LE(0)
+          : Number(wParam)
+        if ((value & 0xffff) === WA_CLICKACTIVE) markTaskbarUserClick()
+      } catch {
+        /* ignore */
+      }
+    })
+    win.hookWindowMessage(WM_MOUSEACTIVATE, () => {
+      markTaskbarUserClick()
+    })
+  } catch (e) {
+    console.warn('[taskbar] hookWindowMessage failed', e)
+  }
+
   win.on('focus', () => {
-    keepTaskbarPreviewOffscreen(win)
-    if (thumbarClickGuard || taskbarToggleLock) return
-    // 刚切换过则忽略连发 focus
-    if (Date.now() - lastTaskbarToggleAt < TASKBAR_TOGGLE_LOCK_MS) return
-    toggleMainFromTaskbar()
-    keepTaskbarPreviewOffscreen(win)
+    ensureTaskbarPreviewAlive(win)
+    setTimeout(() => {
+      if (win.isDestroyed()) return
+      onTaskbarPreviewActivate()
+      ensureTaskbarPreviewAlive(win)
+    }, 30)
   })
 
-  // 预览窗已是前台时再点任务栏会走 minimize，而不是 focus
-  // 注意：切到其他应用时 Windows 也可能 minimize 我们 —— 此时绝不能把主窗拉起来
   win.on('minimize', () => {
-    win.restore()
-    keepTaskbarPreviewOffscreen(win)
-    if (thumbarClickGuard || taskbarToggleLock) return
-    if (Date.now() - lastTaskbarToggleAt < TASKBAR_TOGGLE_LOCK_MS) return
-
-    // 等前台窗口切换完成：若焦点已不在本应用，说明是点了别的应用，忽略
+    ensureTaskbarPreviewAlive(win)
     setTimeout(() => {
-      keepTaskbarPreviewOffscreen(win)
-      if (thumbarClickGuard || taskbarToggleLock) return
-      if (!isOurWindowFocused()) return
-      toggleMainFromTaskbar()
-      keepTaskbarPreviewOffscreen(win)
+      if (win.isDestroyed()) return
+      onTaskbarPreviewActivate()
+      ensureTaskbarPreviewAlive(win)
     }, 40)
   })
 
+  // 任务栏右键「关闭窗口」作用在预览窗上：转到关闭主窗/退出
   win.on('close', (e) => {
+    if (taskbarPreviewAllowClose) return
+    e.preventDefault()
     if (mainWindow && !mainWindow.isDestroyed()) {
-      e.preventDefault()
+      mainWindowCollapsed = false
+      try {
+        if (!mainWindow.isVisible()) mainWindow.show()
+      } catch {
+        /* ignore */
+      }
+      mainWindow.close()
+      return
     }
+    app.quit()
   })
 
   win.on('closed', () => {

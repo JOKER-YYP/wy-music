@@ -225,14 +225,48 @@
           <el-button size="small" text type="danger" @click="failList = []">关闭</el-button>
         </div>
       </div>
-      <el-table :data="failList" size="small" max-height="220" class="fail-table">
+      <el-table
+        :data="failList"
+        size="small"
+        max-height="420"
+        row-key="trackId"
+        class="fail-table unmatched-table"
+      >
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div v-if="!failHasAlt(row)" class="alt-empty">无其它源候选</div>
+            <div v-else class="alt-list">
+              <div class="alt-list-tip">展开挑选其它源（可多选）；已排除本次失败的源，优先参考有词候选</div>
+              <label
+                v-for="h in altsForFail(row)"
+                :key="h.rowKey"
+                class="alt-row"
+                :class="{ on: selectedKeySet.has(h.rowKey) }"
+              >
+                <input
+                  type="checkbox"
+                  :checked="selectedKeySet.has(h.rowKey)"
+                  :disabled="downloading"
+                  @change="onAltCheck(h, ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="alt-title" :title="h.track.name">{{ h.track.name }}</span>
+                <span class="alt-meta">
+                  {{ (h.track.artists || []).filter(Boolean).join(' / ') || '—' }}
+                </span>
+                <span class="alt-src">{{ sourceLabel(h.track) || '—' }}</span>
+                <span v-if="trackHasLyric(h.track)" class="match-tag lyric">有词</span>
+                <span v-else class="alt-no-lyric">无词</span>
+              </label>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="歌曲" min-width="140" show-overflow-tooltip prop="name" />
         <el-table-column label="歌手" min-width="100" show-overflow-tooltip prop="artists" />
-        <el-table-column label="失败原因" min-width="180" show-overflow-tooltip prop="error" />
-        <el-table-column label="换源" width="88">
+        <el-table-column label="失败原因" min-width="160" show-overflow-tooltip prop="error" />
+        <el-table-column label="候选" width="72">
           <template #default="{ row }">
-            <span v-if="failHasAlt(row)" class="alt-ok">可换</span>
-            <span v-else class="alt-no">无其它源</span>
+            <span v-if="failAltCount(row)" class="alt-ok">{{ failAltCount(row) }}</span>
+            <span v-else class="alt-no">0</span>
           </template>
         </el-table-column>
       </el-table>
@@ -535,20 +569,35 @@ function pickBestAlt(
   return best
 }
 
-function failHasAlt(row: BatchDownloadFailItem): boolean {
-  const qi =
-    row.queryIndex ??
-    hits.value.find((h) => h.track.id === row.trackId)?.queryIndex
-  if (qi == null) return false
-  const excludeTrackIds = new Set([row.trackId])
-  const excludeSources = row.source ? new Set([row.source]) : undefined
-  return Boolean(pickBestAlt(qi, { excludeTrackIds, excludeSources }))
-}
-
 function resolveFailQueryIndex(row: BatchDownloadFailItem): number | null {
   if (row.queryIndex != null) return row.queryIndex
   const hit = hits.value.find((h) => h.track.id === row.trackId)
   return hit?.queryIndex ?? null
+}
+
+/** 下载失败行的可换源候选（排除失败曲目与失败源） */
+function altsForFail(row: BatchDownloadFailItem): BatchSearchHit[] {
+  const qi = resolveFailQueryIndex(row)
+  if (qi == null) return []
+  const excludeSource = row.source ? String(row.source) : ''
+  return hits.value
+    .filter((h) => h.queryIndex === qi)
+    .filter((h) => h.track.id !== row.trackId)
+    .filter((h) => !excludeSource || String(h.track.source || '') !== excludeSource)
+    .slice()
+    .sort((a, b) => {
+      if (isBetterHit(a, b)) return -1
+      if (isBetterHit(b, a)) return 1
+      return 0
+    })
+}
+
+function failAltCount(row: BatchDownloadFailItem): number {
+  return altsForFail(row).length
+}
+
+function failHasAlt(row: BatchDownloadFailItem): boolean {
+  return failAltCount(row) > 0
 }
 
 /** 未完全匹配：一键勾选各行最佳换源（优先有词） */

@@ -6,6 +6,7 @@
 import type { MusicSource, TrackDto, XmMusicSource } from '@wy-music/shared'
 import {
   isExternalTrackId,
+  isLiumingyeSource,
   isXmMusicSource,
   makeExternalTrackId,
   MUSIC_SOURCES,
@@ -410,8 +411,14 @@ async function searchKw(kw: string, page: number, limit: number): Promise<ExtHit
 
 const LIUMINGYE_API = 'https://so.liumingye.cn'
 
-/** 下歌吧：so.liumingye.cn —— 搜索有结果，播放/下载走夸克/百度网盘 */
-async function searchLiumingye(kw: string, page: number): Promise<ExtHit[]> {
+type LiumingyePanSource = 'liumingye_quark' | 'liumingye_baidu'
+
+function isLiumingyePanSource(source: MusicSource): source is LiumingyePanSource {
+  return source === 'liumingye_quark' || source === 'liumingye_baidu'
+}
+
+/** 下歌吧：so.liumingye.cn —— 搜索一次；结果按勾选的网盘源打标 */
+async function searchLiumingyeRaw(kw: string, page: number): Promise<Omit<ExtHit, 'source'>[]> {
   const url =
     `${LIUMINGYE_API}/api/music/search?q=${encodeURIComponent(kw)}` +
     `&page=${encodeURIComponent(String(Math.max(1, page)))}`
@@ -431,7 +438,6 @@ async function searchLiumingye(kw: string, page: number): Promise<ExtHit[]> {
     .map((it) => {
       const qualities = Array.isArray(it.quality) ? it.quality.map(String) : []
       return {
-        source: 'liumingye' as const,
         externalId: String(it.id),
         name: String(it.title),
         artists: [String(it.artist || '').trim() || '未知歌手'],
@@ -440,6 +446,13 @@ async function searchLiumingye(kw: string, page: number): Promise<ExtHit[]> {
         payTag: qualities.length ? qualities.join(' / ') : null,
       }
     })
+}
+
+function tagLiumingyeHits(
+  raw: Omit<ExtHit, 'source'>[],
+  source: LiumingyePanSource | 'liumingye',
+): ExtHit[] {
+  return raw.map((it) => ({ ...it, source }))
 }
 
 function pickLiumingyeQuarkShare(
@@ -473,7 +486,10 @@ function pickLiumingyeBaiduShare(
   return { url: String(list[0].url), quality: String(list[0].quality || '百度') }
 }
 
-async function detailLiumingye(externalId: string): Promise<MusicDetailResult> {
+async function detailLiumingye(
+  externalId: string,
+  prefer: 'quark' | 'baidu' | 'auto' = 'auto',
+): Promise<MusicDetailResult> {
   const url = `${LIUMINGYE_API}/api/music/${encodeURIComponent(externalId)}`
   const j = await fetchJson<{
     id?: string
@@ -508,23 +524,23 @@ async function detailLiumingye(externalId: string): Promise<MusicDetailResult> {
   const quark = pickLiumingyeQuarkShare(downloads)
   const baidu = pickLiumingyeBaiduShare(downloads)
 
-  // 优先夸克，失败再试百度
-  if (quark && window.wyAPI?.quarkResolveShare) {
-    try {
-      const resolved = await window.wyAPI.quarkResolveShare(quark.url)
-      return {
-        musicUrl: resolved.url,
-        ...meta,
-        fileName: resolved.fileName,
-        viaQuark: true,
-        link: quark.url,
-      }
-    } catch (e) {
-      if (!baidu) throw e
+  const resolveQuark = async () => {
+    if (!quark) throw new Error('下歌吧未返回夸克分享链接')
+    if (!window.wyAPI?.quarkResolveShare) {
+      throw new Error('请在桌面端下载下歌吧夸克资源')
+    }
+    const resolved = await window.wyAPI.quarkResolveShare(quark.url)
+    return {
+      musicUrl: resolved.url,
+      ...meta,
+      fileName: resolved.fileName,
+      viaQuark: true as const,
+      link: quark.url,
     }
   }
 
-  if (baidu) {
+  const resolveBaidu = async () => {
+    if (!baidu) throw new Error('下歌吧未返回百度分享链接')
     if (!window.wyAPI?.baiduResolveShare) {
       throw new Error('请在桌面端下载下歌吧百度资源')
     }
@@ -533,14 +549,30 @@ async function detailLiumingye(externalId: string): Promise<MusicDetailResult> {
       musicUrl: resolved.url,
       ...meta,
       fileName: resolved.fileName,
-      viaBaidu: true,
+      viaBaidu: true as const,
       link: baidu.url,
     }
   }
 
-  if (quark && !window.wyAPI?.quarkResolveShare) {
-    throw new Error('请在桌面端下载下歌吧资源')
+  const order: Array<'quark' | 'baidu'> =
+    prefer === 'baidu'
+      ? ['baidu', 'quark']
+      : prefer === 'quark'
+        ? ['quark', 'baidu']
+        : ['quark', 'baidu']
+
+  let lastErr: unknown
+  for (const which of order) {
+    const has = which === 'quark' ? quark : baidu
+    if (!has) continue
+    try {
+      return which === 'quark' ? await resolveQuark() : await resolveBaidu()
+    } catch (e) {
+      lastErr = e
+    }
   }
+
+  if (lastErr) throw lastErr
   throw new Error('下歌吧未返回可下载的夸克/百度分享链接')
 }
 
@@ -611,8 +643,6 @@ function searchBySource(
       return searchTang(kw, cumulative)
     case 'kw':
       return searchKw(kw, page, pageSize)
-    case 'liumingye':
-      return searchLiumingye(kw, page)
     default:
       if (isXmMusicSource(source)) return searchXm(source, kw, page, pageSize)
       return Promise.resolve([])
@@ -648,11 +678,14 @@ export async function parallelExternalSearch(opts: {
   ) as MusicSource[]
   if (!activeSources.length) return { list: [], sources: [], hasMore: false }
 
+  const panSources = activeSources.filter(isLiumingyePanSource)
+  const otherSources = activeSources.filter((s) => !isLiumingyePanSource(s))
+
   const sources: SourceSearchStat[] = []
   const list: TrackDto[] = []
 
-  await Promise.all(
-    activeSources.map(async (source) => {
+  await Promise.all([
+    ...otherSources.map(async (source) => {
       try {
         const raw = await withTimeout(
           searchBySource(source, kw, page, pageSize, cumulative),
@@ -670,7 +703,27 @@ export async function parallelExternalSearch(opts: {
         opts.onSource?.({ source, ok: false, list: [], hasMore: false, error })
       }
     }),
-  )
+    // 下歌吧：夸克/百度勾选可分，但 API 只搜一次，再按勾选源分别打标
+    (async () => {
+      if (!panSources.length) return
+      try {
+        const raw = await withTimeout(searchLiumingyeRaw(kw, page), timeoutMs, 'liumingye')
+        const hasMore = raw.length >= pageSize
+        for (const pan of panSources) {
+          const tracks = tagLiumingyeHits(raw, pan).map(toTrack)
+          sources.push({ source: pan, ok: true, count: tracks.length, hasMore, pending: false })
+          for (const t of tracks) list.push(t)
+          opts.onSource?.({ source: pan, ok: true, list: tracks, hasMore })
+        }
+      } catch (e) {
+        const error = errMsg(e)
+        for (const pan of panSources) {
+          sources.push({ source: pan, ok: false, count: 0, hasMore: false, error, pending: false })
+          opts.onSource?.({ source: pan, ok: false, list: [], hasMore: false, error })
+        }
+      }
+    })(),
+  ])
 
   // 保持与勾选源顺序一致（对齐 MUSIC_SOURCES）
   const ordered = activeSources.map(
@@ -713,8 +766,10 @@ export async function resolveExternalDetail(
     return detailXm(source, externalId)
   }
 
-  if (source === 'liumingye') {
-    return detailLiumingye(externalId)
+  if (isLiumingyeSource(source)) {
+    const prefer =
+      source === 'liumingye_baidu' ? 'baidu' : source === 'liumingye_quark' ? 'quark' : 'auto'
+    return detailLiumingye(externalId, prefer)
   }
 
   if (source === 'migu') {

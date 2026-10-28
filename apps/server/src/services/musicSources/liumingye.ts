@@ -1,11 +1,21 @@
 /**
- * 下歌吧 so.liumingye.cn —— 服务端仅支持搜索；详情/导入需桌面端夸克登录
+ * 下歌吧 so.liumingye.cn —— 服务端仅支持搜索；详情/导入需桌面端网盘登录
  */
+import type { MusicSource } from '@wy-music/shared'
 import type { MusicDetail, MusicSearchHit } from './types.js'
 
 const API = 'https://so.liumingye.cn'
 
-export async function searchLiumingye(keyword: string, num = 20): Promise<MusicSearchHit[]> {
+type LiumingyeTag = Extract<
+  MusicSource,
+  'liumingye' | 'liumingye_quark' | 'liumingye_baidu'
+>
+
+export async function searchLiumingye(
+  keyword: string,
+  num = 20,
+  source: LiumingyeTag = 'liumingye_quark',
+): Promise<MusicSearchHit[]> {
   const kw = String(keyword || '').trim()
   if (!kw) return []
   const url = `${API}/api/music/search?q=${encodeURIComponent(kw)}&page=1`
@@ -34,7 +44,7 @@ export async function searchLiumingye(keyword: string, num = 20): Promise<MusicS
     .map((it) => {
       const qualities = Array.isArray(it.quality) ? it.quality.map(String) : []
       return {
-        source: 'liumingye' as const,
+        source,
         externalId: String(it.id),
         name: String(it.title),
         artists: [String(it.artist || '').trim() || '未知歌手'],
@@ -46,5 +56,5 @@ export async function searchLiumingye(keyword: string, num = 20): Promise<MusicS
 }
 
 export async function detailLiumingye(_id: string): Promise<MusicDetail> {
-  throw new Error('下歌吧音频需在桌面端下载（依赖夸克网盘登录），服务端无法拉取直链')
+  throw new Error('下歌吧音频需在桌面端下载（依赖夸克/百度网盘登录），服务端无法拉取直链')
 }

@@ -48,15 +48,21 @@ export type MusicSource =
   | '5singyc'
   | '5singfc'
   | 'kg'
-  /** 下歌吧 so.liumingye.cn（网盘直链，桌面端需夸克登录） */
+  /** @deprecated 旧下歌吧统一源，仅兼容历史 track id */
   | 'liumingye'
+  /** 下歌吧 · 夸克网盘 */
+  | 'liumingye_quark'
+  /** 下歌吧 · 百度网盘 */
+  | 'liumingye_baidu'
 
+/** 可勾选搜索的音源（不含已废弃的统一「下歌吧」） */
 export const MUSIC_SOURCES: MusicSource[] = [
   'migu',
   'vkeys',
   'tang',
   'kw',
-  'liumingye',
+  'liumingye_quark',
+  'liumingye_baidu',
   'netease',
   'qq',
   'kugou',
@@ -78,6 +84,8 @@ export const MUSIC_SOURCE_LABEL: Record<MusicSource, string> = {
   tang: '源3',
   kw: '源4',
   liumingye: '下歌吧',
+  liumingye_quark: '下歌吧·夸克',
+  liumingye_baidu: '下歌吧·百度',
   netease: '网易',
   qq: 'QQ',
   kugou: '酷狗',
@@ -91,6 +99,14 @@ export const MUSIC_SOURCE_LABEL: Record<MusicSource, string> = {
   '5singyc': '5sing原创',
   '5singfc': '5sing翻唱',
   kg: '全民K歌',
+}
+
+export function isLiumingyeSource(source: string): boolean {
+  return (
+    source === 'liumingye' ||
+    source === 'liumingye_quark' ||
+    source === 'liumingye_baidu'
+  )
 }
 
 /** xm95522 聚合接口承载的源 */
@@ -161,7 +177,8 @@ export function parseExternalTrackId(
   const parts = id.split(':')
   if (parts.length < 3) return null
   const source = parts[1] as MusicSource
-  if (!MUSIC_SOURCES.includes(source)) return null
+  // 含历史 liumingye 统一源，以及当前可勾选源
+  if (!(source in MUSIC_SOURCE_LABEL)) return null
   try {
     return { source, externalId: decodeURIComponent(parts.slice(2).join(':')) }
   } catch {

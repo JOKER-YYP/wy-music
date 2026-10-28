@@ -1,5 +1,5 @@
 import type { TrackDto } from '@wy-music/shared'
-import { isExternalTrackId, parseExternalTrackId } from '@wy-music/shared'
+import { isExternalTrackId, isLiumingyeSource, parseExternalTrackId } from '@wy-music/shared'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { importExternalToLibrary, resolveExternalDetail } from './externalMusic'
 import { streamUrl } from './http'
@@ -169,8 +169,8 @@ export async function downloadTrackToLibrary(track: TrackDto) {
   if (!isExternalTrack(track)) {
     throw new Error('曲库歌曲请使用自定义路径下载到本地')
   }
-  if (track.source === 'liumingye') {
-    throw new Error('下歌吧资源依赖夸克网盘，请使用「下载到文件夹」')
+  if (track.source && isLiumingyeSource(track.source)) {
+    throw new Error('下歌吧网盘资源请使用「下载到文件夹」')
   }
   if (!localStorage.getItem('accessToken')) {
     throw new Error('请先登录')
@@ -255,8 +255,8 @@ export async function downloadTracksToLibrary(
     onProgress?.(i, total, track.name)
     try {
       if (!isExternalTrack(track)) throw new Error('非外部曲目')
-      if (track.source === 'liumingye') {
-        throw new Error('下歌吧资源依赖夸克网盘，请改用「下载到文件夹」')
+      if (track.source && isLiumingyeSource(track.source)) {
+        throw new Error('下歌吧网盘资源请改用「下载到文件夹」')
       }
       await importExternalToLibrary(track)
       ok += 1

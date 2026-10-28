@@ -36,7 +36,7 @@
       <el-progress
         :percentage="progressPct"
         :stroke-width="10"
-        color="#ec4141"
+        color="var(--wy-brand)"
       />
       <el-button size="small" text type="danger" @click="cancelSearch">取消</el-button>
     </div>
@@ -1113,8 +1113,9 @@ async function onBatchDownload() {
 .source-picker-block {
   margin: 0 0 14px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--wy-radius-md);
   background: var(--wy-surface-muted);
+  border: 1px solid var(--wy-border);
 }
 .page-head {
   display: flex;
@@ -1344,19 +1345,24 @@ async function onBatchDownload() {
   gap: 8px;
 }
 .source-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  height: auto;
+  padding: 5px 12px;
+  border-radius: var(--wy-radius-pill);
   border: 1px solid var(--wy-border);
   background: var(--wy-surface-muted);
   color: var(--wy-text-secondary);
   font-size: 12px;
-  line-height: 1;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 14px;
+  line-height: 1.25;
+  white-space: normal;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color var(--wy-duration-fast) var(--wy-ease),
+    background var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease);
   .prio {
     display: inline-grid;
     place-items: center;
@@ -1368,9 +1374,10 @@ async function onBatchDownload() {
     font-weight: 700;
     background: var(--wy-brand-soft-strong);
     color: var(--wy-brand);
+    flex-shrink: 0;
   }
   &:hover:not(:disabled) {
-    border-color: var(--wy-brand);
+    border-color: color-mix(in srgb, var(--wy-brand) 35%, var(--wy-border));
     color: var(--wy-brand);
     background: var(--wy-brand-soft);
   }
@@ -1381,13 +1388,14 @@ async function onBatchDownload() {
     border-color: var(--wy-brand);
     background: var(--wy-brand);
     color: var(--wy-text-on-brand);
+    font-weight: 600;
     .prio {
       background: rgba(255, 255, 255, 0.25);
       color: var(--wy-text-on-brand);
     }
   }
   &.selected:not(.active) {
-    border-color: rgba(236, 65, 65, 0.4);
+    border-color: color-mix(in srgb, var(--wy-brand) 45%, var(--wy-border));
     background: var(--wy-brand-soft);
     color: var(--wy-brand);
     font-weight: 600;

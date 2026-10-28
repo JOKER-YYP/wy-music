@@ -273,16 +273,18 @@ onMounted(async () => {
 }
 .banner {
   height: 140px;
-  border-radius: 10px;
+  border-radius: var(--wy-radius-md);
   padding: 22px 20px;
-  color: #fff;
+  color: var(--wy-text-on-brand);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--wy-shadow-sm);
   &.clickable {
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition:
+      transform var(--wy-duration-fast) var(--wy-ease),
+      box-shadow var(--wy-duration-fast) var(--wy-ease);
     &:hover {
       transform: translateY(-2px);
       box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
@@ -348,7 +350,7 @@ onMounted(async () => {
   top: 6px;
   right: 8px;
   font-size: 12px;
-  color: #fff;
+  color: var(--wy-text-on-brand);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 .play-fab {
@@ -360,15 +362,15 @@ onMounted(async () => {
   border: none;
   border-radius: 50%;
   background: var(--wy-brand);
-  color: #fff;
+  color: var(--wy-text-on-brand);
   display: grid;
   place-items: center;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity var(--wy-duration-fast) var(--wy-ease);
   .iconfont {
     font-size: 14px;
-    color: #fff;
+    color: var(--wy-text-on-brand);
   }
 }
 .playlist-card:hover .play-fab {

@@ -286,9 +286,10 @@ defineExpose({ pushHistory })
 .search-dropdown {
   max-height: min(640px, calc(100vh - 120px));
   overflow: auto;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.08);
+  background: var(--wy-surface);
+  border-radius: var(--wy-radius-md);
+  border: 1px solid var(--wy-border);
+  box-shadow: var(--wy-shadow-sm);
   padding: 14px 16px 16px;
 }
 .sec {
@@ -401,7 +402,7 @@ defineExpose({ pushHistory })
 .badge-hot {
   flex-shrink: 0;
   font-size: 10px;
-  color: #fff;
+  color: var(--wy-text-on-brand);
   background: var(--wy-brand);
   border-radius: 3px;
   padding: 0 3px;

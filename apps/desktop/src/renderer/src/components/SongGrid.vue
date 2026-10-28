@@ -191,7 +191,7 @@ function coverStyle(t: TrackDto) {
   const u = mediaUrl(t.coverUrl)
   return u
     ? { backgroundImage: `url(${u})` }
-    : { background: 'linear-gradient(135deg,#f3c4c4,var(--wy-brand))' }
+    : { background: 'var(--wy-cover-gradient)' }
 }
 
 function isExternal(t: TrackDto) {
@@ -366,7 +366,7 @@ function closeMenu() {
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.35);
-  color: #fff;
+  color: var(--wy-text-on-brand);
   font-size: 22px;
   opacity: 0;
   transition: opacity 0.15s;
@@ -494,7 +494,7 @@ function closeMenu() {
 .ctx-menu {
   position: fixed;
   min-width: 148px;
-  background: #fff;
+  background: var(--wy-surface);
   border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
   padding: 6px;

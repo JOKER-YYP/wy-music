@@ -32,7 +32,7 @@ const emit = defineEmits<{ click: [] }>()
   height: 40px;
   border: none;
   border-radius: 50%;
-  background: #fff;
+  background: var(--wy-surface);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.16);
   cursor: pointer;
   display: grid;

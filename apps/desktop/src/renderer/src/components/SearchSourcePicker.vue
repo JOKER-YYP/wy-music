@@ -10,8 +10,8 @@
       <label
         v-for="s in allSources"
         :key="s"
-        class="picker-tag"
-        :class="{ on: selectedSet.has(s) }"
+        class="wy-chip picker-tag"
+        :class="{ 'is-on': selectedSet.has(s) }"
       >
         <input
           type="checkbox"
@@ -94,14 +94,19 @@ function clearAll() {
   font-size: 12px;
   color: var(--wy-brand);
   cursor: pointer;
-  &:hover {
+  &:hover:not(:disabled) {
     text-decoration: underline;
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
+    border-radius: 2px;
   }
 }
 .picker-count {
   font-size: 12px;
   color: var(--wy-text-muted);
   margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 .picker-tags {
   display: flex;
@@ -109,32 +114,10 @@ function clearAll() {
   gap: 8px;
 }
 .picker-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px 0 8px;
-  border-radius: 14px;
-  border: 1px solid var(--wy-border);
-  background: var(--wy-surface-muted);
-  color: var(--wy-text-secondary);
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  user-select: none;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-  input {
-    margin: 0;
-    accent-color: var(--wy-brand);
-  }
-  &.on {
-    border-color: color-mix(in srgb, var(--wy-brand) 45%, var(--wy-border));
-    background: var(--wy-brand-soft);
-    color: var(--wy-brand);
-    font-weight: 600;
-  }
-  &:hover {
-    border-color: color-mix(in srgb, var(--wy-brand) 35%, var(--wy-border));
-  }
+  height: auto;
+  min-height: 28px;
+  padding: 5px 10px 5px 8px;
+  line-height: 1.25;
+  white-space: normal;
 }
 </style>

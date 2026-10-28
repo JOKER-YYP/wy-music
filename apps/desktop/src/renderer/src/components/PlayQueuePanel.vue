@@ -143,7 +143,7 @@ function coverStyle(t: QueueTrack) {
   const u = mediaUrl(t.coverUrl)
   return u
     ? { backgroundImage: `url(${u})` }
-    : { backgroundImage: 'linear-gradient(135deg,#f3c4c4,var(--wy-brand))' }
+    : { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 function formatDuration(ms?: number) {
@@ -192,7 +192,7 @@ async function clearAll() {
   bottom: var(--wy-player-h);
   width: min(420px, 100vw);
   z-index: 2600;
-  background: #fff;
+  background: var(--wy-surface);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
   border-left: 1px solid #eee;
   display: flex;
@@ -289,7 +289,7 @@ async function clearAll() {
   height: 40px;
   border: none;
   border-radius: 50%;
-  background: #fff;
+  background: var(--wy-surface);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.16);
   cursor: pointer;
   display: grid;

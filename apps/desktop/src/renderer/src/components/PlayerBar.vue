@@ -283,7 +283,7 @@ watch(
 const artists = computed(() => track.value?.artists?.join(' / ') || '')
 const coverStyle = computed(() => {
   const url = mediaUrl(track.value?.coverUrl)
-  return url ? `url(${url})` : 'linear-gradient(135deg,var(--wy-brand),#ff8a80)'
+  return url ? `url(${url})` : 'var(--wy-cover-gradient)'
 })
 
 watch(
@@ -496,17 +496,17 @@ onBeforeUnmount(() => {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #c8c8c8;
+    background: var(--wy-scrollbar);
     border: none;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
     opacity: 1;
-    transition: background 0.12s, transform 0.12s, border 0.12s;
+    transition: background var(--wy-duration-fast), transform var(--wy-duration-fast), border var(--wy-duration-fast);
   }
   .progress-wrap:hover &,
   .hovered &,
   &:hover {
     &::-webkit-slider-thumb {
-      background: #fff;
+      background: var(--wy-surface);
       border: 2px solid var(--wy-brand);
       box-shadow: 0 0 0 1px rgba(236, 65, 65, 0.2);
       transform: scale(1.08);
@@ -519,13 +519,13 @@ onBeforeUnmount(() => {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #c8c8c8;
+    background: var(--wy-scrollbar);
     border: none;
   }
   .progress-wrap:hover &,
   .hovered & {
     &::-moz-range-thumb {
-      background: #fff;
+      background: var(--wy-surface);
       border: 2px solid var(--wy-brand);
     }
   }
@@ -677,21 +677,24 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   border: none;
   background: var(--wy-brand);
-  color: #fff;
+  color: var(--wy-text-on-brand);
   cursor: pointer;
   display: grid;
   place-items: center;
   padding: 0;
   box-shadow: 0 4px 12px rgba(236, 65, 65, 0.35);
-  transition: transform 0.12s, background 0.12s;
+  transition: transform var(--wy-duration-fast), background var(--wy-duration-fast);
   .play-ico {
     font-size: 22px;
-    color: #fff;
+    color: var(--wy-text-on-brand);
     line-height: 1;
   }
   &:hover:not(:disabled) {
-    background: #e03333;
+    background: var(--wy-brand-hover);
     transform: scale(1.05);
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
   }
   &:disabled {
     opacity: 0.55;
@@ -702,7 +705,7 @@ onBeforeUnmount(() => {
   width: 16px;
   height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
+  border-top-color: var(--wy-text-on-brand);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }

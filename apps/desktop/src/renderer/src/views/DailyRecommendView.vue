@@ -96,7 +96,7 @@ function trackCover(row: TrackDto) {
   const url = mediaUrl(row.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+    : { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 function isCurrent(row: TrackDto) {
@@ -165,8 +165,13 @@ onMounted(load)
   height: 200px;
   border-radius: 10px;
   flex-shrink: 0;
-  background: linear-gradient(160deg, #ff6b6b 0%, var(--wy-brand) 55%, #c72c2c 100%);
-  color: #fff;
+  background: linear-gradient(
+    160deg,
+    var(--wy-brand-tint) 0%,
+    var(--wy-brand) 55%,
+    var(--wy-brand-hover) 100%
+  );
+  color: var(--wy-text-on-brand);
   display: flex;
   flex-direction: column;
   align-items: center;

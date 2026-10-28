@@ -181,7 +181,7 @@ const artistCover = computed(() => {
   const url = mediaUrl(artistSummary.value?.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+    : { backgroundImage: 'var(--wy-cover-gradient)' }
 })
 
 const matchedPlaylists = computed(() => {
@@ -193,7 +193,7 @@ const matchedPlaylists = computed(() => {
 function plistCover(p: PlaylistDto) {
   const url = mediaUrl(p.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,var(--wy-brand))' }
+  return { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 function mergeTracks(prev: TrackDto[], next: TrackDto[]) {
@@ -389,19 +389,20 @@ watch(
   margin: 0 0 12px;
   font-size: 28px;
   font-weight: 700;
-  color: #222;
+  color: var(--wy-text);
 }
 .source-picker-block {
   margin: 0 0 16px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--wy-radius-md);
   background: var(--wy-surface-muted);
+  border: 1px solid var(--wy-border);
 }
 .tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--wy-border);
   margin-bottom: 20px;
 }
 .tab {
@@ -412,6 +413,13 @@ watch(
   color: var(--wy-text-secondary);
   cursor: pointer;
   position: relative;
+  transition: color var(--wy-duration-fast) var(--wy-ease);
+  &:hover:not(.active) {
+    color: var(--wy-text);
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
+  }
   &.active {
     color: var(--wy-brand);
     font-weight: 600;
@@ -445,14 +453,14 @@ watch(
   align-items: center;
   gap: 16px;
   padding: 12px;
-  border-radius: 10px;
+  border-radius: var(--wy-radius-md);
   background: var(--wy-surface-muted);
   margin-bottom: 20px;
   max-width: 420px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--wy-duration-fast) var(--wy-ease);
   &:hover {
-    background: var(--wy-border);
+    background: var(--wy-brand-soft);
   }
 }
 .artist-avatar {
@@ -527,6 +535,6 @@ watch(
   }
 }
 .source-err {
-  color: #b07a7a;
+  color: color-mix(in srgb, var(--wy-brand) 55%, var(--wy-text-muted));
 }
 </style>

@@ -199,14 +199,14 @@ function trackCover(row: TrackDto) {
   const url = mediaUrl(row.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+    : { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 function albumCover(alb: AlbumItem) {
   const url = mediaUrl(alb.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,#7b5cff,#3d2b8c)' }
+    : { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 function similarAvatar(a: SimilarItem) {
@@ -318,7 +318,7 @@ watch(() => route.params.name, load)
   width: 180px;
   height: 180px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
+  background: var(--wy-cover-gradient);
   background-size: cover;
   background-position: center;
   flex-shrink: 0;
@@ -556,7 +556,7 @@ watch(() => route.params.name, load)
   aspect-ratio: 1;
   margin: 0 auto;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
+  background: var(--wy-cover-gradient);
   background-size: cover;
   background-position: center;
   color: #fff;

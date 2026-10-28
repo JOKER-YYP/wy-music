@@ -78,7 +78,7 @@ const ui = useUiStore()
 function coverStyle(url?: string | null) {
   const u = mediaUrl(url)
   if (u) return { backgroundImage: `url(${u})` }
-  return { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+  return { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 function chartCover(chart: ChartItem) {
@@ -96,7 +96,7 @@ function recoStyle(c: ChartItem) {
       backgroundPosition: 'center',
     }
   }
-  return { background: c.color || 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+  return { background: c.color || 'var(--wy-cover-gradient)' }
 }
 
 function goDetail(id: string) {

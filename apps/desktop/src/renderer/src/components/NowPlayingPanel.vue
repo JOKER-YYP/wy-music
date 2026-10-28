@@ -208,7 +208,7 @@ const coverStyle = computed(() => {
   const url = coverUrl.value
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+    : { backgroundImage: 'var(--wy-cover-gradient)' }
 })
 const bgStyle = computed(() => {
   const url = coverUrl.value

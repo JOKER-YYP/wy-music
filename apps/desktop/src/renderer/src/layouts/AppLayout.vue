@@ -55,7 +55,7 @@
         </div>
         <button
           type="button"
-          class="batch-search-btn"
+          class="topbar-chip"
           title="批量搜歌"
           @click="goBatchSearch"
         >
@@ -64,8 +64,8 @@
         </button>
         <button
           type="button"
-          class="quark-login-btn"
-          :class="{ logged: quarkLoggedIn }"
+          class="topbar-chip topbar-chip--status"
+          :class="{ 'is-logged': quarkLoggedIn }"
           :title="
             quarkLoggedIn
               ? '已登录，点击可退出夸克网盘'
@@ -74,7 +74,7 @@
           :disabled="quarkLoginLoading"
           @click="onQuarkLoginClick"
         >
-          <span class="quark-dot" />
+          <span class="status-dot" />
           <span>
             {{
               quarkLoginLoading
@@ -87,8 +87,8 @@
         </button>
         <button
           type="button"
-          class="quark-login-btn baidu-login-btn"
-          :class="{ logged: baiduLoggedIn }"
+          class="topbar-chip topbar-chip--status"
+          :class="{ 'is-logged': baiduLoggedIn }"
           :title="
             baiduLoggedIn
               ? '已登录，点击可退出百度网盘'
@@ -97,7 +97,7 @@
           :disabled="baiduLoginLoading"
           @click="onBaiduLoginClick"
         >
-          <span class="quark-dot" />
+          <span class="status-dot" />
           <span>
             {{
               baiduLoginLoading
@@ -782,10 +782,10 @@ function onLogout() {
   align-items: center;
   justify-content: space-between;
   padding: 0 0 0 14px;
-  gap: 16px;
+  gap: 12px;
   position: relative;
   z-index: 30;
-  color: #fff;
+  color: var(--wy-text-on-brand);
   -webkit-app-region: drag;
   app-region: drag;
   user-select: none;
@@ -793,16 +793,18 @@ function onLogout() {
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   min-width: 0;
   flex: 1;
+  row-gap: 0;
 }
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
-  height: 54px;
+  height: var(--wy-topbar-h);
   padding-right: 4px;
   -webkit-app-region: no-drag;
   app-region: no-drag;
@@ -810,16 +812,14 @@ function onLogout() {
 .topbar-left .brand,
 .topbar-left .hist-nav,
 .topbar-left .search-anchor,
-.topbar-left .batch-search-btn,
-.topbar-left .quark-login-btn,
-.topbar-left .baidu-login-btn {
+.topbar-left .topbar-chip {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 .win-controls {
   display: flex;
   align-items: stretch;
-  height: 54px;
+  height: var(--wy-topbar-h);
   margin-left: 8px;
 }
 .win-btn {
@@ -827,14 +827,17 @@ function onLogout() {
   height: 100%;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--wy-on-brand-soft);
   cursor: pointer;
   display: grid;
   place-items: center;
   padding: 0;
-  transition: background 0.12s;
+  transition: background var(--wy-duration-fast) var(--wy-ease);
   &:hover {
     background: rgba(255, 255, 255, 0.14);
+  }
+  &:focus-visible {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55);
   }
   &.win-close:hover {
     background: #e81123;
@@ -901,7 +904,7 @@ function onLogout() {
 .brand-logo {
   width: 26px;
   height: 26px;
-  border-radius: 6px;
+  border-radius: var(--wy-radius-sm);
   object-fit: cover;
   flex-shrink: 0;
   display: block;
@@ -910,7 +913,7 @@ function onLogout() {
 .brand-name {
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--wy-text-on-brand);
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
@@ -925,94 +928,94 @@ function onLogout() {
   height: 24px;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.12);
-  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.14);
+  color: var(--wy-on-brand-soft);
   display: grid;
   place-items: center;
   cursor: pointer;
   padding: 0;
+  transition: background var(--wy-duration-fast) var(--wy-ease), color var(--wy-duration-fast) var(--wy-ease);
   &:hover {
-    background: rgba(0, 0, 0, 0.2);
-    color: #fff;
+    background: rgba(0, 0, 0, 0.22);
+    color: var(--wy-text-on-brand);
+  }
+  &:focus-visible {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
   }
 }
 .search-anchor {
   position: relative;
-  width: 240px;
-  flex-shrink: 0;
+  width: min(240px, 28vw);
+  min-width: 140px;
+  flex-shrink: 1;
 }
-.batch-search-btn {
+.topbar-chip {
   height: 30px;
-  border: none;
-  border-radius: 15px;
+  border: 1px solid transparent;
+  border-radius: var(--wy-radius-pill);
   padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  cursor: pointer;
-  background: rgba(0, 0, 0, 0.16);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 12px;
-  line-height: 1;
-  &:hover {
-    background: rgba(0, 0, 0, 0.22);
-    color: #fff;
-  }
-}
-.quark-login-btn {
-  height: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 15px;
-  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.12);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--wy-on-brand-soft);
   font-size: 12px;
   line-height: 1;
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease),
+    border-color var(--wy-duration-fast) var(--wy-ease);
   &:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.2);
-    color: #fff;
+    background: rgba(0, 0, 0, 0.24);
+    color: var(--wy-text-on-brand);
+  }
+  &:focus-visible {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
   }
   &:disabled {
     opacity: 0.7;
     cursor: wait;
   }
-  &.logged {
+  &--status {
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(0, 0, 0, 0.12);
+    padding: 0 10px;
+  }
+  &.is-logged {
     border-color: rgba(103, 194, 58, 0.55);
     background: rgba(103, 194, 58, 0.22);
   }
-  .quark-dot {
+  .status-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.45);
+    background: var(--wy-on-brand-muted);
     flex-shrink: 0;
   }
-  &.logged .quark-dot {
-    background: #67c23a;
+  &.is-logged .status-dot {
+    background: var(--el-color-success, #67c23a);
   }
 }
 .search-wrap {
   height: 30px;
-  border-radius: 15px;
+  border-radius: var(--wy-radius-pill);
   background: rgba(0, 0, 0, 0.16);
   display: flex;
   align-items: center;
   padding: 0 8px 0 12px;
   gap: 6px;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    box-shadow var(--wy-duration-fast) var(--wy-ease);
   &.focused {
     background: rgba(0, 0, 0, 0.22);
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
   }
 }
 .search-icon {
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--wy-on-brand-muted);
   flex-shrink: 0;
 }
 .search-input {
@@ -1021,8 +1024,9 @@ function onLogout() {
   outline: none;
   background: transparent;
   font-size: 12px;
-  color: #fff;
+  color: var(--wy-text-on-brand);
   min-width: 0;
+  caret-color: var(--wy-text-on-brand);
   &::placeholder {
     color: rgba(255, 255, 255, 0.55);
   }
@@ -1031,7 +1035,7 @@ function onLogout() {
 .mic-slot {
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--wy-on-brand-muted);
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -1043,7 +1047,7 @@ function onLogout() {
 .clear-btn {
   cursor: pointer;
   &:hover {
-    color: #fff;
+    color: var(--wy-text-on-brand);
     background: rgba(255, 255, 255, 0.12);
   }
 }
@@ -1057,10 +1061,13 @@ function onLogout() {
   cursor: pointer;
   padding: 0 8px 0 2px;
   border-radius: 14px;
-  color: #fff;
+  color: var(--wy-text-on-brand);
   line-height: 1;
   &:hover {
     background: rgba(0, 0, 0, 0.12);
+  }
+  &:focus-visible {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
   }
 }
 .avatar {
@@ -1068,7 +1075,7 @@ function onLogout() {
   height: 24px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.25);
-  color: #fff;
+  color: var(--wy-text-on-brand);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1081,11 +1088,11 @@ function onLogout() {
 .avatar-img {
   object-fit: cover;
   padding: 0;
-  background: #fff;
+  background: var(--wy-surface);
 }
 .uname {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--wy-on-brand-soft);
   max-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1096,17 +1103,21 @@ function onLogout() {
 .text-btn {
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--wy-on-brand-soft);
   cursor: pointer;
   height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-  border-radius: 6px;
+  border-radius: var(--wy-radius-sm);
+  transition: background var(--wy-duration-fast) var(--wy-ease), color var(--wy-duration-fast) var(--wy-ease);
   &:hover {
     background: rgba(0, 0, 0, 0.12);
-    color: #fff;
+    color: var(--wy-text-on-brand);
+  }
+  &:focus-visible {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
   }
 }
 .icon-btn {
@@ -1135,7 +1146,7 @@ function onLogout() {
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: #fff;
+  background: var(--wy-surface);
   color: var(--wy-brand);
   font-size: 10px;
   font-weight: 700;
@@ -1190,7 +1201,7 @@ function onLogout() {
   padding: 0;
   &:hover {
     color: var(--wy-text-secondary);
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--wy-brand-soft);
   }
 }
 .fold-toggle {
@@ -1201,13 +1212,14 @@ function onLogout() {
   margin: 4px 8px 0;
   height: 28px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--wy-radius-sm);
   background: transparent;
   color: var(--wy-text-muted);
   font-size: 12px;
   cursor: pointer;
+  transition: background var(--wy-duration-fast) var(--wy-ease), color var(--wy-duration-fast) var(--wy-ease);
   &:hover {
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--wy-brand-soft);
     color: var(--wy-text-secondary);
   }
 }
@@ -1232,7 +1244,10 @@ function onLogout() {
   place-items: center;
   cursor: pointer;
   padding: 0;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease),
+    background var(--wy-duration-fast) var(--wy-ease);
   &:hover {
     border-color: var(--wy-brand);
     color: var(--wy-brand);
@@ -1253,7 +1268,7 @@ function onLogout() {
   border-radius: 8px;
   color: var(--wy-text);
   font-size: 14px;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--wy-duration-fast) var(--wy-ease), color var(--wy-duration-fast) var(--wy-ease);
   &:hover:not(.active) {
     background: var(--wy-brand-soft);
   }
@@ -1274,12 +1289,12 @@ function onLogout() {
   height: 28px;
   border-radius: 4px;
   object-fit: cover;
-  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
+  background: var(--wy-cover-gradient);
   flex-shrink: 0;
   display: block;
 }
 .plist-cover--empty {
-  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
+  background: var(--wy-cover-gradient);
 }
 .plist-name {
   overflow: hidden;

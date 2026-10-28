@@ -94,7 +94,7 @@ const hotTracks = computed(() => (props.hotTracks || []).slice(0, 10))
 function coverStyle(p: PlazaPlaylist) {
   const url = mediaUrl(p.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,var(--wy-brand))' }
+  return { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 function trackCover(t: TrackDto) {
   const url = mediaUrl(t.coverUrl)

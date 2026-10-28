@@ -285,7 +285,7 @@ function isMine(msg: UserNotificationDto) {
 function trackCoverStyle(trackId: string) {
   const url = mediaUrl(trackMap.value[trackId]?.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+  return { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 function formatTime(iso: string) {
@@ -604,7 +604,7 @@ defineExpose({ refresh, loadUnread })
   height: 42px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
+  background: var(--wy-cover-gradient);
   background-size: cover;
   background-position: center;
   color: #fff;
@@ -726,7 +726,7 @@ defineExpose({ refresh, loadUnread })
   min-width: 0;
 }
 .bubble {
-  background: #fff;
+  background: var(--wy-surface);
   color: var(--wy-text);
   font-size: 13px;
   line-height: 1.55;
@@ -738,7 +738,7 @@ defineExpose({ refresh, loadUnread })
 }
 .song-card {
   border: none;
-  background: #fff;
+  background: var(--wy-surface);
   border-radius: 10px;
   padding: 8px;
   display: flex;
@@ -793,7 +793,7 @@ defineExpose({ refresh, loadUnread })
 }
 .chat-input {
   flex-shrink: 0;
-  background: #fff;
+  background: var(--wy-surface);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   padding: 10px 12px 12px;
 }

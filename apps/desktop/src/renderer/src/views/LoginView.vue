@@ -89,7 +89,7 @@ async function onRegister() {
 .card {
   width: 380px;
   padding: 32px 28px 24px;
-  background: #fff;
+  background: var(--wy-surface);
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   h1 {

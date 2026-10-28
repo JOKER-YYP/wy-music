@@ -127,7 +127,7 @@ function trackCover(row: TrackDto) {
   const url = mediaUrl(row.coverUrl)
   return url
     ? { backgroundImage: `url(${url})` }
-    : { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+    : { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 function isCurrent(row: TrackDto) {

@@ -314,7 +314,7 @@ function coverStyle(t: TrackDto) {
   const u = mediaUrl(t.coverUrl)
   return u
     ? { backgroundImage: `url(${u})` }
-    : { background: 'linear-gradient(135deg,#f3c4c4,var(--wy-brand))' }
+    : { background: 'var(--wy-cover-gradient)' }
 }
 
 function qualityTag(t: TrackDto): string | null {
@@ -556,7 +556,7 @@ async function onMenuAction(action: string) {
   border: none;
   border-radius: 50%;
   background: var(--wy-brand);
-  color: #fff;
+  color: var(--wy-text-on-brand);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -695,7 +695,7 @@ async function onMenuAction(action: string) {
 .batch-play-ico {
   font-size: 18px;
   line-height: 1;
-  color: #fff;
+  color: var(--wy-text-on-brand);
 }
 .eq {
   display: inline-flex;

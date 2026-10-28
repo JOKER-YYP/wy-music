@@ -155,7 +155,7 @@ const canSaveAs = computed(() => {
 const coverStyle = computed(() => {
   const url = mediaUrl(detail.value?.coverUrl || detail.value?.tracks?.[0]?.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+  return { backgroundImage: 'var(--wy-cover-gradient)' }
 })
 
 const createdText = computed(() => {

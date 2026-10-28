@@ -413,7 +413,7 @@ label {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: linear-gradient(145deg, #ff8a80, var(--wy-brand));
+  background: var(--wy-cover-gradient);
   background-size: cover;
   background-position: center;
   color: #fff;

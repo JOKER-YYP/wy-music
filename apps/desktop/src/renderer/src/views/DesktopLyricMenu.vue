@@ -139,7 +139,7 @@ onUnmounted(() => {
   height: 100%;
   box-sizing: border-box;
   padding: 6px 0;
-  background: #fff;
+  background: var(--wy-surface);
   border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
   overflow: visible;
@@ -173,7 +173,7 @@ onUnmounted(() => {
   top: 0;
   min-width: 108px;
   padding: 6px 0;
-  background: #fff;
+  background: var(--wy-surface);
   border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
   z-index: 10;

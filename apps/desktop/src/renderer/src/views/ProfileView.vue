@@ -193,7 +193,7 @@ function coverStyle(p: PlaylistDto) {
   const url = mediaUrl(p.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
   if (p.isSystem) return { backgroundImage: 'linear-gradient(145deg,#2a2a2a,#111)' }
-  return { backgroundImage: 'linear-gradient(135deg,#ff8a80,var(--wy-brand))' }
+  return { backgroundImage: 'var(--wy-cover-gradient)' }
 }
 
 async function load() {
@@ -226,7 +226,7 @@ onMounted(load)
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
+  background: var(--wy-cover-gradient);
   background-size: cover;
   background-position: center;
   color: #fff;

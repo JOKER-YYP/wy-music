@@ -223,7 +223,7 @@ const selectedTags = ref<string[]>([])
 const coverStyle = computed(() => {
   const url = previewUrl.value || mediaUrl(detail.value?.coverUrl)
   if (url) return { backgroundImage: `url(${url})` }
-  return { backgroundImage: 'linear-gradient(135deg,var(--wy-brand),#ff8a80)' }
+  return { backgroundImage: 'var(--wy-cover-gradient)' }
 })
 
 function parseTags(raw?: string | null) {

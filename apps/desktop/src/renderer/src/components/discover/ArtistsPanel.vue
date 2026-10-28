@@ -179,7 +179,7 @@ watch(letter, load)
   aspect-ratio: 1;
   margin: 0 auto;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff8a80, var(--wy-brand));
+  background: var(--wy-cover-gradient);
   background-size: cover;
   background-position: center;
   color: #fff;

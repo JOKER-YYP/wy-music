@@ -160,7 +160,7 @@ const coverStyle = computed(() => {
   return {
     backgroundImage: url
       ? `url(${url})`
-      : 'linear-gradient(135deg,var(--wy-brand),#ff8a80)',
+      : 'var(--wy-cover-gradient)',
   }
 })
 

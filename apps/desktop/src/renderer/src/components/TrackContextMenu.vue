@@ -105,7 +105,7 @@ function emitAction(action: string) {
   padding: 6px;
   list-style: none;
   min-width: 176px;
-  background: #fff;
+  background: var(--wy-surface);
   border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
   border: 1px solid #eee;

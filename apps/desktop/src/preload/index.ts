@@ -136,6 +136,21 @@ const wyAPI = {
     return () => ipcRenderer.removeListener('quark:loginChanged', listener)
   },
 
+  /** 下歌吧下载依赖的百度网盘登录态 */
+  baiduHasLogin: () => ipcRenderer.invoke('baidu:hasLogin') as Promise<boolean>,
+  baiduOpenLogin: () => ipcRenderer.invoke('baidu:openLogin') as Promise<boolean>,
+  baiduEnsureLogin: () => ipcRenderer.invoke('baidu:ensureLogin') as Promise<boolean>,
+  baiduLogout: () => ipcRenderer.invoke('baidu:logout') as Promise<boolean>,
+  baiduResolveShare: (shareUrl: string) =>
+    ipcRenderer.invoke('baidu:resolveShare', shareUrl) as Promise<{ url: string; fileName: string }>,
+  baiduDownloadFile: (payload: { url: string; destPath: string }) =>
+    ipcRenderer.invoke('baidu:downloadFile', payload) as Promise<{ ok: boolean; path: string }>,
+  onBaiduLoginChanged: (handler: (ok: boolean) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, ok: boolean) => handler(Boolean(ok))
+    ipcRenderer.on('baidu:loginChanged', listener)
+    return () => ipcRenderer.removeListener('baidu:loginChanged', listener)
+  },
+
   // 桌面小组件
   toggleMiniPlayer: () =>
     ipcRenderer.invoke('mini:toggle') as Promise<{ open: boolean }>,

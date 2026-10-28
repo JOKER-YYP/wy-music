@@ -71,6 +71,7 @@ async function resolveDownloadSource(track: TrackDto): Promise<{
   url: string
   lyricText?: string | null
   viaQuark?: boolean
+  viaBaidu?: boolean
   fileName?: string | null
 }> {
   if (isExternalTrack(track)) {
@@ -86,6 +87,7 @@ async function resolveDownloadSource(track: TrackDto): Promise<{
       url: detail.musicUrl,
       lyricText: detail.lyricText,
       viaQuark: detail.viaQuark,
+      viaBaidu: detail.viaBaidu,
       fileName: detail.fileName,
     }
   }
@@ -134,6 +136,11 @@ export async function downloadTrackToPath(
       throw new Error('请在桌面端下载下歌吧资源')
     }
     await window.wyAPI.quarkDownloadFile({ url: source.url, destPath: finalPath })
+  } else if (source.viaBaidu) {
+    if (!window.wyAPI.baiduDownloadFile) {
+      throw new Error('请在桌面端下载下歌吧百度资源')
+    }
+    await window.wyAPI.baiduDownloadFile({ url: source.url, destPath: finalPath })
   } else {
     await window.wyAPI.downloadFile({ url: source.url, destPath: finalPath })
   }

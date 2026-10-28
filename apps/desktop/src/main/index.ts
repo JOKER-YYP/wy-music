@@ -29,6 +29,14 @@ import {
   openQuarkLoginWindow,
   resolveQuarkShareDownload,
 } from './quarkPan'
+import {
+  downloadWithBaiduSession,
+  ensureBaiduLogin,
+  hasBaiduLogin,
+  logoutBaidu,
+  openBaiduLoginWindow,
+  resolveBaiduShareDownload,
+} from './baiduPan'
 
 /** 外部音乐源域名：允许忽略过期证书（如酷我 kw-api） */
 const MUSIC_API_HOSTS = new Set([
@@ -1582,6 +1590,25 @@ app.whenReady().then(() => {
       const destPath = String(payload?.destPath || '').trim()
       if (!url || !destPath) throw new Error('缺少下载参数')
       await downloadWithQuarkSession(url, destPath)
+      return { ok: true as const, path: destPath }
+    },
+  )
+
+  /** 下歌吧 / 百度网盘：登录态与分享直链 */
+  ipcMain.handle('baidu:hasLogin', () => hasBaiduLogin())
+  ipcMain.handle('baidu:openLogin', () => openBaiduLoginWindow(mainWindow))
+  ipcMain.handle('baidu:ensureLogin', () => ensureBaiduLogin(mainWindow))
+  ipcMain.handle('baidu:logout', () => logoutBaidu())
+  ipcMain.handle('baidu:resolveShare', async (_e, shareUrl: string) => {
+    return resolveBaiduShareDownload(String(shareUrl || ''), mainWindow)
+  })
+  ipcMain.handle(
+    'baidu:downloadFile',
+    async (_e, payload: { url: string; destPath: string }) => {
+      const url = String(payload?.url || '').trim()
+      const destPath = String(payload?.destPath || '').trim()
+      if (!url || !destPath) throw new Error('缺少下载参数')
+      await downloadWithBaiduSession(url, destPath)
       return { ok: true as const, path: destPath }
     },
   )

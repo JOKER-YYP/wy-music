@@ -103,6 +103,16 @@ declare global {
         destPath: string
       }) => Promise<{ ok: boolean; path: string }>
       onQuarkLoginChanged?: (handler: (ok: boolean) => void) => () => void
+      baiduHasLogin?: () => Promise<boolean>
+      baiduOpenLogin?: () => Promise<boolean>
+      baiduEnsureLogin?: () => Promise<boolean>
+      baiduLogout?: () => Promise<boolean>
+      baiduResolveShare?: (shareUrl: string) => Promise<{ url: string; fileName: string }>
+      baiduDownloadFile?: (payload: {
+        url: string
+        destPath: string
+      }) => Promise<{ ok: boolean; path: string }>
+      onBaiduLoginChanged?: (handler: (ok: boolean) => void) => () => void
       toggleMiniPlayer?: () => Promise<{ open: boolean }>
       closeMiniPlayer?: () => Promise<boolean>
       isMiniPlayerOpen?: () => Promise<boolean>

@@ -58,10 +58,12 @@ export type MusicDetailResult = {
   artists?: string[]
   album?: string | null
   link?: string | null
-  /** 网盘原始文件名（下歌吧/夸克） */
+  /** 网盘原始文件名（下歌吧/夸克/百度） */
   fileName?: string | null
   /** 需用夸克会话下载直链 */
   viaQuark?: boolean
+  /** 需用百度会话下载直链 */
+  viaBaidu?: boolean
 }
 
 function toTrack(hit: ExtHit): TrackDto {
@@ -428,7 +430,6 @@ async function searchLiumingye(kw: string, page: number): Promise<ExtHit[]> {
     .filter((it) => it.id && it.title)
     .map((it) => {
       const qualities = Array.isArray(it.quality) ? it.quality.map(String) : []
-      const hasQuark = qualities.some((q) => /夸克/.test(q))
       return {
         source: 'liumingye' as const,
         externalId: String(it.id),
@@ -436,8 +437,7 @@ async function searchLiumingye(kw: string, page: number): Promise<ExtHit[]> {
         artists: [String(it.artist || '').trim() || '未知歌手'],
         album: it.album || null,
         coverUrl: it.cover || null,
-        // 无夸克链接时标百度，下载时会明确报错
-        payTag: qualities.length ? qualities.join(' / ') : hasQuark ? null : '仅百度网盘',
+        payTag: qualities.length ? qualities.join(' / ') : null,
       }
     })
 }
@@ -456,6 +456,21 @@ function pickLiumingyeQuarkShare(
   }
   list.sort((a, b) => score(String(b.quality || '')) - score(String(a.quality || '')))
   return { url: String(list[0].url), quality: String(list[0].quality || '夸克') }
+}
+
+function pickLiumingyeBaiduShare(
+  downloads: { url?: string; quality?: string }[],
+): { url: string; quality: string } | null {
+  const list = downloads.filter((d) => d.url && /pan\.baidu\.com/i.test(String(d.url)))
+  if (!list.length) return null
+  const score = (q: string) => {
+    if (/百度.*?(MP3|高品)/i.test(q) || /MP3/i.test(q)) return 40
+    if (/FLAC|无损/i.test(q)) return 30
+    if (/百度/i.test(q)) return 10
+    return 0
+  }
+  list.sort((a, b) => score(String(b.quality || '')) - score(String(a.quality || '')))
+  return { url: String(list[0].url), quality: String(list[0].quality || '百度') }
 }
 
 async function detailLiumingye(externalId: string): Promise<MusicDetailResult> {
@@ -481,30 +496,52 @@ async function detailLiumingye(externalId: string): Promise<MusicDetailResult> {
       album: j.album || null,
     }
   }
-  const picked = pickLiumingyeQuarkShare(j.downloads || [])
-  if (!picked) {
-    const hasBaidu = (j.downloads || []).some((d) => /pan\.baidu\.com/i.test(String(d.url || '')))
-    throw new Error(
-      hasBaidu
-        ? '该资源仅有百度网盘链接，暂不支持自动下载（请换夸克音质或其它源）'
-        : '下歌吧未返回可下载的夸克分享链接',
-    )
-  }
-  if (!window.wyAPI?.quarkResolveShare) {
-    throw new Error('请在桌面端下载下歌吧资源')
-  }
-  const resolved = await window.wyAPI.quarkResolveShare(picked.url)
-  return {
-    musicUrl: resolved.url,
+
+  const meta = {
     coverUrl: j.cover || null,
     lyricText: normalizeXmLyric(j.lyrics),
     name: j.title || undefined,
     artists: j.artist ? [String(j.artist)] : undefined,
     album: j.album || null,
-    fileName: resolved.fileName,
-    viaQuark: true,
-    link: picked.url,
   }
+  const downloads = j.downloads || []
+  const quark = pickLiumingyeQuarkShare(downloads)
+  const baidu = pickLiumingyeBaiduShare(downloads)
+
+  // 优先夸克，失败再试百度
+  if (quark && window.wyAPI?.quarkResolveShare) {
+    try {
+      const resolved = await window.wyAPI.quarkResolveShare(quark.url)
+      return {
+        musicUrl: resolved.url,
+        ...meta,
+        fileName: resolved.fileName,
+        viaQuark: true,
+        link: quark.url,
+      }
+    } catch (e) {
+      if (!baidu) throw e
+    }
+  }
+
+  if (baidu) {
+    if (!window.wyAPI?.baiduResolveShare) {
+      throw new Error('请在桌面端下载下歌吧百度资源')
+    }
+    const resolved = await window.wyAPI.baiduResolveShare(baidu.url)
+    return {
+      musicUrl: resolved.url,
+      ...meta,
+      fileName: resolved.fileName,
+      viaBaidu: true,
+      link: baidu.url,
+    }
+  }
+
+  if (quark && !window.wyAPI?.quarkResolveShare) {
+    throw new Error('请在桌面端下载下歌吧资源')
+  }
+  throw new Error('下歌吧未返回可下载的夸克/百度分享链接')
 }
 
 export type ParallelSearchResult = {

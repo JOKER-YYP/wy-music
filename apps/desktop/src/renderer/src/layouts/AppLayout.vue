@@ -85,6 +85,29 @@
             }}
           </span>
         </button>
+        <button
+          type="button"
+          class="quark-login-btn baidu-login-btn"
+          :class="{ logged: baiduLoggedIn }"
+          :title="
+            baiduLoggedIn
+              ? '已登录，点击可退出百度网盘'
+              : '登录百度网盘（可用 App 扫码）'
+          "
+          :disabled="baiduLoginLoading"
+          @click="onBaiduLoginClick"
+        >
+          <span class="quark-dot" />
+          <span>
+            {{
+              baiduLoginLoading
+                ? '处理中…'
+                : baiduLoggedIn
+                  ? '退出百度'
+                  : '登录百度'
+            }}
+          </span>
+        </button>
       </div>
 
       <div class="topbar-right">
@@ -358,12 +381,17 @@ onMounted(() => {
   user.restore()
   void refreshMaximized()
   void refreshQuarkLogin()
+  void refreshBaiduLogin()
   unsubMaximized = window.wyAPI?.onWindowMaximized?.((v) => {
     isMaximized.value = v
   }) || null
   unsubQuarkLogin =
     window.wyAPI?.onQuarkLoginChanged?.((ok) => {
       quarkLoggedIn.value = ok
+    }) || null
+  unsubBaiduLogin =
+    window.wyAPI?.onBaiduLoginChanged?.((ok) => {
+      baiduLoggedIn.value = ok
     }) || null
   if (!user.accessToken) {
     ui.openLogin('login')
@@ -381,6 +409,8 @@ onBeforeUnmount(() => {
   unsubMaximized = null
   unsubQuarkLogin?.()
   unsubQuarkLogin = null
+  unsubBaiduLogin?.()
+  unsubBaiduLogin = null
   document.removeEventListener('mousedown', onDocPointerDown)
   window.removeEventListener('resize', updateSearchPanelPos)
 })
@@ -523,6 +553,10 @@ const quarkLoggedIn = ref(false)
 const quarkLoginLoading = ref(false)
 let unsubQuarkLogin: (() => void) | null = null
 
+const baiduLoggedIn = ref(false)
+const baiduLoginLoading = ref(false)
+let unsubBaiduLogin: (() => void) | null = null
+
 async function refreshQuarkLogin() {
   if (!window.wyAPI?.quarkHasLogin) {
     quarkLoggedIn.value = false
@@ -582,6 +616,68 @@ async function onQuarkLogout() {
   } finally {
     quarkLoginLoading.value = false
     await refreshQuarkLogin()
+  }
+}
+
+async function refreshBaiduLogin() {
+  if (!window.wyAPI?.baiduHasLogin) {
+    baiduLoggedIn.value = false
+    return
+  }
+  try {
+    baiduLoggedIn.value = await window.wyAPI.baiduHasLogin()
+  } catch {
+    baiduLoggedIn.value = false
+  }
+}
+
+async function onBaiduLoginClick() {
+  if (baiduLoggedIn.value) {
+    await onBaiduLogout()
+    return
+  }
+  if (!window.wyAPI?.baiduOpenLogin) {
+    ElMessage.warning('请在桌面端登录百度网盘')
+    return
+  }
+  baiduLoginLoading.value = true
+  try {
+    const ok = await window.wyAPI.baiduOpenLogin()
+    baiduLoggedIn.value = ok
+    if (ok) ElMessage.success('百度网盘已登录')
+    else ElMessage.warning('未检测到登录，请扫码或账号登录后等待窗口自动关闭')
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '打开百度登录失败')
+  } finally {
+    baiduLoginLoading.value = false
+    await refreshBaiduLogin()
+  }
+}
+
+async function onBaiduLogout() {
+  if (!window.wyAPI?.baiduLogout) {
+    ElMessage.warning('请在桌面端退出百度网盘')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('退出后下载下歌吧百度资源需重新登录，确定退出？', '退出百度网盘', {
+      confirmButtonText: '退出',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  baiduLoginLoading.value = true
+  try {
+    await window.wyAPI.baiduLogout()
+    baiduLoggedIn.value = false
+    ElMessage.success('已退出百度网盘')
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '退出失败')
+  } finally {
+    baiduLoginLoading.value = false
+    await refreshBaiduLogin()
   }
 }
 
@@ -715,7 +811,8 @@ function onLogout() {
 .topbar-left .hist-nav,
 .topbar-left .search-anchor,
 .topbar-left .batch-search-btn,
-.topbar-left .quark-login-btn {
+.topbar-left .quark-login-btn,
+.topbar-left .baidu-login-btn {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

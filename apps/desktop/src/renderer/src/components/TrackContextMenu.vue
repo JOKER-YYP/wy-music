@@ -19,36 +19,36 @@
           <span class="iconfont icon-next ctx-ico" aria-hidden="true" />
           <span>下一首播放</span>
         </li>
-        <li @click="emitAction('comments')">
+        <li v-if="!isLocalFolder" @click="emitAction('comments')">
           <el-icon><ChatDotRound /></el-icon>
           <span>查看评论</span>
         </li>
-        <li class="sep" />
-        <li @click="emitAction('collect')">
+        <li v-if="!isLocalFolder" class="sep" />
+        <li v-if="!isLocalFolder" @click="emitAction('collect')">
           <el-icon><FolderAdd /></el-icon>
           <span>收藏</span>
         </li>
-        <li @click="emitAction('like')">
+        <li v-if="!isLocalFolder" @click="emitAction('like')">
           <el-icon>
             <StarFilled v-if="track?.liked" />
             <Star v-else />
           </el-icon>
           <span>{{ track?.liked ? '取消喜欢' : '喜欢' }}</span>
         </li>
-        <li @click="emitAction('download')">
+        <li v-if="!isLocalFolder" @click="emitAction('download')">
           <el-icon><Download /></el-icon>
           <span>{{ isExternal ? '下载…' : '下载到本地' }}</span>
         </li>
-        <li @click="emitAction('copy')">
+        <li v-if="!isLocalFolder" @click="emitAction('copy')">
           <el-icon><Link /></el-icon>
           <span>复制链接</span>
         </li>
-        <li v-if="allowRemove || allowDelete" class="sep" />
-        <li v-if="allowRemove" class="danger" @click="emitAction('remove')">
+        <li v-if="!isLocalFolder && (allowRemove || allowDelete)" class="sep" />
+        <li v-if="!isLocalFolder && allowRemove" class="danger" @click="emitAction('remove')">
           <el-icon><Remove /></el-icon>
           <span>从歌单中删除</span>
         </li>
-        <li v-if="allowDelete" class="danger" @click="emitAction('delete')">
+        <li v-if="!isLocalFolder && allowDelete" class="danger" @click="emitAction('delete')">
           <el-icon><Delete /></el-icon>
           <span>删除</span>
         </li>
@@ -70,6 +70,7 @@ import {
 } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import type { TrackDto } from '@wy-music/shared'
+import { isLocalFolderTrack } from '../services/librarySources'
 import { isExternalTrack } from '../services/trackDownload'
 
 const props = defineProps<{
@@ -87,6 +88,9 @@ const emit = defineEmits<{
 }>()
 
 const isExternal = computed(() => (props.track ? isExternalTrack(props.track) : false))
+const isLocalFolder = computed(() =>
+  props.track ? isLocalFolderTrack(props.track as TrackDto & { localPath?: string }) : false,
+)
 
 function emitAction(action: string) {
   emit('action', action)

@@ -101,6 +101,7 @@
             <span class="name" :title="row.name">{{ row.name }}</span>
             <div v-if="!batchMode" class="row-actions">
               <button
+                v-if="!isFolderOnly(row)"
                 type="button"
                 title="下载到本地"
                 :disabled="downloadingId === row.id"
@@ -108,10 +109,20 @@
               >
                 <el-icon><Download /></el-icon>
               </button>
-              <button type="button" title="收藏到歌单" @click.stop="onCollect(row)">
+              <button
+                v-if="!isFolderOnly(row)"
+                type="button"
+                title="收藏到歌单"
+                @click.stop="onCollect(row)"
+              >
                 <el-icon><FolderAdd /></el-icon>
               </button>
-              <button type="button" title="评论" @click.stop="onComments(row)">
+              <button
+                v-if="!isFolderOnly(row)"
+                type="button"
+                title="评论"
+                @click.stop="onComments(row)"
+              >
                 <el-icon><ChatDotRound /></el-icon>
               </button>
               <button type="button" title="更多" @click.stop="openMenu($event, row)">
@@ -129,12 +140,18 @@
       <div class="col-album" :title="row.album || ''">{{ row.album || '-' }}</div>
 
       <div class="col-like">
-        <button class="like-btn" type="button" @click.stop="toggleLike(row)">
+        <button
+          v-if="!isFolderOnly(row)"
+          class="like-btn"
+          type="button"
+          @click.stop="toggleLike(row)"
+        >
           <el-icon :size="16" :color="row.liked ? 'var(--wy-brand)' : 'var(--wy-text-muted)'">
             <StarFilled v-if="row.liked" />
             <Star v-else />
           </el-icon>
         </button>
+        <span v-else class="like-placeholder">—</span>
       </div>
 
       <div class="col-dur">{{ formatDuration(row.durationMs) }}</div>
@@ -173,9 +190,10 @@ import {
 } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
 import { http, mediaUrl, streamUrl } from '../services/http'
-import { usePlayerStore } from '../stores/player'
+import { usePlayerStore, type QueueTrack } from '../stores/player'
 import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
+import { isLocalFolderTrack } from '../services/librarySources'
 import { formatDuration } from '../services/localUpload'
 import {
   chooseLocalSavePath,
@@ -189,7 +207,7 @@ import PlayingLocateFab from './PlayingLocateFab.vue'
 
 const props = withDefaults(
   defineProps<{
-    tracks: TrackDto[]
+    tracks: Array<TrackDto | QueueTrack>
     allowDelete?: boolean
     allowRemove?: boolean
     playlistId?: string
@@ -230,6 +248,14 @@ const partialSelected = computed(() => selectedCount.value > 0 && !allSelected.v
 const canBatchDelete = computed(() => props.allowDelete || (props.allowRemove && !!props.playlistId))
 
 const selectedTracks = computed(() => props.tracks.filter((t) => selected.value.has(t.id)))
+
+function asQueueTrack(row: TrackDto | QueueTrack): QueueTrack {
+  return row as QueueTrack
+}
+
+function isFolderOnly(row: TrackDto | QueueTrack) {
+  return isLocalFolderTrack(asQueueTrack(row))
+}
 
 const currentInList = computed(() => {
   const id = player.currentTrack?.id
@@ -337,8 +363,8 @@ function isPlaying(row: TrackDto) {
   return isCurrent(row) && player.playing
 }
 
-function playOne(row: TrackDto) {
-  player.playTrack(row, props.tracks)
+function playOne(row: TrackDto | QueueTrack) {
+  player.playTrack(asQueueTrack(row), props.tracks.map(asQueueTrack))
 }
 
 function onThumbClick(row: TrackDto) {
@@ -350,21 +376,24 @@ function onThumbClick(row: TrackDto) {
 }
 
 function batchPlay() {
-  const list = selectedTracks.value
+  const list = selectedTracks.value.map(asQueueTrack)
   if (!list.length) return
   player.setQueue(list, 0)
 }
 
 function batchAddQueue() {
-  const list = selectedTracks.value
+  const list = selectedTracks.value.map(asQueueTrack)
   if (!list.length) return
   const added = player.appendToQueue(list)
   ElMessage.success(added ? `已添加 ${added} 首到播放列表` : '所选歌曲已在播放列表中')
 }
 
 function batchCollect() {
-  const list = selectedTracks.value
-  if (!list.length) return
+  const list = selectedTracks.value.filter((t) => !isFolderOnly(t))
+  if (!list.length) {
+    ElMessage.info('本地文件夹曲目暂不支持收藏到歌单')
+    return
+  }
   if (!user.accessToken) {
     ui.openLogin('login')
     return
@@ -373,8 +402,11 @@ function batchCollect() {
 }
 
 async function batchDelete() {
-  const list = selectedTracks.value
-  if (!list.length) return
+  const list = selectedTracks.value.filter((t) => !isFolderOnly(t))
+  if (!list.length) {
+    ElMessage.info('本地文件夹曲目不会从磁盘删除，请在来源设置中移除文件夹')
+    return
+  }
   try {
     if (props.allowRemove && props.playlistId) {
       await ElMessageBox.confirm(`确定从歌单中删除选中的 ${list.length} 首歌曲？`, '删除', {
@@ -408,7 +440,11 @@ async function batchDelete() {
   }
 }
 
-function onCollect(row: TrackDto) {
+function onCollect(row: TrackDto | QueueTrack) {
+  if (isFolderOnly(row)) {
+    ElMessage.info('本地文件夹曲目暂不支持收藏到歌单')
+    return
+  }
   if (!user.accessToken) {
     ui.openLogin('login')
     return
@@ -416,12 +452,20 @@ function onCollect(row: TrackDto) {
   ui.openCollect(row)
 }
 
-function onComments(row: TrackDto) {
+function onComments(row: TrackDto | QueueTrack) {
+  if (isFolderOnly(row)) {
+    ElMessage.info('本地文件夹曲目暂无评论')
+    return
+  }
   ui.openPageComments(row)
   router.push(`/comment/${row.id}`)
 }
 
-async function toggleLike(row: TrackDto) {
+async function toggleLike(row: TrackDto | QueueTrack) {
+  if (isFolderOnly(row)) {
+    ElMessage.info('本地文件夹曲目暂不支持喜欢')
+    return
+  }
   if (!user.accessToken) {
     ui.openLogin('login')
     return
@@ -442,7 +486,11 @@ function closeMenu() {
   menu.track = null
 }
 
-async function onDownload(track: TrackDto) {
+async function onDownload(track: TrackDto | QueueTrack) {
+  if (isFolderOnly(track)) {
+    ElMessage.info('本地文件夹曲目已在本机，无需下载')
+    return
+  }
   if (downloadingId.value === track.id) return
   if (!user.accessToken) {
     ui.openLogin('login')
@@ -835,6 +883,10 @@ async function onMenuAction(action: string) {
   &:hover {
     background: rgba(236, 65, 65, 0.08);
   }
+}
+.like-placeholder {
+  color: var(--wy-text-muted);
+  font-size: 12px;
 }
 .col-dur {
   font-size: 13px;

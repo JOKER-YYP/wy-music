@@ -22,11 +22,12 @@
 import { ref } from 'vue'
 import { Operation } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
+import type { QueueTrack } from '../stores/player'
 import SongListTable from './SongListTable.vue'
 
 withDefaults(
   defineProps<{
-    tracks: TrackDto[]
+    tracks: Array<TrackDto | QueueTrack>
     allowDelete?: boolean
     allowRemove?: boolean
     playlistId?: string

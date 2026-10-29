@@ -67,6 +67,10 @@ const wyAPI = {
     ipcRenderer.invoke('net:downloadFile', payload) as Promise<{ ok: boolean; path: string }>,
   writeTextFile: (payload: { path: string; text: string }) =>
     ipcRenderer.invoke('fs:writeTextFile', payload) as Promise<{ ok: boolean; path: string }>,
+  getTempDownloadPath: (fileName?: string) =>
+    ipcRenderer.invoke('fs:tempDownloadPath', fileName) as Promise<string>,
+  deleteFile: (filePath: string) =>
+    ipcRenderer.invoke('fs:deleteFile', filePath) as Promise<{ ok: boolean }>,
   selectAudioFiles: (multi = false) =>
     ipcRenderer.invoke('dialog:selectAudioFiles', multi) as Promise<string[]>,
   selectLrcFile: () =>

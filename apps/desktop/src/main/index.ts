@@ -1903,6 +1903,29 @@ app.whenReady().then(() => {
     },
   )
 
+  /** 临时下载路径（下歌吧入库：先下到 temp 再上传曲库） */
+  ipcMain.handle('fs:tempDownloadPath', async (_e, fileName?: string) => {
+    const dir = join(app.getPath('temp'), 'wy-music-import')
+    mkdirSync(dir, { recursive: true })
+    const raw = String(fileName || `audio-${randomUUID()}.mp3`)
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+      .trim()
+      .slice(0, 160) || `audio-${randomUUID()}.mp3`
+    const safe = raw.includes('.') ? raw : `${raw}.mp3`
+    return join(dir, `${Date.now()}-${safe}`)
+  })
+
+  ipcMain.handle('fs:deleteFile', async (_e, filePath?: string) => {
+    const p = String(filePath || '').trim()
+    if (!p) return { ok: false as const }
+    try {
+      if (existsSync(p)) unlinkSync(p)
+      return { ok: true as const }
+    } catch {
+      return { ok: false as const }
+    }
+  })
+
   ipcMain.handle('dialog:selectAudioFiles', async (_e, multi = false) => {
     const parent = getParentWindow()
     const options: Electron.OpenDialogOptions = {

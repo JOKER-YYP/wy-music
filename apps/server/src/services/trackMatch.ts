@@ -101,15 +101,19 @@ export function matchExternalSongs(
 
     const candidates = (byName.get(norm) || []).filter((t) => !used.has(t.id))
     let hit: IndexedTrack | undefined
+    const remoteHasArtist = normalizeArtistList(remote.artists).length > 0
 
-    if (candidates.length === 1) {
-      hit = candidates[0]
-    } else if (candidates.length > 1) {
-      hit =
-        candidates.find((t) => artistsOverlap(remote.artists, t.artists)) ||
-        candidates[0]
-    } else {
-      // 兜底：歌名包含关系 + 歌手交集
+    // 有歌手信息时必须歌手有交集，避免同名乱匹配；无歌手时仅接受唯一歌名命中
+    if (candidates.length) {
+      if (remoteHasArtist) {
+        hit = candidates.find((t) => artistsOverlap(remote.artists, t.artists))
+      } else if (candidates.length === 1) {
+        hit = candidates[0]
+      }
+    }
+
+    if (!hit && remoteHasArtist) {
+      // 兜底：歌名包含关系 + 歌手交集（仍要求歌手）
       hit = index.find(
         (t) =>
           !used.has(t.id) &&

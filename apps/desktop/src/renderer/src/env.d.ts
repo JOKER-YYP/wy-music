@@ -87,6 +87,8 @@ declare global {
           lyricText?: string
         }
       }) => Promise<{ ok: boolean; message?: string; data?: unknown }>
+      getTempDownloadPath?: (fileName?: string) => Promise<string>
+      deleteFile?: (filePath: string) => Promise<{ ok: boolean }>
       toLocalPlayUrl: (filePath: string) => string
       fetchJson?: (url: string) => Promise<unknown>
       fetchFormJson?: (

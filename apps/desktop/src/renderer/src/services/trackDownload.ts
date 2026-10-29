@@ -164,24 +164,96 @@ export async function downloadTrackToLocalFile(track: TrackDto): Promise<string 
   return downloadTrackToPath(track, destPath)
 }
 
-/** 下载到曲库 */
+/**
+ * 下歌吧：本机用夸克/百度下到临时文件，再上传公共曲库（服务端拉不到网盘直链）
+ */
+async function importLiumingyePanToLibrary(track: TrackDto): Promise<TrackDto> {
+  if (
+    !window.wyAPI?.getTempDownloadPath ||
+    !window.wyAPI?.uploadTrack ||
+    !window.wyAPI?.quarkDownloadFile ||
+    !window.wyAPI?.baiduDownloadFile
+  ) {
+    throw new Error('请在桌面端将下歌吧资源下载到曲库')
+  }
+  const accessToken = localStorage.getItem('accessToken') || ''
+  if (!accessToken) throw new Error('请先登录')
+
+  const source = await resolveDownloadSource(track)
+  if (!source.viaQuark && !source.viaBaidu) {
+    // 偶发直链，走服务端导入
+    return importExternalToLibrary(track)
+  }
+
+  const preferredExt =
+    extFromFileName(source.fileName) || guessExtFromUrl(source.url) || '.mp3'
+  const destPath = await window.wyAPI.getTempDownloadPath(
+    suggestedDownloadName(track, preferredExt),
+  )
+
+  try {
+    if (source.viaQuark) {
+      await window.wyAPI.quarkDownloadFile({ url: source.url, destPath })
+    } else {
+      await window.wyAPI.baiduDownloadFile({ url: source.url, destPath })
+    }
+
+    const result = await window.wyAPI.uploadTrack({
+      filePath: destPath,
+      accessToken,
+      apiBase: import.meta.env.VITE_API_BASE || 'http://127.0.0.1:3001',
+      fields: {
+        name: track.name,
+        artists: (track.artists || []).filter(Boolean).join(',') || '未知歌手',
+        album: track.album || '',
+        lyricText: source.lyricText || track.lyricText || '',
+      },
+    })
+    if (!result.ok || !result.data) {
+      throw new Error(result.message || '上传到曲库失败')
+    }
+    return result.data as TrackDto
+  } finally {
+    try {
+      await window.wyAPI.deleteFile?.(destPath)
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** 下载到曲库（含下歌吧：先网盘下到临时目录再上传） */
 export async function downloadTrackToLibrary(track: TrackDto) {
   if (!isExternalTrack(track)) {
     throw new Error('曲库歌曲请使用自定义路径下载到本地')
   }
-  if (track.source && isLiumingyeSource(track.source)) {
-    throw new Error('下歌吧网盘资源请使用「下载到文件夹」')
-  }
   if (!localStorage.getItem('accessToken')) {
     throw new Error('请先登录')
   }
-  const imported = await importExternalToLibrary(track)
+  const imported =
+    track.source && isLiumingyeSource(track.source)
+      ? await importLiumingyePanToLibrary(track)
+      : await importExternalToLibrary(track)
   ElMessage.success(
     imported.status === 'pending'
       ? `「${imported.name}」已提交审核`
       : `「${imported.name}」已下载到曲库`,
   )
   return imported
+}
+
+/** 入库但不弹成功 toast（批量用） */
+export async function importTrackToLibraryQuiet(track: TrackDto): Promise<TrackDto> {
+  if (!isExternalTrack(track)) {
+    throw new Error('非外部曲目')
+  }
+  if (!localStorage.getItem('accessToken')) {
+    throw new Error('请先登录')
+  }
+  if (track.source && isLiumingyeSource(track.source)) {
+    return importLiumingyePanToLibrary(track)
+  }
+  return importExternalToLibrary(track)
 }
 
 function joinDirFile(dir: string, fileName: string) {
@@ -255,10 +327,7 @@ export async function downloadTracksToLibrary(
     onProgress?.(i, total, track.name)
     try {
       if (!isExternalTrack(track)) throw new Error('非外部曲目')
-      if (track.source && isLiumingyeSource(track.source)) {
-        throw new Error('下歌吧网盘资源请改用「下载到文件夹」')
-      }
-      await importExternalToLibrary(track)
+      await importTrackToLibraryQuiet(track)
       ok += 1
     } catch (e) {
       failures.push(failItem(track, e))

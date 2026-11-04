@@ -134,6 +134,20 @@ declare global {
       closeDesktopLyricMenu?: () => Promise<boolean>
       publishDesktopLyricPrefs?: (prefs: Record<string, unknown>) => void
       onDesktopLyricPrefs?: (handler: (prefs: Record<string, unknown>) => void) => () => void
+      getShellPrefs?: () => Promise<{
+        showTray: boolean
+        closeToTray: boolean
+        mediaKeysEnabled: boolean
+      }>
+      setShellPrefs?: (prefs: {
+        showTray?: boolean
+        closeToTray?: boolean
+        mediaKeysEnabled?: boolean
+      }) => Promise<{
+        showTray: boolean
+        closeToTray: boolean
+        mediaKeysEnabled: boolean
+      }>
     }
   }
 }

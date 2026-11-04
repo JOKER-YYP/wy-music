@@ -37,6 +37,15 @@ import {
   openBaiduLoginWindow,
   resolveBaiduShareDownload,
 } from './baiduPan'
+import {
+  initTrayAndMediaKeys,
+  handleMainWindowClose,
+  handleCloseButton,
+  updateTrayPlayerState,
+  resolveTrayIconFromCandidates,
+  shouldCloseToTray,
+  requestAppQuit,
+} from './trayMedia'
 
 /** 外部音乐源域名：允许忽略过期证书（如酷我 kw-api） */
 const MUSIC_API_HOSTS = new Set([
@@ -657,6 +666,10 @@ function createWindow() {
     win.show()
     mainWindowCollapsed = false
     updateThumbarButtons(lastPlayerState, true)
+  })
+
+  win.on('close', (e) => {
+    handleMainWindowClose(e)
   })
 
   win.on('closed', () => {
@@ -1635,6 +1648,7 @@ app.whenReady().then(() => {
     return win.isMaximized()
   })
   ipcMain.handle('window:close', () => {
+    if (handleCloseButton()) return true
     const win = mainWindow
     if (win && !win.isDestroyed()) win.close()
     return true
@@ -1721,9 +1735,10 @@ app.whenReady().then(() => {
     }
   })
 
-  // 主窗口 → 小组件 / 桌面歌词 / 任务栏预览：播放状态同步
+  // 主窗口 → 小组件 / 桌面歌词 / 任务栏预览 / 托盘：播放状态同步
   ipcMain.on('player:pushState', (_e, state) => {
     applyTaskbarPlayerState(state || null)
+    updateTrayPlayerState(state || null)
     if (miniWindow && !miniWindow.isDestroyed()) {
       miniWindow.webContents.send('player:state', state)
     }
@@ -2144,12 +2159,39 @@ app.whenReady().then(() => {
     },
   )
 
+  initTrayAndMediaKeys({
+    resolveIcon: () => {
+      const fromApp = resolveAppIcon()
+      if (fromApp && !fromApp.isEmpty()) return fromApp
+      return resolveTrayIconFromCandidates([
+        join(__dirname, '../../resources/icon.ico'),
+        join(__dirname, '../../resources/icon.png'),
+        join(__dirname, '../../resources/logo.png'),
+        join(process.cwd(), 'resources/icon.ico'),
+        join(process.cwd(), 'resources/icon.png'),
+        join(process.cwd(), 'resources/logo.png'),
+      ])
+    },
+    focusMain: () => focusMainWindow(),
+    collapseMain: () => collapseMainWindow(),
+    sendPlayerCommand: (cmd) => sendPlayerCommand(cmd),
+    toggleMiniPlayer: () => toggleMiniPlayer(),
+    toggleDesktopLyric: () => toggleDesktopLyric(),
+    isMiniOpen: () => Boolean(miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()),
+    isDesktopLyricOpen: () => isDesktopLyricOpen(),
+  })
+
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    else focusMainWindow()
   })
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // 关闭到托盘时主窗被 hide 而非 destroy，不会走到这里；
+  // 真正关闭且仍保留托盘时不退出，由托盘「退出」结束进程。
+  if (process.platform === 'darwin') return
+  if (shouldCloseToTray()) return
+  requestAppQuit()
 })

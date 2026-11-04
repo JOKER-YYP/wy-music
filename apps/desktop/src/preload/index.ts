@@ -202,6 +202,24 @@ const wyAPI = {
     ipcRenderer.on('desktopLyric:prefs', listener)
     return () => ipcRenderer.removeListener('desktopLyric:prefs', listener)
   },
+
+  // 托盘 / 全局媒体键
+  getShellPrefs: () =>
+    ipcRenderer.invoke('shell:getPrefs') as Promise<{
+      showTray: boolean
+      closeToTray: boolean
+      mediaKeysEnabled: boolean
+    }>,
+  setShellPrefs: (prefs: {
+    showTray?: boolean
+    closeToTray?: boolean
+    mediaKeysEnabled?: boolean
+  }) =>
+    ipcRenderer.invoke('shell:setPrefs', prefs) as Promise<{
+      showTray: boolean
+      closeToTray: boolean
+      mediaKeysEnabled: boolean
+    }>,
 }
 
 contextBridge.exposeInMainWorld('wyAPI', wyAPI)

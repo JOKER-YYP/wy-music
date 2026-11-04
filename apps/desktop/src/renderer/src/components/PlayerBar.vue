@@ -6,9 +6,11 @@
       @mouseenter="progressHovered = true"
       @mouseleave="progressHovered = false"
     >
-      <div v-show="progressHovered || dragging" class="time-tip">
-        {{ formatTime(displayTime) }} / {{ formatTime(sliderMax) }}
-      </div>
+      <Transition name="tip-fade">
+        <div v-if="progressHovered || dragging" class="time-tip">
+          {{ formatTime(displayTime) }} / {{ formatTime(sliderMax) }}
+        </div>
+      </Transition>
       <input
         class="seek"
         type="range"
@@ -27,20 +29,27 @@
 
     <div class="body">
       <div class="meta">
-        <button
-          ref="coverEl"
-          class="cover"
-          type="button"
-          title="打开播放页"
-          :class="{ spinning: player.playing }"
-          :style="{ backgroundImage: coverStyle }"
-          :disabled="!track"
-          @click="openNowPlaying"
-        />
-        <div class="info">
-          <div class="title" :title="track?.name">{{ track?.name || '未在播放' }}</div>
-          <div class="artists">{{ artists || ' ' }}</div>
+        <div class="cover-slot">
+          <Transition name="cover-swap" mode="out-in">
+            <button
+              :key="track?.id || 'empty'"
+              ref="coverEl"
+              class="cover"
+              type="button"
+              title="打开播放页"
+              :class="{ spinning: player.playing }"
+              :style="{ backgroundImage: coverStyle }"
+              :disabled="!track"
+              @click="openNowPlaying"
+            />
+          </Transition>
         </div>
+        <Transition name="meta-fade" mode="out-in">
+          <div :key="track?.id || 'empty'" class="info">
+            <div class="title" :title="track?.name">{{ track?.name || '未在播放' }}</div>
+            <div class="artists">{{ artists || ' ' }}</div>
+          </div>
+        </Transition>
 
         <div v-if="track && !track.localPath && !track.previewFile" class="social">
           <button
@@ -50,7 +59,7 @@
             :class="{ on: track.liked }"
             @click="toggleLike"
           >
-            <el-icon :size="16">
+            <el-icon :size="16" :class="{ 'like-pop': track.liked }">
               <StarFilled v-if="track.liked" />
               <Star v-else />
             </el-icon>
@@ -464,6 +473,18 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   pointer-events: none;
   z-index: 3;
+  font-variant-numeric: tabular-nums;
+}
+.tip-fade-enter-active,
+.tip-fade-leave-active {
+  transition:
+    opacity var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease);
+}
+.tip-fade-enter-from,
+.tip-fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }
 .seek {
   -webkit-appearance: none;
@@ -480,7 +501,7 @@ onBeforeUnmount(() => {
     var(--wy-border-strong) var(--pct, 0%),
     var(--wy-border-strong) 100%
   );
-  transition: height 0.12s ease;
+  transition: height var(--wy-duration-fast) var(--wy-ease);
   &:disabled {
     cursor: default;
     opacity: 0.5;
@@ -500,7 +521,11 @@ onBeforeUnmount(() => {
     border: none;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
     opacity: 1;
-    transition: background var(--wy-duration-fast), transform var(--wy-duration-fast), border var(--wy-duration-fast);
+    transition:
+      background var(--wy-duration-fast) var(--wy-ease),
+      transform var(--wy-duration-fast) var(--wy-ease-out),
+      border-color var(--wy-duration-fast) var(--wy-ease),
+      box-shadow var(--wy-duration-fast) var(--wy-ease);
   }
   .progress-wrap:hover &,
   .hovered &,
@@ -509,7 +534,7 @@ onBeforeUnmount(() => {
       background: var(--wy-surface);
       border: 2px solid var(--wy-brand);
       box-shadow: 0 0 0 1px rgba(236, 65, 65, 0.2);
-      transform: scale(1.08);
+      transform: scale(1.12);
     }
   }
   &:disabled::-webkit-slider-thumb {
@@ -521,12 +546,16 @@ onBeforeUnmount(() => {
     border-radius: 50%;
     background: var(--wy-scrollbar);
     border: none;
+    transition:
+      background var(--wy-duration-fast) var(--wy-ease),
+      transform var(--wy-duration-fast) var(--wy-ease);
   }
   .progress-wrap:hover &,
   .hovered & {
     &::-moz-range-thumb {
       background: var(--wy-surface);
       border: 2px solid var(--wy-brand);
+      transform: scale(1.12);
     }
   }
   &::-moz-range-track {
@@ -549,6 +578,12 @@ onBeforeUnmount(() => {
   gap: 10px;
   min-width: 0;
 }
+.cover-slot {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  position: relative;
+}
 .cover {
   width: 44px;
   height: 44px;
@@ -563,21 +598,63 @@ onBeforeUnmount(() => {
     0 0 0 1px #111,
     inset 0 0 0 1px rgba(255, 255, 255, 0.15);
   position: relative;
-  transition: transform 0.2s ease;
+  transition: transform var(--wy-duration) var(--wy-ease-out);
   &:disabled {
     cursor: default;
     opacity: 0.7;
   }
   &:not(:disabled):hover {
-    transform: scale(1.04);
+    transform: scale(1.05);
+  }
+  &:not(:disabled):active {
+    transform: scale(0.97);
   }
   &.spinning {
     animation: spin 12s linear infinite;
   }
 }
+.cover-swap-enter-active,
+.cover-swap-leave-active {
+  transition:
+    opacity var(--wy-duration) var(--wy-ease),
+    transform var(--wy-duration) var(--wy-ease-out);
+}
+.cover-swap-enter-from {
+  opacity: 0;
+  transform: scale(0.88);
+}
+.cover-swap-leave-to {
+  opacity: 0;
+  transform: scale(1.06);
+}
+.meta-fade-enter-active,
+.meta-fade-leave-active {
+  transition:
+    opacity var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration) var(--wy-ease-out);
+}
+.meta-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.meta-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+@keyframes like-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.28);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 .info {
@@ -618,6 +695,13 @@ onBeforeUnmount(() => {
   cursor: pointer;
   padding: 0;
   font-size: 12px;
+  transition: color var(--wy-duration-fast) var(--wy-ease);
+  .el-icon {
+    transition: transform var(--wy-duration-fast) var(--wy-ease-out);
+  }
+  .like-pop {
+    animation: like-pop 0.38s var(--wy-ease-out);
+  }
   &:hover,
   &.on {
     color: var(--wy-brand);
@@ -648,6 +732,10 @@ onBeforeUnmount(() => {
   place-items: center;
   padding: 0;
   font-size: 13px;
+  transition:
+    color var(--wy-duration-fast) var(--wy-ease),
+    background var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
   .iconfont {
     font-size: 20px;
     color: inherit;
@@ -655,7 +743,14 @@ onBeforeUnmount(() => {
   }
   &:hover:not(:disabled) {
     color: var(--wy-brand);
-    background: rgba(236, 65, 65, 0.08);
+    background: var(--wy-brand-soft);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.92);
+  }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--wy-focus-ring);
   }
   &:disabled {
     opacity: 0.35;
@@ -683,15 +778,23 @@ onBeforeUnmount(() => {
   place-items: center;
   padding: 0;
   box-shadow: 0 4px 12px rgba(236, 65, 65, 0.35);
-  transition: transform var(--wy-duration-fast), background var(--wy-duration-fast);
+  transition:
+    transform var(--wy-duration-fast) var(--wy-ease-out),
+    background var(--wy-duration-fast) var(--wy-ease),
+    box-shadow var(--wy-duration-fast) var(--wy-ease);
   .play-ico {
     font-size: 22px;
     color: var(--wy-text-on-brand);
     line-height: 1;
+    transition: transform var(--wy-duration-fast) var(--wy-ease-out);
   }
   &:hover:not(:disabled) {
     background: var(--wy-brand-hover);
-    transform: scale(1.05);
+    transform: scale(1.06);
+    box-shadow: 0 6px 16px rgba(236, 65, 65, 0.4);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.94);
   }
   &:focus-visible {
     box-shadow: var(--wy-focus-ring);
@@ -736,5 +839,31 @@ onBeforeUnmount(() => {
   width: 100%;
   accent-color: var(--wy-brand);
   cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover.spinning,
+  .play-loading {
+    animation: none;
+  }
+  .cover-swap-enter-active,
+  .cover-swap-leave-active,
+  .meta-fade-enter-active,
+  .meta-fade-leave-active,
+  .tip-fade-enter-active,
+  .tip-fade-leave-active {
+    transition-duration: 0.01ms !important;
+  }
+  .cover-swap-enter-from,
+  .cover-swap-leave-to,
+  .meta-fade-enter-from,
+  .meta-fade-leave-to,
+  .tip-fade-enter-from,
+  .tip-fade-leave-to {
+    transform: none;
+  }
+  .like-pop {
+    animation: none;
+  }
 }
 </style>

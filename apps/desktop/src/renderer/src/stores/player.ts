@@ -76,6 +76,49 @@ async function safePlay(audio: HTMLAudioElement) {
   }
 }
 
+/** 播放/暂停音量淡入淡出（短程，避免硬切） */
+let volumeFadeRaf = 0
+let volumeFadeToken = 0
+
+function cancelVolumeFade() {
+  if (volumeFadeRaf) {
+    cancelAnimationFrame(volumeFadeRaf)
+    volumeFadeRaf = 0
+  }
+  volumeFadeToken += 1
+}
+
+function rampVolume(audio: HTMLAudioElement, target: number, ms: number): Promise<void> {
+  cancelVolumeFade()
+  const start = audio.volume
+  const clamped = Math.min(1, Math.max(0, target))
+  if (ms <= 0 || Math.abs(start - clamped) < 0.008) {
+    audio.volume = clamped
+    return Promise.resolve()
+  }
+  const token = volumeFadeToken
+  const t0 = performance.now()
+  return new Promise((resolve) => {
+    const step = (now: number) => {
+      if (token !== volumeFadeToken) {
+        resolve()
+        return
+      }
+      const p = Math.min(1, (now - t0) / ms)
+      const eased = 1 - (1 - p) * (1 - p)
+      audio.volume = start + (clamped - start) * eased
+      if (p < 1) {
+        volumeFadeRaf = requestAnimationFrame(step)
+      } else {
+        audio.volume = clamped
+        volumeFadeRaf = 0
+        resolve()
+      }
+    }
+    volumeFadeRaf = requestAnimationFrame(step)
+  })
+}
+
 export const usePlayerStore = defineStore('player', {
   state: () => ({
     queue: [] as QueueTrack[],
@@ -299,8 +342,10 @@ export const usePlayerStore = defineStore('player', {
         })
 
         if (token !== this.playToken) return
+        audio.volume = 0
         await safePlay(audio)
         if (token !== this.playToken) return
+        void rampVolume(audio, this.volume, 220)
 
         this.playing = true
         if (
@@ -321,7 +366,7 @@ export const usePlayerStore = defineStore('player', {
       }
     },
 
-    toggle() {
+    async toggle() {
       const audio = this.ensureAudio()
       if (!this.currentTrack) return
       if (!audio.src) {
@@ -329,12 +374,18 @@ export const usePlayerStore = defineStore('player', {
         return
       }
       if (audio.paused) {
-        void safePlay(audio).then(() => {
-          // 若源已失效，整曲重载
-          if (audio.error) void this.playCurrent()
-        })
+        audio.volume = 0
+        await safePlay(audio)
+        // 若源已失效，整曲重载
+        if (audio.error) {
+          void this.playCurrent()
+          return
+        }
+        void rampVolume(audio, this.volume, 180)
       } else {
+        await rampVolume(audio, 0, 140)
         audio.pause()
+        audio.volume = this.volume
       }
     },
 
@@ -455,6 +506,7 @@ export const usePlayerStore = defineStore('player', {
     setVolume(v: number) {
       this.volume = v
       localStorage.setItem('volume', String(v))
+      cancelVolumeFade()
       this.ensureAudio().volume = v
     },
 

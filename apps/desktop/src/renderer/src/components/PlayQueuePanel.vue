@@ -194,10 +194,11 @@ async function clearAll() {
   z-index: 2600;
   background: var(--wy-surface);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
-  border-left: 1px solid #eee;
+  border-left: 1px solid var(--wy-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: -6px 0 28px rgba(16, 16, 24, 0.1);
 }
 
 .head {
@@ -340,15 +341,16 @@ async function clearAll() {
   gap: 12px;
   padding: 8px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--wy-radius-sm);
   background: transparent;
   text-align: left;
   cursor: pointer;
+  transition: background var(--wy-duration-fast) var(--wy-ease);
   &:hover {
     background: var(--wy-surface-muted);
   }
   &.active {
-    background: var(--wy-surface-muted);
+    background: var(--wy-brand-soft);
     .name,
     .artists,
     .duration {
@@ -421,13 +423,30 @@ async function clearAll() {
   padding-left: 8px;
 }
 
-.queue-slide-enter-active,
+.queue-slide-enter-active {
+  transition:
+    transform var(--wy-duration) var(--wy-ease-out),
+    opacity var(--wy-duration) var(--wy-ease);
+}
 .queue-slide-leave-active {
-  transition: transform 0.22s ease, opacity 0.22s ease;
+  transition:
+    transform var(--wy-duration-fast) var(--wy-ease-in),
+    opacity var(--wy-duration-fast) var(--wy-ease-in);
 }
 .queue-slide-enter-from,
 .queue-slide-leave-to {
-  transform: translateX(100%);
-  opacity: 0.6;
+  transform: translateX(18px);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-slide-enter-active,
+  .queue-slide-leave-active {
+    transition-duration: 0.01ms !important;
+  }
+  .queue-slide-enter-from,
+  .queue-slide-leave-to {
+    transform: none;
+  }
 }
 </style>

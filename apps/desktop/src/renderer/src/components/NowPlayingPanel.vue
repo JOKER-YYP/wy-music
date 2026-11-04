@@ -6,7 +6,11 @@
         class="now-playing"
         @wheel="onWheel"
       >
-        <div class="np-bg" :style="bgStyle" />
+        <div class="np-bg-stack">
+          <Transition name="np-bg">
+            <div :key="coverUrl || 'empty'" class="np-bg" :style="bgStyle" />
+          </Transition>
+        </div>
         <div class="np-mask" />
 
         <header class="np-top">
@@ -23,18 +27,26 @@
               <div class="tonearm" :class="{ on: player.playing }" />
               <div class="vinyl" :class="{ spinning: player.playing }">
                 <div class="vinyl-disc">
-                  <div class="vinyl-cover" :style="coverStyle" />
+                  <div class="vinyl-cover-slot">
+                    <Transition name="vinyl-cover">
+                      <div :key="track.id" class="vinyl-cover" :style="coverStyle" />
+                    </Transition>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           <div class="np-right">
-            <h1 class="song-name">{{ track.name }}</h1>
-            <div class="song-meta">
-              <span v-if="track.album">专辑：{{ track.album }}</span>
-              <span>歌手：{{ artists }}</span>
-            </div>
+            <Transition name="np-meta" mode="out-in">
+              <div :key="track.id" class="song-head">
+                <h1 class="song-name">{{ track.name }}</h1>
+                <div class="song-meta">
+                  <span v-if="track.album">专辑：{{ track.album }}</span>
+                  <span>歌手：{{ artists }}</span>
+                </div>
+              </div>
+            </Transition>
 
             <div class="tabs">
               <button
@@ -446,6 +458,12 @@ watch(
   flex-direction: column;
   color: #fff;
   overflow: hidden;
+  will-change: transform, opacity;
+}
+.np-bg-stack {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 .np-bg {
   position: absolute;
@@ -454,6 +472,17 @@ watch(
   background-position: center;
   filter: blur(48px) brightness(0.32);
   transform: scale(1.12);
+}
+.np-bg-enter-active,
+.np-bg-leave-active {
+  transition: opacity var(--wy-duration-slow) var(--wy-ease);
+}
+.np-bg-enter-from,
+.np-bg-leave-to {
+  opacity: 0;
+}
+.np-bg-leave-active {
+  position: absolute;
 }
 .np-mask {
   position: absolute;
@@ -483,8 +512,14 @@ watch(
   display: grid;
   place-items: center;
   border-radius: 50%;
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
   &:hover {
     background: rgba(255, 255, 255, 0.08);
+  }
+  &:active {
+    transform: scale(0.92);
   }
 }
 .np-top-title {
@@ -519,7 +554,7 @@ watch(
   border-radius: 4px;
   transform-origin: top center;
   transform: rotate(-28deg);
-  transition: transform 0.45s ease;
+  transition: transform var(--wy-duration-slow) var(--wy-ease-out);
   z-index: 2;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   &::before {
@@ -571,14 +606,48 @@ watch(
 .vinyl.spinning .vinyl-disc {
   animation-play-state: running;
 }
-.vinyl-cover {
+.vinyl-cover-slot {
   width: 56%;
   height: 56%;
+  position: relative;
+}
+.vinyl-cover {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background-size: cover;
   background-position: center;
   border: 3px solid rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.vinyl-cover-enter-active,
+.vinyl-cover-leave-active {
+  transition: opacity var(--wy-duration) var(--wy-ease);
+}
+.vinyl-cover-enter-from,
+.vinyl-cover-leave-to {
+  opacity: 0;
+}
+.vinyl-cover-leave-active {
+  position: absolute;
+  inset: 0;
+}
+.song-head {
+  min-width: 0;
+}
+.np-meta-enter-active,
+.np-meta-leave-active {
+  transition:
+    opacity var(--wy-duration) var(--wy-ease),
+    transform var(--wy-duration) var(--wy-ease-out);
+}
+.np-meta-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.np-meta-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 @keyframes spin {
   to {
@@ -652,7 +721,10 @@ watch(
   padding: 11px 72px 11px 8px;
   font-size: 16px;
   color: rgba(255, 255, 255, 0.32);
-  transition: color 0.28s ease, font-size 0.28s ease;
+  transition:
+    color var(--wy-duration) var(--wy-ease),
+    font-size var(--wy-duration) var(--wy-ease-out),
+    opacity var(--wy-duration) var(--wy-ease);
   line-height: 1.55;
   &:hover {
     color: rgba(255, 255, 255, 0.72);
@@ -791,9 +863,16 @@ watch(
   display: grid;
   place-items: center;
   padding: 0;
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
   &:hover {
     background: rgba(255, 255, 255, 0.1);
     color: #fff;
+  }
+  &:active {
+    transform: scale(0.9);
   }
   &.on {
     color: var(--wy-brand);
@@ -840,12 +919,18 @@ watch(
   place-items: center;
   cursor: pointer;
   padding: 0;
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
   .iconfont {
     font-size: 18px;
     line-height: 1;
   }
   &:hover {
     background: rgba(255, 255, 255, 0.2);
+  }
+  &:active {
+    transform: scale(0.9);
   }
 }
 .np-play {
@@ -859,12 +944,22 @@ watch(
   place-items: center;
   cursor: pointer;
   padding: 0;
+  box-shadow: 0 8px 24px rgba(236, 65, 65, 0.35);
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out),
+    box-shadow var(--wy-duration-fast) var(--wy-ease);
   .iconfont {
     font-size: 22px;
     line-height: 1;
   }
   &:hover {
     background: var(--wy-brand-hover);
+    transform: scale(1.05);
+    box-shadow: 0 10px 28px rgba(236, 65, 65, 0.42);
+  }
+  &:active {
+    transform: scale(0.94);
   }
 }
 .np-right-tools {
@@ -874,19 +969,86 @@ watch(
   gap: 4px;
   :deep(.el-button) {
     color: rgba(255, 255, 255, 0.85);
+    --el-button-text-color: rgba(255, 255, 255, 0.85);
+    --el-button-hover-text-color: #fff;
+    --el-button-hover-bg-color: rgba(255, 255, 255, 0.12);
+    --el-button-hover-border-color: transparent;
+    --el-button-active-text-color: #fff;
+    --el-button-active-bg-color: rgba(255, 255, 255, 0.18);
+    --el-button-disabled-text-color: rgba(255, 255, 255, 0.35);
+    --el-button-disabled-bg-color: transparent;
+    background: transparent;
+    border-color: transparent;
+    &:hover,
+    &:focus {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.12);
+      border-color: transparent;
+    }
   }
   :deep(.dl-on) {
     color: var(--wy-brand) !important;
+    --el-button-text-color: var(--wy-brand);
+    --el-button-hover-text-color: var(--wy-brand);
   }
 }
-.np-fade-enter-active,
-.np-fade-leave-active {
-  transition: opacity 0.28s ease, transform 0.28s ease;
+.np-fade-enter-active {
+  transition:
+    opacity var(--wy-duration-slow) var(--wy-ease-out),
+    transform var(--wy-duration-slow) var(--wy-ease-out);
 }
-.np-fade-enter-from,
+.np-fade-leave-active {
+  transition:
+    opacity var(--wy-duration) var(--wy-ease-in),
+    transform var(--wy-duration) var(--wy-ease-in);
+}
+.np-fade-enter-from {
+  opacity: 0;
+  transform: translateY(36px);
+}
 .np-fade-leave-to {
   opacity: 0;
-  transform: translateY(28px);
+  transform: translateY(18px);
+}
+.np-fade-enter-active .np-body {
+  animation: np-body-in var(--wy-duration-slow) var(--wy-ease-out) both;
+}
+@keyframes np-body-in {
+  from {
+    opacity: 0.55;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vinyl.spinning .vinyl-disc {
+    animation: none;
+  }
+  .np-fade-enter-active,
+  .np-fade-leave-active,
+  .np-bg-enter-active,
+  .np-bg-leave-active,
+  .vinyl-cover-enter-active,
+  .vinyl-cover-leave-active,
+  .np-meta-enter-active,
+  .np-meta-leave-active {
+    transition-duration: 0.01ms !important;
+  }
+  .np-fade-enter-from,
+  .np-fade-leave-to,
+  .np-meta-enter-from,
+  .np-meta-leave-to {
+    transform: none;
+  }
+  .np-fade-enter-active .np-body {
+    animation: none;
+  }
+  .tonearm {
+    transition: none;
+  }
 }
 @media (max-width: 900px) {
   .np-body {

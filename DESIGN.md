@@ -26,8 +26,12 @@ Operate surfaces for a self-hosted music client. Light chrome with a single NetE
 | `--wy-on-brand-soft` | `rgba(255,255,255,.88)` | Primary controls on red topbar |
 | `--wy-focus-ring` | `0 0 0 2px #fff, 0 0 0 4px rgba(236,65,65,.45)` | Keyboard focus |
 | `--wy-scrollbar` | `#c8c8d0` | Scrollbar thumb |
-| `--wy-duration-fast` | `150ms` | Control transitions |
+| `--wy-duration-fast` | `150ms` | Control / feedback |
+| `--wy-duration` | `220ms` | Routine state change |
+| `--wy-duration-slow` | `380ms` | Overlay / now-playing entrance |
 | `--wy-ease` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Default easing |
+| `--wy-ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | Confident arrivals |
+| `--wy-ease-in` | `cubic-bezier(0.4, 0, 1, 1)` | Faster exits |
 
 Admin canvas may use a slightly cooler page bg (`#f3f4f7`) with white surfaces; same brand and text tokens.
 

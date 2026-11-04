@@ -36,7 +36,11 @@
 
   /* Motion */
   --wy-duration-fast: 150ms;
+  --wy-duration: 220ms;
+  --wy-duration-slow: 380ms;
   --wy-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --wy-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --wy-ease-in: cubic-bezier(0.4, 0, 1, 1);
 
   /* Focus / chrome */
   --wy-focus-ring: 0 0 0 2px #fff, 0 0 0 4px rgba(236, 65, 65, 0.45);

@@ -30,7 +30,13 @@
               <el-icon><VideoPlay /></el-icon>
               播放全部
             </el-button>
-            <el-button round disabled title="暂未开放">
+            <el-button
+              round
+              :disabled="!detail.tracks?.length"
+              :loading="downloading"
+              title="下载全部歌曲到本机文件夹"
+              @click="downloadAllToFolder"
+            >
               <el-icon><Download /></el-icon>
               下载
             </el-button>
@@ -41,6 +47,9 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="share" disabled>分享...</el-dropdown-item>
+                  <el-dropdown-item command="download" :disabled="!detail.tracks?.length">
+                    下载全部到文件夹…
+                  </el-dropdown-item>
                   <el-dropdown-item command="batch">批量操作</el-dropdown-item>
                   <el-dropdown-item command="addAll">添加全部至播放列表</el-dropdown-item>
                   <el-dropdown-item
@@ -126,8 +135,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Edit, MoreFilled, Search, VideoPlay } from '@element-plus/icons-vue'
 import type { TrackDto } from '@wy-music/shared'
 import { mediaUrl } from '../services/http'
+import { isElectronApp } from '../services/localUpload'
+import { downloadTracksToFolder } from '../services/trackDownload'
 import { usePlayerStore } from '../stores/player'
 import { usePlaylistStore, type PlaylistDetail } from '../stores/playlist'
+import { useUiStore } from '../stores/ui'
 import { useUserStore } from '../stores/user'
 import SongListTable from '../components/SongListTable.vue'
 
@@ -136,6 +148,7 @@ const router = useRouter()
 const player = usePlayerStore()
 const playlistStore = usePlaylistStore()
 const user = useUserStore()
+const ui = useUiStore()
 
 const loading = ref(false)
 const detail = ref<PlaylistDetail | null>(null)
@@ -144,6 +157,7 @@ const keyword = ref('')
 const batchMode = ref(false)
 const savingAs = ref(false)
 const reordering = ref(false)
+const downloading = ref(false)
 
 const isOwner = computed(() => {
   if (!detail.value || !user.user?.id) return false
@@ -246,6 +260,76 @@ function playAll() {
   player.setQueue(detail.value.tracks, 0)
 }
 
+async function downloadAllToFolder() {
+  const tracks = detail.value?.tracks || []
+  if (!tracks.length) {
+    ElMessage.info('歌单为空')
+    return
+  }
+  if (!user.accessToken) {
+    ui.openLogin('login')
+    return
+  }
+  if (!isElectronApp()) {
+    ElMessage.warning('请在桌面端下载到本机文件夹')
+    return
+  }
+  if (downloading.value) return
+
+  try {
+    await ElMessageBox.confirm(
+      `将把歌单「${detail.value?.name}」共 ${tracks.length} 首下载到你选择的文件夹。\n文件名按「歌名 - 歌手」规则自动命名。`,
+      '下载到文件夹',
+      {
+        confirmButtonText: '选择文件夹…',
+        cancelButtonText: '取消',
+        type: 'info',
+      },
+    )
+  } catch {
+    return
+  }
+
+  downloading.value = true
+  const progress = ElMessage({
+    message: `准备下载 0/${tracks.length}…`,
+    type: 'info',
+    duration: 0,
+    showClose: false,
+  })
+  try {
+    const { ok, fail, failures, folder } = await downloadTracksToFolder(
+      tracks,
+      (done, total, name) => {
+        progress.message =
+          done >= total
+            ? `下载完成 ${total}/${total}`
+            : `正在下载 ${done + 1}/${total}${name ? ` · ${name}` : ''}`
+      },
+    )
+    progress.close()
+    if (!folder) return
+    if (fail) {
+      const tip = failures
+        .slice(0, 3)
+        .map((f) => `「${f.name}」${f.error}`)
+        .join('；')
+      ElMessage.warning(
+        `已保存 ${ok} 首到 ${folder}，失败 ${fail} 首${tip ? `：${tip}` : ''}${
+          fail > 3 ? '…' : ''
+        }`,
+      )
+    } else {
+      ElMessage.success(`已全部下载到 ${folder}（${ok} 首）`)
+    }
+  } catch (e: any) {
+    progress.close()
+    ElMessage.error(e?.message || '下载失败')
+  } finally {
+    downloading.value = false
+  }
+}
+
 function addAllToQueue() {
   const list = detail.value?.tracks || []
   if (!list.length) {
@@ -287,7 +371,8 @@ function onMoreCommand(cmd: string) {
   if (cmd === 'batch') {
     activeTab.value = 'songs'
     batchMode.value = true
-  } else if (cmd === 'addAll') addAllToQueue()
+  } else if (cmd === 'download') void downloadAllToFolder()
+  else if (cmd === 'addAll') addAllToQueue()
   else if (cmd === 'edit') goEdit()
   else if (cmd === 'delete') void onDelete()
   else if (cmd === 'saveAs') void onSaveAs()

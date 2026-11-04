@@ -777,7 +777,7 @@ function onLogout() {
   grid-column: 1 / -1;
   grid-row: 1;
   height: var(--wy-topbar-h);
-  background: var(--wy-brand);
+  background: var(--wy-topbar);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -785,10 +785,11 @@ function onLogout() {
   gap: 12px;
   position: relative;
   z-index: 30;
-  color: var(--wy-text-on-brand);
+  color: var(--wy-topbar-fg);
   -webkit-app-region: drag;
   app-region: drag;
   user-select: none;
+  transition: background var(--wy-duration) var(--wy-ease);
 }
 .topbar-left {
   display: flex;
@@ -870,7 +871,7 @@ function onLogout() {
     width: 9px;
     height: 9px;
     border: 1px solid currentColor;
-    background: var(--wy-brand);
+    background: var(--wy-topbar);
   }
 }
 .win-x {
@@ -913,7 +914,7 @@ function onLogout() {
 .brand-name {
   font-size: 15px;
   font-weight: 700;
-  color: var(--wy-text-on-brand);
+  color: var(--wy-topbar-fg);
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
@@ -928,7 +929,7 @@ function onLogout() {
   height: 24px;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.14);
+  background: var(--wy-topbar-control);
   color: var(--wy-on-brand-soft);
   display: grid;
   place-items: center;
@@ -936,11 +937,11 @@ function onLogout() {
   padding: 0;
   transition: background var(--wy-duration-fast) var(--wy-ease), color var(--wy-duration-fast) var(--wy-ease);
   &:hover {
-    background: rgba(0, 0, 0, 0.22);
-    color: var(--wy-text-on-brand);
+    background: var(--wy-topbar-control-hover);
+    color: var(--wy-topbar-fg);
   }
   &:focus-visible {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--wy-topbar-fg) 55%, transparent);
   }
 }
 .search-anchor {
@@ -959,7 +960,7 @@ function onLogout() {
   gap: 6px;
   flex-shrink: 0;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--wy-topbar-control);
   color: var(--wy-on-brand-soft);
   font-size: 12px;
   line-height: 1;
@@ -968,11 +969,11 @@ function onLogout() {
     color var(--wy-duration-fast) var(--wy-ease),
     border-color var(--wy-duration-fast) var(--wy-ease);
   &:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.24);
-    color: var(--wy-text-on-brand);
+    background: var(--wy-topbar-control-hover);
+    color: var(--wy-topbar-fg);
   }
   &:focus-visible {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--wy-topbar-fg) 55%, transparent);
   }
   &:disabled {
     opacity: 0.7;
@@ -1001,7 +1002,7 @@ function onLogout() {
 .search-wrap {
   height: 30px;
   border-radius: var(--wy-radius-pill);
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--wy-topbar-control);
   display: flex;
   align-items: center;
   padding: 0 8px 0 12px;
@@ -1010,8 +1011,8 @@ function onLogout() {
     background var(--wy-duration-fast) var(--wy-ease),
     box-shadow var(--wy-duration-fast) var(--wy-ease);
   &.focused {
-    background: rgba(0, 0, 0, 0.22);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+    background: var(--wy-topbar-control-hover);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--wy-topbar-fg) 28%, transparent);
   }
 }
 .search-icon {
@@ -1024,11 +1025,11 @@ function onLogout() {
   outline: none;
   background: transparent;
   font-size: 12px;
-  color: var(--wy-text-on-brand);
+  color: var(--wy-topbar-fg);
   min-width: 0;
-  caret-color: var(--wy-text-on-brand);
+  caret-color: var(--wy-brand);
   &::placeholder {
-    color: rgba(255, 255, 255, 0.55);
+    color: var(--wy-on-brand-muted);
   }
 }
 .clear-btn,
@@ -1047,8 +1048,8 @@ function onLogout() {
 .clear-btn {
   cursor: pointer;
   &:hover {
-    color: var(--wy-text-on-brand);
-    background: rgba(255, 255, 255, 0.12);
+    color: var(--wy-topbar-fg);
+    background: var(--wy-topbar-control-hover);
   }
 }
 .user-chip {
@@ -1061,21 +1062,21 @@ function onLogout() {
   cursor: pointer;
   padding: 0 8px 0 2px;
   border-radius: 14px;
-  color: var(--wy-text-on-brand);
+  color: var(--wy-topbar-fg);
   line-height: 1;
   &:hover {
-    background: rgba(0, 0, 0, 0.12);
+    background: var(--wy-topbar-control);
   }
   &:focus-visible {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--wy-topbar-fg) 55%, transparent);
   }
 }
 .avatar {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-  color: var(--wy-text-on-brand);
+  background: var(--wy-topbar-control-hover);
+  color: var(--wy-topbar-fg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1113,11 +1114,11 @@ function onLogout() {
   border-radius: var(--wy-radius-sm);
   transition: background var(--wy-duration-fast) var(--wy-ease), color var(--wy-duration-fast) var(--wy-ease);
   &:hover {
-    background: rgba(0, 0, 0, 0.12);
-    color: var(--wy-text-on-brand);
+    background: var(--wy-topbar-control);
+    color: var(--wy-topbar-fg);
   }
   &:focus-visible {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--wy-topbar-fg) 55%, transparent);
   }
 }
 .icon-btn {

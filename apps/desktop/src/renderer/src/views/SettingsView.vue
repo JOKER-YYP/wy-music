@@ -12,6 +12,32 @@
       <el-descriptions-item label="编辑资料">
         <el-button link type="primary" @click="$router.push('/profile/edit')">修改头像 / 昵称等</el-button>
       </el-descriptions-item>
+
+      <el-descriptions-item label="主题皮肤">
+        <div class="theme-grid">
+          <button
+            v-for="t in theme.presets"
+            :key="t.id"
+            type="button"
+            class="theme-card"
+            :class="{ active: theme.id === t.id }"
+            :title="t.name"
+            @click="onPickTheme(t.id)"
+          >
+            <span
+              class="theme-swatch"
+              :style="{
+                background: `linear-gradient(135deg, ${t.preview.topbar} 0 46%, ${t.preview.bg} 46% 100%)`,
+              }"
+            >
+              <span class="theme-accent" :style="{ background: t.preview.accent }" />
+            </span>
+            <span class="theme-name">{{ t.name }}</span>
+          </button>
+        </div>
+        <div class="lib-tip">参照网易云皮肤思路：顶栏配色 + 强调色；选择后立即生效并记住。</div>
+      </el-descriptions-item>
+
       <el-descriptions-item label="公共曲库来源">
         <div class="lib-sources">
           <span>{{ sourcesLabel }}</span>
@@ -63,8 +89,11 @@ import {
   type LibrarySourcesPrefs,
 } from '../services/librarySources'
 import { useUserStore } from '../stores/user'
+import { useThemeStore } from '../stores/theme'
+import type { ThemeId } from '../themes'
 
 const user = useUserStore()
+const theme = useThemeStore()
 const router = useRouter()
 const sourcesOpen = ref(false)
 const prefs = ref(loadLibrarySources())
@@ -81,6 +110,12 @@ function onSourcesSaved(next: LibrarySourcesPrefs) {
   prefs.value = next
   ElMessage.success('曲库来源已更新')
   router.push('/library')
+}
+
+function onPickTheme(id: ThemeId) {
+  if (theme.id === id) return
+  theme.setTheme(id)
+  ElMessage.success(`已切换为「${theme.preset.name}」`)
 }
 
 async function loadShell() {
@@ -126,7 +161,7 @@ onMounted(() => {
 
 <style scoped>
 .settings-page {
-  max-width: 720px;
+  max-width: 760px;
 }
 .settings-page h2 {
   margin: 0 0 16px;
@@ -151,5 +186,68 @@ onMounted(() => {
   margin: 6px 0;
   color: var(--wy-text);
   font-size: 13px;
+}
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 520px;
+}
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--wy-radius-md);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
+  &:hover {
+    transform: translateY(-1px);
+  }
+  &.active {
+    border-color: var(--wy-brand);
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
+  }
+}
+.theme-swatch {
+  position: relative;
+  height: 52px;
+  border-radius: calc(var(--wy-radius-md) - 2px);
+  border: 1px solid var(--wy-border);
+  overflow: hidden;
+  box-shadow: var(--wy-shadow-sm);
+}
+.theme-accent {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+.theme-name {
+  font-size: 12px;
+  color: var(--wy-text-secondary);
+  padding: 0 2px 2px;
+  line-height: 1.2;
+}
+.theme-card.active .theme-name {
+  color: var(--wy-brand);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .theme-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

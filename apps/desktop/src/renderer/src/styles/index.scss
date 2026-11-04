@@ -1,7 +1,7 @@
 @import './iconfont.css';
 
 :root {
-  /* Brand (incumbent NetEase-inspired) */
+  /* Brand (incumbent NetEase-inspired) — overridable by themes */
   --wy-brand: #ec4141;
   --wy-brand-hover: #e03535;
   --wy-brand-soft: rgba(236, 65, 65, 0.08);
@@ -23,6 +23,13 @@
   --wy-text-on-brand: #ffffff;
   --wy-on-brand-muted: rgba(255, 255, 255, 0.72);
   --wy-on-brand-soft: rgba(255, 255, 255, 0.88);
+
+  /* Topbar skin (NetEase-like themes) */
+  --wy-topbar: var(--wy-brand);
+  --wy-topbar-fg: #ffffff;
+  --wy-topbar-control: rgba(0, 0, 0, 0.14);
+  --wy-topbar-control-hover: rgba(0, 0, 0, 0.22);
+  --wy-window-bg: var(--wy-topbar);
 
   /* Layout */
   --wy-player-h: 68px;

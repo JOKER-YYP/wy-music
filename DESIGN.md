@@ -49,10 +49,23 @@ Segoe UI / PingFang SC / Microsoft YaHei / system-ui. Weights 400 / 600 / 700. C
 - Radius: `--wy-radius-sm` 6px, `--wy-radius-md` 10px, `--wy-radius-pill` for search / chips
 - Soft offset shadows only (`--wy-shadow-sm`)
 
+## Built-in themes
+
+Themes live in `apps/desktop/src/renderer/src/themes/` and swap CSS variables on `:root` (`data-theme`). At a time **one** accent drives brand + topbar (NetEase-skin model).
+
+| Id | Name | Notes |
+|----|------|--------|
+| `classic-red` | 经典红 | Default; red topbar |
+| `dark` | 暗夜黑 | Dark chrome + red accent; toggles `html.dark` for Element Plus |
+| `white` | 极简白 | Light topbar, red accents |
+| `sky` / `forest` / `violet` / `orange` / `sakura` | 彩皮 | Light surfaces; colored topbar + brand |
+
+Topbar tokens: `--wy-topbar`, `--wy-topbar-fg`, `--wy-topbar-control`, `--wy-topbar-control-hover`. Selection persists as `localStorage.wy-theme-id`.
+
 ## Do's and Don'ts
 
 - Do: use CSS variables (`var(--wy-*)`) instead of raw `#ec4141` / `#999`
-- Do: keep one brand red; status uses Element semantic colors
-- Don't: introduce a second accent (green/purple) on Operate screens
+- Do: keep **one** active accent from the current theme; status uses Element semantic colors
+- Don't: mix multiple brand accents on one screen outside theme preview
 - Don't: nest cards or add decorative gradient text
-- Don't: gray secondary text on colored brand surfaces — use `--wy-text-on-brand` / `--wy-on-brand-*`
+- Don't: gray secondary text on colored brand/topbar surfaces — use `--wy-topbar-fg` / `--wy-on-brand-*` / `--wy-text-on-brand`

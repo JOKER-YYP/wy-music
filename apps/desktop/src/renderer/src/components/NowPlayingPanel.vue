@@ -166,19 +166,20 @@
             </div>
 
             <div class="np-right-tools">
-              <el-button text title="收藏到歌单" @click="openCollect">
+              <button class="np-tool" type="button" title="收藏到歌单" @click="openCollect">
                 <el-icon :size="18"><FolderAdd /></el-icon>
-              </el-button>
-              <el-button
+              </button>
+              <button
                 v-if="isDesktop"
-                text
+                class="np-tool"
+                type="button"
                 title="桌面歌词"
-                :class="{ 'dl-on': desktopLyricOn }"
+                :class="{ on: desktopLyricOn }"
                 @click="toggleDesktopLyric"
               >
                 桌词
-              </el-button>
-              <el-button text title="歌词" disabled>词</el-button>
+              </button>
+              <button class="np-tool" type="button" title="歌词" disabled>词</button>
             </div>
           </div>
         </footer>
@@ -967,29 +968,39 @@ watch(
   justify-content: flex-end;
   align-items: center;
   gap: 4px;
-  :deep(.el-button) {
-    color: rgba(255, 255, 255, 0.85);
-    --el-button-text-color: rgba(255, 255, 255, 0.85);
-    --el-button-hover-text-color: #fff;
-    --el-button-hover-bg-color: rgba(255, 255, 255, 0.12);
-    --el-button-hover-border-color: transparent;
-    --el-button-active-text-color: #fff;
-    --el-button-active-bg-color: rgba(255, 255, 255, 0.18);
-    --el-button-disabled-text-color: rgba(255, 255, 255, 0.35);
-    --el-button-disabled-bg-color: transparent;
-    background: transparent;
-    border-color: transparent;
-    &:hover,
-    &:focus {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.12);
-      border-color: transparent;
-    }
+}
+.np-tool {
+  height: 32px;
+  min-width: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--wy-radius-sm);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
   }
-  :deep(.dl-on) {
-    color: var(--wy-brand) !important;
-    --el-button-text-color: var(--wy-brand);
-    --el-button-hover-text-color: var(--wy-brand);
+  &:active:not(:disabled) {
+    transform: scale(0.94);
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  &.on {
+    color: var(--wy-brand);
   }
 }
 .np-fade-enter-active {

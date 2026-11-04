@@ -288,9 +288,15 @@ onMounted(async () => {
   color: var(--wy-text-secondary);
   cursor: pointer;
   position: relative;
-  transition: color 0.15s ease;
+  transition:
+    color var(--wy-duration-fast) var(--wy-ease),
+    font-size var(--wy-duration-fast) var(--wy-ease);
   &:hover:not(.active) {
     color: var(--wy-text);
+  }
+  &:focus-visible {
+    box-shadow: none;
+    color: var(--wy-brand);
   }
   &.active {
     color: var(--wy-text);
@@ -361,6 +367,7 @@ onMounted(async () => {
     font-size: 13px;
     color: var(--wy-text-muted);
     cursor: pointer;
+    transition: color var(--wy-duration-fast) var(--wy-ease);
     &:hover {
       color: var(--wy-brand);
     }
@@ -382,12 +389,14 @@ onMounted(async () => {
 .cover {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--wy-radius-md);
   background-size: cover;
   background-position: center;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: var(--wy-shadow-sm);
+  transition:
+    transform var(--wy-duration) var(--wy-ease-out),
+    box-shadow var(--wy-duration) var(--wy-ease);
 }
 .play-count {
   position: absolute;
@@ -411,14 +420,22 @@ onMounted(async () => {
   place-items: center;
   cursor: pointer;
   opacity: 0;
-  transition: opacity var(--wy-duration-fast) var(--wy-ease);
+  transform: translateY(4px) scale(0.92);
+  box-shadow: 0 4px 12px rgba(236, 65, 65, 0.35);
+  transition:
+    opacity var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration) var(--wy-ease-out);
   .iconfont {
     font-size: 14px;
     color: var(--wy-text-on-brand);
   }
+  &:hover {
+    background: var(--wy-brand-hover);
+  }
 }
 .playlist-card:hover .play-fab {
   opacity: 1;
+  transform: none;
 }
 .plist-name {
   margin-top: 8px;

@@ -125,8 +125,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.settings-page {
+  max-width: 720px;
+}
 .settings-page h2 {
   margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 700;
 }
 .lib-sources {
   display: flex;
@@ -136,13 +141,15 @@ onMounted(() => {
 .lib-tip {
   margin-top: 6px;
   font-size: 12px;
-  color: var(--wy-text-secondary);
-  line-height: 1.4;
+  color: var(--wy-text-muted);
+  line-height: 1.45;
 }
 .shell-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 4px 0;
+  margin: 6px 0;
+  color: var(--wy-text);
+  font-size: 13px;
 }
 </style>

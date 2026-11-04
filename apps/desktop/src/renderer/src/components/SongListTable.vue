@@ -673,19 +673,32 @@ async function onMenuAction(action: string) {
   place-items: center;
   cursor: pointer;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(236, 65, 65, 0.28);
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out),
+    box-shadow var(--wy-duration-fast) var(--wy-ease);
   &:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+    box-shadow: none;
   }
   &:not(:disabled):hover {
     background: var(--wy-brand-hover);
+    transform: scale(1.05);
+  }
+  &:not(:disabled):active {
+    transform: scale(0.94);
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
   }
 }
 .batch-btn {
   height: 32px;
   padding: 0 14px;
   border: 1px solid var(--wy-border-strong);
-  border-radius: 16px;
+  border-radius: var(--wy-radius-pill);
   background: var(--wy-surface);
   color: var(--wy-text);
   font-size: 13px;
@@ -693,11 +706,17 @@ async function onMenuAction(action: string) {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    border-color var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease);
   &:hover:not(:disabled) {
     background: var(--wy-brand-soft);
-    border-color: rgba(236, 65, 65, 0.35);
+    border-color: color-mix(in srgb, var(--wy-brand) 40%, var(--wy-border-strong));
     color: var(--wy-brand);
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
   }
   &:disabled {
     opacity: 0.45;
@@ -712,8 +731,11 @@ async function onMenuAction(action: string) {
   cursor: pointer;
   padding: 6px 8px;
   flex-shrink: 0;
+  border-radius: var(--wy-radius-sm);
+  transition: color var(--wy-duration-fast) var(--wy-ease), background var(--wy-duration-fast) var(--wy-ease);
   &:hover {
     color: var(--wy-brand);
+    background: var(--wy-brand-soft);
   }
 }
 .table-head,
@@ -763,10 +785,14 @@ async function onMenuAction(action: string) {
   border-radius: 4px;
   flex-shrink: 0;
   opacity: 0.55;
+  transition:
+    opacity var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease),
+    background var(--wy-duration-fast) var(--wy-ease);
   &:hover {
     opacity: 1;
     color: var(--wy-text-secondary);
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--wy-surface-muted);
   }
   &:active {
     cursor: grabbing;
@@ -774,9 +800,9 @@ async function onMenuAction(action: string) {
 }
 .song-row {
   height: 56px;
-  border-radius: 6px;
+  border-radius: var(--wy-radius-sm);
   cursor: default;
-  transition: background 0.12s ease;
+  transition: background var(--wy-duration-fast) var(--wy-ease);
   &.dragging {
     opacity: 0.45;
   }
@@ -786,7 +812,8 @@ async function onMenuAction(action: string) {
   &:hover {
     background: var(--wy-brand-soft);
     .row-actions {
-      display: flex;
+      opacity: 1;
+      pointer-events: auto;
     }
     .drag-handle {
       opacity: 1;
@@ -832,6 +859,21 @@ async function onMenuAction(action: string) {
   color: var(--wy-text-muted);
   display: grid;
   place-items: center;
+  border-radius: 50%;
+  transition:
+    color var(--wy-duration-fast) var(--wy-ease),
+    background var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
+  &:hover {
+    color: var(--wy-brand);
+    background: var(--wy-brand-soft-strong);
+  }
+  &:active {
+    transform: scale(0.9);
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
+  }
 }
 .num {
   font-size: 13px;
@@ -892,10 +934,14 @@ async function onMenuAction(action: string) {
   flex: 0 0 40px;
   width: 40px;
   height: 40px;
-  border-radius: 4px;
+  border-radius: var(--wy-radius-sm);
   background-size: cover;
   background-position: center;
   cursor: pointer;
+  transition: transform var(--wy-duration-fast) var(--wy-ease-out);
+  &:hover {
+    transform: scale(1.04);
+  }
 }
 .title-meta {
   min-width: 0;
@@ -915,10 +961,13 @@ async function onMenuAction(action: string) {
   text-overflow: ellipsis;
 }
 .row-actions {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--wy-duration-fast) var(--wy-ease);
   button {
     width: 28px;
     height: 28px;
@@ -930,9 +979,16 @@ async function onMenuAction(action: string) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    transition:
+      background var(--wy-duration-fast) var(--wy-ease),
+      color var(--wy-duration-fast) var(--wy-ease),
+      transform var(--wy-duration-fast) var(--wy-ease-out);
     &:hover {
-      background: #ebebeb;
-      color: var(--wy-text);
+      background: var(--wy-surface-muted);
+      color: var(--wy-brand);
+    }
+    &:active {
+      transform: scale(0.9);
     }
   }
   .disabled-act {
@@ -983,8 +1039,17 @@ async function onMenuAction(action: string) {
   display: grid;
   place-items: center;
   border-radius: 50%;
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
   &:hover {
-    background: rgba(236, 65, 65, 0.08);
+    background: var(--wy-brand-soft);
+  }
+  &:active {
+    transform: scale(0.9);
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
   }
 }
 .like-placeholder {

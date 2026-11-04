@@ -254,3 +254,13 @@ select:focus-visible {
   border-radius: var(--wy-radius-md);
   box-shadow: var(--wy-shadow-sm);
 }
+
+.el-popover.el-popper {
+  border-color: var(--wy-border);
+  border-radius: var(--wy-radius-md);
+  box-shadow: var(--wy-shadow-sm);
+}
+
+.el-tooltip__trigger:focus-visible {
+  outline: none;
+}

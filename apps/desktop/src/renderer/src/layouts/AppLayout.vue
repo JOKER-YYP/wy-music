@@ -1265,12 +1265,21 @@ function onLogout() {
   gap: 10px;
   height: 38px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: var(--wy-radius-md);
   color: var(--wy-text);
   font-size: 14px;
-  transition: background var(--wy-duration-fast) var(--wy-ease), color var(--wy-duration-fast) var(--wy-ease);
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
   &:hover:not(.active) {
     background: var(--wy-brand-soft);
+  }
+  &:active:not(.active) {
+    transform: scale(0.985);
+  }
+  &:focus-visible {
+    box-shadow: var(--wy-focus-ring);
   }
   &.active {
     background: var(--wy-brand);

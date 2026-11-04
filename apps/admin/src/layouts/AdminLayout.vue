@@ -13,7 +13,11 @@
       >
         <el-menu-item index="/dashboard">仪表盘</el-menu-item>
         <el-menu-item index="/tracks">公共曲库</el-menu-item>
+        <el-menu-item index="/playlists">歌单管理</el-menu-item>
+        <el-menu-item index="/banners">Banner</el-menu-item>
+        <el-menu-item index="/comments">评论管理</el-menu-item>
         <el-menu-item index="/users">用户管理</el-menu-item>
+        <el-menu-item index="/settings">系统设置</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container class="main-wrap">
@@ -45,7 +49,11 @@ const pageTitle = computed(() => {
   const map: Record<string, string> = {
     '/dashboard': '仪表盘',
     '/tracks': '公共曲库',
+    '/playlists': '歌单管理',
+    '/banners': 'Banner 管理',
+    '/comments': '评论管理',
     '/users': '用户管理',
+    '/settings': '系统设置',
   }
   return map[route.path] || '管理后台'
 })
@@ -62,7 +70,7 @@ function logout() {
   background: var(--wy-bg);
 }
 .aside {
-  background: var(--wy-surface);
+  background: var(--wy-sidebar);
   border-right: 1px solid var(--wy-border);
   display: flex;
   flex-direction: column;
@@ -75,6 +83,7 @@ function logout() {
   padding: 0 18px;
   border-bottom: 1px solid var(--wy-border);
   flex-shrink: 0;
+  background: var(--wy-sidebar);
 }
 .logo-mark {
   display: inline-grid;
@@ -83,7 +92,7 @@ function logout() {
   height: 28px;
   border-radius: 8px;
   background: var(--wy-brand);
-  color: #fff;
+  color: var(--wy-text-on-brand);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -105,6 +114,9 @@ function logout() {
   border-radius: var(--wy-radius-sm);
   margin-bottom: 2px;
   color: var(--wy-text-secondary);
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease);
 }
 .side-menu :deep(.el-menu-item:hover) {
   background: var(--wy-brand-soft);
@@ -117,6 +129,8 @@ function logout() {
 }
 .main-wrap {
   min-width: 0;
+  flex: 1;
+  background: var(--wy-bg);
 }
 .header {
   background: var(--wy-surface);
@@ -124,7 +138,7 @@ function logout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: 0 24px;
 }
 .header-title {
   font-size: 15px;
@@ -141,6 +155,15 @@ function logout() {
   color: var(--wy-text-secondary);
 }
 .main {
-  padding: 20px 22px 28px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  padding: 20px 24px 32px;
+  background: var(--wy-bg);
+}
+.main :deep(> *) {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
 }
 </style>

@@ -17,15 +17,15 @@
     <template v-if="activeTab === '精选'">
       <section class="banners">
         <div
-          v-for="(b, i) in banners"
-          :key="i"
+          v-for="(b, i) in displayBanners"
+          :key="b.id || i"
           class="banner"
           :class="{ clickable: !!b.to }"
-          :style="{ background: b.bg }"
+          :style="bannerStyle(b)"
           @click="onBannerClick(b)"
         >
           <div class="banner-title">{{ b.title }}</div>
-          <div class="banner-sub">{{ b.sub }}</div>
+          <div v-if="b.sub" class="banner-sub">{{ b.sub }}</div>
         </div>
       </section>
 
@@ -113,7 +113,16 @@ const player = usePlayerStore()
 const user = useUserStore()
 const ui = useUiStore()
 
-const banners = [
+type BannerCard = {
+  id?: string
+  title: string
+  sub?: string
+  bg?: string
+  imageUrl?: string | null
+  to?: string
+}
+
+const FALLBACK_BANNERS: BannerCard[] = [
   {
     title: '今日推荐',
     sub: '根据你的口味生成',
@@ -123,6 +132,23 @@ const banners = [
   { title: '新歌速递', sub: '发现刚上传的好声音', bg: 'linear-gradient(135deg,#54a0ff,#2e86de)' },
   { title: '热门精选', sub: '大家正在听', bg: 'linear-gradient(135deg,#5f27cd,#341f97)' },
 ]
+
+const apiBanners = ref<BannerCard[]>([])
+const displayBanners = computed(() =>
+  apiBanners.value.length ? apiBanners.value : FALLBACK_BANNERS,
+)
+
+function bannerStyle(b: BannerCard) {
+  const img = mediaUrl(b.imageUrl)
+  if (img) {
+    return {
+      backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.55)), url(${img})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }
+  }
+  return { background: b.bg || 'linear-gradient(135deg,#ff6b6b,#ee5a24)' }
+}
 
 const playlistEmptyTip = computed(() => {
   if (!user.accessToken) return '登录后可根据口味推荐公开歌单'
@@ -149,8 +175,9 @@ function ensureLogin() {
   return false
 }
 
-function onBannerClick(b: { to?: string; title: string }) {
-  if (!b.to) {
+function onBannerClick(b: BannerCard) {
+  const to = b.to
+  if (!to) {
     if (b.title === '新歌速递') {
       document.querySelector('.section')?.scrollIntoView({ behavior: 'smooth' })
     } else if (b.title === '热门精选') {
@@ -159,11 +186,15 @@ function onBannerClick(b: { to?: string; title: string }) {
     }
     return
   }
-  if (!ensureLogin()) {
-    sessionStorage.setItem('loginRedirect', b.to)
+  if (/^https?:\/\//i.test(to)) {
+    window.open(to, '_blank', 'noopener')
     return
   }
-  void router.push(b.to)
+  if (!ensureLogin()) {
+    sessionStorage.setItem('loginRedirect', to)
+    return
+  }
+  void router.push(to)
 }
 
 function openPlaylist(id: string) {
@@ -202,6 +233,19 @@ async function reload() {
     const { data } = await http.get('/api/discover')
     latest.value = data.data.latest || []
     hot.value = data.data.hot || []
+    const raw = (data.data.banners || []) as Array<{
+      id: string
+      title: string
+      imageUrl?: string | null
+      linkUrl?: string | null
+    }>
+    apiBanners.value = raw.map((b) => ({
+      id: b.id,
+      title: b.title,
+      imageUrl: b.imageUrl,
+      to: b.linkUrl || undefined,
+      sub: '',
+    }))
   } catch {
     // keep current
   }

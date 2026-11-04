@@ -2,8 +2,17 @@ import type { TrackDto } from '@wy-music/shared'
 import { isExternalTrackId, isLiumingyeSource, parseExternalTrackId } from '@wy-music/shared'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { importExternalToLibrary, resolveExternalDetail } from './externalMusic'
-import { streamUrl } from './http'
+import { http, streamUrl } from './http'
 import { isElectronApp } from './localUpload'
+
+async function reportDownloadStat(trackId: string) {
+  if (!trackId || trackId.startsWith('local:') || trackId.startsWith('ext:')) return
+  try {
+    await http.post(`/api/tracks/${trackId}/download-stat`)
+  } catch {
+    /* 统计失败不阻断下载 */
+  }
+}
 
 function sanitizeFileName(name: string) {
   return (
@@ -154,6 +163,9 @@ export async function downloadTrackToPath(
       /* 歌词失败不阻断 */
     }
   }
+  if (!isExternalTrack(track)) {
+    await reportDownloadStat(track.id)
+  }
   return finalPath
 }
 
@@ -234,6 +246,7 @@ export async function downloadTrackToLibrary(track: TrackDto) {
     track.source && isLiumingyeSource(track.source)
       ? await importLiumingyePanToLibrary(track)
       : await importExternalToLibrary(track)
+  await reportDownloadStat(imported.id)
   ElMessage.success(
     imported.status === 'pending'
       ? `「${imported.name}」已提交审核`
@@ -250,10 +263,12 @@ export async function importTrackToLibraryQuiet(track: TrackDto): Promise<TrackD
   if (!localStorage.getItem('accessToken')) {
     throw new Error('请先登录')
   }
-  if (track.source && isLiumingyeSource(track.source)) {
-    return importLiumingyePanToLibrary(track)
-  }
-  return importExternalToLibrary(track)
+  const imported =
+    track.source && isLiumingyeSource(track.source)
+      ? await importLiumingyePanToLibrary(track)
+      : await importExternalToLibrary(track)
+  await reportDownloadStat(imported.id)
+  return imported
 }
 
 function joinDirFile(dir: string, fileName: string) {

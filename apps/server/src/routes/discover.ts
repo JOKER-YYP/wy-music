@@ -37,7 +37,17 @@ router.get('/', optionalAuth, async (_req, res) => {
     }),
   ])
   return ok(res, {
-    banners,
+    banners: banners.map((b) => ({
+      id: b.id,
+      title: b.title,
+      imageUrl:
+        b.imageUrl &&
+        (/^https?:\/\//i.test(b.imageUrl) || b.imageUrl.startsWith('/media/')
+          ? b.imageUrl
+          : toPublicUrl(b.imageUrl)),
+      linkUrl: b.linkUrl,
+      sort: b.sort,
+    })),
     latest: latest.map((t) => toTrackDto(t)),
     hot: hot.map((t) => toTrackDto(t)),
   })

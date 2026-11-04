@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="admin-page">
     <div class="head">
       <div class="filters">
         <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="onFilter">
@@ -13,35 +13,55 @@
           v-model="keyword"
           placeholder="搜索歌名 / 歌手 / 专辑"
           clearable
-          style="width: 240px"
+          style="width: 200px"
+          @keyup.enter="onFilter"
+          @clear="onFilter"
+        />
+        <el-input
+          v-model="uploader"
+          placeholder="上传者"
+          clearable
+          style="width: 140px"
           @keyup.enter="onFilter"
           @clear="onFilter"
         />
         <el-button type="danger" @click="onFilter">查询</el-button>
+        <el-button @click="loadDuplicates">重复检测</el-button>
+      </div>
+      <div v-if="selected.length" class="batch">
+        <span>已选 {{ selected.length }}</span>
+        <el-button size="small" type="success" @click="batch('approve')">批量通过</el-button>
+        <el-button size="small" type="warning" @click="batch('reject')">批量驳回</el-button>
+        <el-button size="small" @click="batch('offline')">批量下架</el-button>
+        <el-button size="small" type="danger" @click="batch('delete')">批量删除</el-button>
       </div>
     </div>
 
-    <el-table v-loading="loading" :data="list" stripe>
-      <el-table-column prop="name" label="歌曲" min-width="150" show-overflow-tooltip />
-      <el-table-column label="歌手" min-width="120" show-overflow-tooltip>
+    <el-table
+      v-loading="loading"
+      :data="list"
+      stripe
+      @selection-change="onSelectionChange"
+    >
+      <el-table-column type="selection" width="42" />
+      <el-table-column prop="name" label="歌曲" min-width="140" show-overflow-tooltip />
+      <el-table-column label="歌手" min-width="110" show-overflow-tooltip>
         <template #default="{ row }">{{ row.artists?.join(' / ') }}</template>
       </el-table-column>
-      <el-table-column prop="album" label="专辑" min-width="120" show-overflow-tooltip />
-      <el-table-column label="时长" width="80">
+      <el-table-column prop="album" label="专辑" min-width="110" show-overflow-tooltip />
+      <el-table-column label="时长" width="72">
         <template #default="{ row }">{{ formatDuration(row.durationMs) }}</template>
       </el-table-column>
-      <el-table-column label="大小" width="90">
-        <template #default="{ row }">{{ formatBytes(row.fileSize) }}</template>
-      </el-table-column>
-      <el-table-column prop="uploaderNickname" label="上传者" width="100" show-overflow-tooltip />
-      <el-table-column label="状态" width="96">
+      <el-table-column prop="uploaderNickname" label="上传者" width="96" show-overflow-tooltip />
+      <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="statusTag(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="playCount" label="播放" width="72" />
-      <el-table-column label="操作" width="320" fixed="right">
+      <el-table-column prop="playCount" label="播放" width="64" />
+      <el-table-column label="操作" width="360" fixed="right">
         <template #default="{ row }">
+          <el-button link type="primary" @click="preview(row)">试听</el-button>
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button
             v-if="row.status !== 'published'"
@@ -66,15 +86,23 @@
           >
             下架
           </el-button>
+          <el-button
+            v-if="row.status === 'offline' || row.status === 'rejected'"
+            link
+            type="success"
+            @click="approve(row.id)"
+          >
+            恢复
+          </el-button>
           <el-button link type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <el-pagination
-      class="pager"
       v-model:current-page="page"
       v-model:page-size="pageSize"
+      class="pager"
       :page-sizes="[20, 50, 100]"
       :total="total"
       layout="total, sizes, prev, pager, next"
@@ -131,22 +159,48 @@
         <el-button type="danger" :loading="saving" @click="saveEdit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="previewVisible" title="试听" width="420px" @closed="stopPreview">
+      <div v-if="previewTrack" class="preview-box">
+        <div class="preview-name">{{ previewTrack.name }}</div>
+        <div class="preview-artists">{{ previewTrack.artists?.join(' / ') }}</div>
+        <audio ref="audioRef" class="audio" controls :src="previewSrc" />
+      </div>
+    </el-dialog>
+
+    <el-dialog v-model="dupVisible" title="重复曲目（相同文件哈希）" width="720px">
+      <el-empty v-if="!dupGroups.length" description="未发现重复文件" />
+      <div v-for="g in dupGroups" :key="g.fileHash" class="dup-group">
+        <div class="dup-head">{{ g.count }} 首 · {{ g.fileHash.slice(0, 12) }}…</div>
+        <div v-for="t in g.tracks" :key="t.id" class="dup-row">
+          <span>{{ t.name }} — {{ t.artists?.join('/') }}</span>
+          <el-tag size="small">{{ statusLabel(t.status) }}</el-tag>
+          <el-button link type="danger" @click="remove(t)">删除</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import type { TrackDto, TrackStatus } from '@wy-music/shared'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { http } from '../services/http'
+import { adminStreamUrl, formatBytes } from '../services/media'
 
+const route = useRoute()
+const router = useRouter()
 const list = ref<TrackDto[]>([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const status = ref('')
+const status = ref(String(route.query.status || ''))
 const keyword = ref('')
+const uploader = ref('')
 const loading = ref(false)
+const selected = ref<TrackDto[]>([])
 
 const editVisible = ref(false)
 const saving = ref(false)
@@ -165,18 +219,19 @@ const editForm = reactive({
   playCount: 0,
 })
 
+const previewVisible = ref(false)
+const previewTrack = ref<TrackDto | null>(null)
+const previewSrc = ref('')
+const audioRef = ref<HTMLAudioElement | null>(null)
+
+const dupVisible = ref(false)
+const dupGroups = ref<Array<{ fileHash: string; count: number; tracks: TrackDto[] }>>([])
+
 function formatDuration(ms: number) {
   const s = Math.floor((ms || 0) / 1000)
   const m = Math.floor(s / 60)
   const r = s % 60
   return `${m}:${String(r).padStart(2, '0')}`
-}
-
-function formatBytes(n: number) {
-  if (!n) return '—'
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
 function statusLabel(s: string) {
@@ -210,6 +265,7 @@ async function load() {
         pageSize: pageSize.value,
         status: status.value || undefined,
         keyword: keyword.value || undefined,
+        uploader: uploader.value || undefined,
       },
     })
     list.value = data.data.list
@@ -221,7 +277,14 @@ async function load() {
 
 function onFilter() {
   page.value = 1
+  const q: Record<string, string> = {}
+  if (status.value) q.status = status.value
+  void router.replace({ path: '/tracks', query: q })
   load()
+}
+
+function onSelectionChange(rows: TrackDto[]) {
+  selected.value = rows
 }
 
 async function openEdit(row: TrackDto) {
@@ -249,8 +312,6 @@ async function saveEdit() {
   }
   const artists = editForm.artists.trim() || '未知歌手'
   const album = editForm.album.trim() || '未知专辑'
-  editForm.artists = artists
-  editForm.album = album
   saving.value = true
   try {
     await http.put(`/api/admin/tracks/${editForm.id}`, {
@@ -268,6 +329,18 @@ async function saveEdit() {
   } finally {
     saving.value = false
   }
+}
+
+function preview(row: TrackDto) {
+  previewTrack.value = row
+  previewSrc.value = adminStreamUrl(row.id)
+  previewVisible.value = true
+}
+
+function stopPreview() {
+  audioRef.value?.pause()
+  previewSrc.value = ''
+  previewTrack.value = null
 }
 
 async function approve(id: string) {
@@ -298,14 +371,54 @@ async function offline(id: string) {
 
 async function remove(row: TrackDto) {
   await ElMessageBox.confirm(
-    `确认删除「${row.name}」？文件将永久删除，相关用户下次进入会收到下架提示。`,
+    `确认删除「${row.name}」？文件将永久删除。`,
     '警告',
     { type: 'warning' },
   )
   await http.delete(`/api/admin/tracks/${row.id}`)
   ElMessage.success('已删除')
   load()
+  if (dupVisible.value) loadDuplicates()
 }
+
+async function batch(action: 'approve' | 'reject' | 'offline' | 'delete') {
+  const ids = selected.value.map((t) => t.id)
+  if (!ids.length) return
+  let reason = '不符合规范'
+  if (action === 'reject') {
+    const { value } = await ElMessageBox.prompt('请输入驳回原因', '批量驳回', {
+      inputValue: reason,
+    })
+    reason = value
+  } else {
+    const labels = { approve: '通过', reject: '驳回', offline: '下架', delete: '删除' }
+    await ElMessageBox.confirm(`确认批量${labels[action]} ${ids.length} 首？`, '批量操作', {
+      type: 'warning',
+    })
+  }
+  await http.post('/api/admin/tracks/batch', { action, ids, reason })
+  ElMessage.success('批量处理完成')
+  selected.value = []
+  load()
+}
+
+async function loadDuplicates() {
+  const { data } = await http.get('/api/admin/tracks/duplicates')
+  dupGroups.value = data.data.groups || []
+  dupVisible.value = true
+}
+
+watch(
+  () => route.query.status,
+  (v) => {
+    const next = String(v || '')
+    if (next !== status.value) {
+      status.value = next
+      page.value = 1
+      load()
+    }
+  },
+)
 
 onMounted(load)
 </script>
@@ -313,7 +426,7 @@ onMounted(load)
 <style scoped>
 .head {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   margin-bottom: 14px;
   gap: 12px;
@@ -324,6 +437,13 @@ onMounted(load)
   gap: 8px;
   flex-wrap: wrap;
 }
+.batch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--wy-text-secondary);
+}
 .pager {
   margin-top: 16px;
   justify-content: flex-end;
@@ -331,5 +451,45 @@ onMounted(load)
 .meta {
   color: var(--wy-text-muted);
   font-size: 13px;
+}
+.preview-box {
+  text-align: center;
+}
+.preview-name {
+  font-weight: 600;
+  font-size: 16px;
+}
+.preview-artists {
+  color: var(--wy-text-secondary);
+  margin: 6px 0 14px;
+  font-size: 13px;
+}
+.audio {
+  width: 100%;
+}
+.dup-group {
+  border: 1px solid var(--wy-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.dup-head {
+  font-size: 12px;
+  color: var(--wy-text-muted);
+  margin-bottom: 8px;
+}
+.dup-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.dup-row span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

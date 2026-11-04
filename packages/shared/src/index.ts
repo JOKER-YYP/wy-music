@@ -199,6 +199,8 @@ export interface TrackDto {
   uploaderId: string
   uploaderNickname?: string
   playCount: number
+  /** 下载累计（入库/本地下载上报） */
+  downloadCount?: number
   liked?: boolean
   fileSize: number
   mimeType: string
@@ -272,6 +274,14 @@ export interface PageResult<T> {
   pageSize: number
 }
 
+export interface DashboardRankItem {
+  id: string
+  name: string
+  artists: string[]
+  value: number
+  coverUrl?: string | null
+}
+
 export interface DashboardStats {
   userCount: number
   trackCount: number
@@ -279,6 +289,54 @@ export interface DashboardStats {
   pendingCount: number
   todayUploadCount: number
   todayPlayCount: number
+  /** 评论总数（可选，管理端增强） */
+  commentCount?: number
+  /** 公开歌单数 */
+  publicPlaylistCount?: number
+  /** 喜欢总数 */
+  likeCount?: number
+  /** 播放总量（曲库 playCount 汇总） */
+  totalPlayCount?: number
+  /** 下载总量 */
+  totalDownloadCount?: number
+  /** 歌单收录关系数 */
+  playlistCollectCount?: number
+  /** 存储占用字节（按曲库 fileSize 汇总） */
+  storageBytes?: number
+  /** 近 7 日趋势 */
+  trends?: Array<{
+    date: string
+    uploadCount: number
+    playCount: number
+  }>
+  /** 歌曲状态分布 */
+  statusDistribution?: Array<{ status: string; count: number }>
+  /** 播放量 TOP */
+  topPlays?: DashboardRankItem[]
+  /** 喜欢/收藏 TOP */
+  topLikes?: DashboardRankItem[]
+  /** 下载量 TOP */
+  topDownloads?: DashboardRankItem[]
+  /** 歌单收录 TOP */
+  topCollected?: DashboardRankItem[]
+}
+
+export interface BannerDto {
+  id: string
+  title: string
+  imageUrl: string
+  linkUrl?: string | null
+  sort: number
+  enabled: boolean
+}
+
+export interface AppSettingsDto {
+  uploadNeedReview: boolean
+  uploadMaxSizeMb: number
+  registerEnabled: boolean
+  siteName: string
+  siteAnnouncement: string
+  storageRoot: string
 }
 
 export const AUDIO_MIME_WHITELIST = [

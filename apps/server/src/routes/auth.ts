@@ -54,6 +54,10 @@ const avatarUpload = multer({
 })
 
 router.post('/register', async (req, res) => {
+  const { isRegisterEnabled } = await import('../services/systemSettings.js')
+  if (!(await isRegisterEnabled())) {
+    return fail(res, 40302, '暂未开放注册', 403)
+  }
   const parsed = registerSchema.safeParse(req.body)
   if (!parsed.success) {
     return fail(res, 40001, '参数错误：账号至少3位，密码至少6位')

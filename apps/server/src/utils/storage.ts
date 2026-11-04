@@ -9,6 +9,7 @@ export function ensureStorageDirs() {
     path.join(config.storageRoot, 'audio'),
     path.join(config.storageRoot, 'covers'),
     path.join(config.storageRoot, 'avatars'),
+    path.join(config.storageRoot, 'banners'),
   ]
   for (const dir of dirs) {
     fs.mkdirSync(dir, { recursive: true })

@@ -44,6 +44,7 @@ export function toTrackDto(
     uploaderId: track.uploaderId,
     uploaderNickname: track.uploader?.nickname,
     playCount: track.playCount,
+    downloadCount: Number((track as { downloadCount?: number }).downloadCount ?? 0),
     liked: liked ?? false,
     fileSize: track.fileSize,
     mimeType: track.mimeType,

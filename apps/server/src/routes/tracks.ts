@@ -156,6 +156,20 @@ router.get('/:id', optionalAuth, async (req: AuthedRequest, res) => {
   return ok(res, toTrackDto(track, liked))
 })
 
+/** 上报一次下载（本地下载 / 入库成功后由客户端调用） */
+router.post('/:id/download-stat', requireAuth, async (req: AuthedRequest, res) => {
+  const id = req.params.id
+  const exists = await prisma.track.findUnique({ where: { id }, select: { id: true } })
+  if (!exists) return fail(res, 40401, '歌曲不存在', 404)
+  await prisma.$executeRaw`
+    UPDATE Track SET downloadCount = COALESCE(downloadCount, 0) + 1 WHERE id = ${id}
+  `
+  const rows = await prisma.$queryRaw<Array<{ downloadCount: number }>>`
+    SELECT downloadCount FROM Track WHERE id = ${id}
+  `
+  return ok(res, { downloadCount: Number(rows[0]?.downloadCount || 0) })
+})
+
 router.get('/:id/stream', optionalAuth, async (req: AuthedRequest, res) => {
   // 支持 <audio src> 通过 query token 鉴权
   if (!req.user && typeof req.query.token === 'string' && req.query.token) {
@@ -404,7 +418,8 @@ router.post(
       return ok(res, toTrackDto(updated), '歌曲已存在，已更新信息')
     }
 
-    const status = config.uploadNeedReview ? 'pending' : 'published'
+    const { isUploadNeedReview } = await import('../services/systemSettings.js')
+    const status = (await isUploadNeedReview()) ? 'pending' : 'published'
 
     // 部分浏览器对 .MP3 给出空 MIME，统一兜底
     const ext = path.extname(req.file.originalname).toLowerCase()
@@ -686,7 +701,8 @@ router.post('/import-external', requireAuth, async (req: AuthedRequest, res) => 
     }
 
     // 3) 写入曲库（含歌词）
-    const status = config.uploadNeedReview ? 'pending' : 'published'
+    const { isUploadNeedReview } = await import('../services/systemSettings.js')
+    const status = (await isUploadNeedReview()) ? 'pending' : 'published'
     const track = await prisma.track.create({
       data: {
         name,

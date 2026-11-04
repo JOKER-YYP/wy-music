@@ -1,5 +1,9 @@
 <template>
-  <div ref="rootRef" class="song-list" :class="{ 'is-batch': batchMode }">
+  <div
+    ref="rootRef"
+    class="song-list"
+    :class="{ 'is-batch': batchMode, 'is-reorder': canReorder }"
+  >
     <div v-if="batchMode" class="batch-bar">
       <div class="batch-actions">
         <button
@@ -70,10 +74,14 @@
         playing: isPlaying(row),
         active: isCurrent(row),
         checked: batchMode && selected.has(row.id),
+        dragging: dragIndex === idx,
+        'drag-over': overIndex === idx && dragIndex !== null && dragIndex !== idx,
       }"
       @click="onRowClick(row)"
       @dblclick="onRowDblclick(row)"
       @contextmenu.prevent="onRowContext($event, row)"
+      @dragover.prevent="onDragOver(idx)"
+      @drop.prevent="onDrop(idx)"
     >
       <div v-if="batchMode" class="col-check" @click.stop>
         <input
@@ -82,7 +90,18 @@
           @change="toggleSelect(row.id)"
         />
       </div>
-      <div v-else class="col-idx">
+      <div v-else class="col-idx" :class="{ reorderable: canReorder }">
+        <span
+          v-if="canReorder"
+          class="drag-handle"
+          draggable="true"
+          title="拖动排序"
+          @click.stop
+          @dragstart="onDragStart($event, idx)"
+          @dragend="onDragEnd"
+        >
+          <el-icon :size="14"><Rank /></el-icon>
+        </span>
         <span v-if="isPlaying(row)" class="eq"><i /><i /><i /></span>
         <button v-else class="idx-play" type="button" @click="playOne(row)">
           <span class="num">{{ String(idx + 1).padStart(2, '0') }}</span>
@@ -185,6 +204,7 @@ import {
   FolderAdd,
   List,
   MoreFilled,
+  Rank,
   Star,
   StarFilled,
 } from '@element-plus/icons-vue'
@@ -210,6 +230,8 @@ const props = withDefaults(
     tracks: Array<TrackDto | QueueTrack>
     allowDelete?: boolean
     allowRemove?: boolean
+    /** 歌单详情：所有者可拖拽排序（搜索过滤时应关闭） */
+    allowReorder?: boolean
     playlistId?: string
     emptyText?: string
     batchMode?: boolean
@@ -217,6 +239,7 @@ const props = withDefaults(
   {
     allowDelete: true,
     allowRemove: false,
+    allowReorder: false,
     emptyText: '暂无歌曲',
     batchMode: false,
   },
@@ -224,6 +247,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   refresh: []
+  reorder: [tracks: Array<TrackDto | QueueTrack>]
   'update:batchMode': [boolean]
 }>()
 
@@ -234,11 +258,17 @@ const user = useUserStore()
 const rootRef = ref<HTMLElement | null>(null)
 const selected = ref<Set<string>>(new Set())
 const downloadingId = ref<string | null>(null)
+const dragIndex = ref<number | null>(null)
+const overIndex = ref<number | null>(null)
 
 const batchMode = computed({
   get: () => props.batchMode,
   set: (v: boolean) => emit('update:batchMode', v),
 })
+
+const canReorder = computed(
+  () => Boolean(props.allowReorder) && !batchMode.value && props.tracks.length > 1,
+)
 
 const selectedCount = computed(() => selected.value.size)
 const allSelected = computed(
@@ -255,6 +285,40 @@ function asQueueTrack(row: TrackDto | QueueTrack): QueueTrack {
 
 function isFolderOnly(row: TrackDto | QueueTrack) {
   return isLocalFolderTrack(asQueueTrack(row))
+}
+
+function onDragStart(e: DragEvent, index: number) {
+  if (!canReorder.value) {
+    e.preventDefault()
+    return
+  }
+  dragIndex.value = index
+  overIndex.value = index
+  e.dataTransfer?.setData('text/plain', props.tracks[index]?.id || String(index))
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+}
+
+function onDragOver(index: number) {
+  if (dragIndex.value === null) return
+  overIndex.value = index
+}
+
+function onDragEnd() {
+  dragIndex.value = null
+  overIndex.value = null
+}
+
+function onDrop(index: number) {
+  const from = dragIndex.value
+  dragIndex.value = null
+  overIndex.value = null
+  if (from === null || from === index || !canReorder.value) return
+
+  const next = props.tracks.slice()
+  const [moved] = next.splice(from, 1)
+  if (!moved) return
+  next.splice(index, 0, moved)
+  emit('reorder', next)
 }
 
 const currentInList = computed(() => {
@@ -660,6 +724,10 @@ async function onMenuAction(action: string) {
   align-items: center;
   padding: 0 8px;
 }
+.is-reorder .table-head,
+.is-reorder .song-row {
+  grid-template-columns: 72px minmax(180px, 1.4fr) minmax(100px, 1fr) 48px 56px;
+}
 .table-head.batch,
 .song-row.checked,
 .is-batch .song-row {
@@ -685,15 +753,43 @@ async function onMenuAction(action: string) {
     cursor: pointer;
   }
 }
+.drag-handle {
+  width: 22px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--wy-text-muted);
+  cursor: grab;
+  border-radius: 4px;
+  flex-shrink: 0;
+  opacity: 0.55;
+  &:hover {
+    opacity: 1;
+    color: var(--wy-text-secondary);
+    background: rgba(0, 0, 0, 0.04);
+  }
+  &:active {
+    cursor: grabbing;
+  }
+}
 .song-row {
   height: 56px;
   border-radius: 6px;
   cursor: default;
   transition: background 0.12s ease;
+  &.dragging {
+    opacity: 0.45;
+  }
+  &.drag-over {
+    box-shadow: inset 0 2px 0 0 var(--wy-brand);
+  }
   &:hover {
     background: var(--wy-brand-soft);
     .row-actions {
       display: flex;
+    }
+    .drag-handle {
+      opacity: 1;
     }
     .num {
       display: none;
@@ -718,6 +814,13 @@ async function onMenuAction(action: string) {
 .col-idx {
   display: grid;
   place-items: center;
+  &.reorderable {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 2px;
+    min-width: 0;
+  }
 }
 .idx-play {
   border: none;

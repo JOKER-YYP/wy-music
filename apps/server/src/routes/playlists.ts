@@ -554,6 +554,42 @@ router.post('/:id/tracks', requireAuth, async (req: AuthedRequest, res) => {
   return ok(res, true, '已添加')
 })
 
+/** 按完整 trackIds 重排歌单曲目 position（须与现有曲目集合一致） */
+router.put('/:id/tracks/reorder', requireAuth, async (req: AuthedRequest, res) => {
+  const playlist = await prisma.playlist.findUnique({ where: { id: req.params.id } })
+  if (!playlist) return fail(res, 40401, '歌单不存在', 404)
+  if (playlist.ownerId !== req.user!.id) return fail(res, 40301, '无权操作', 403)
+
+  const rawIds = Array.isArray(req.body?.trackIds) ? (req.body.trackIds as unknown[]) : []
+  const trackIds = Array.from(
+    new Set(rawIds.filter((id): id is string => typeof id === 'string').map((id) => id.trim()).filter(Boolean)),
+  )
+  if (!trackIds.length) return fail(res, 40001, '缺少 trackIds')
+
+  const existing = await prisma.playlistTrack.findMany({
+    where: { playlistId: playlist.id },
+    select: { trackId: true },
+  })
+  if (trackIds.length !== existing.length) {
+    return fail(res, 40002, '排序列表与歌单曲目数量不一致')
+  }
+  const existingSet = new Set(existing.map((e) => e.trackId))
+  if (trackIds.some((id) => !existingSet.has(id))) {
+    return fail(res, 40002, '排序列表包含非本歌单曲目')
+  }
+
+  await prisma.$transaction(
+    trackIds.map((trackId, position) =>
+      prisma.playlistTrack.update({
+        where: { playlistId_trackId: { playlistId: playlist.id, trackId } },
+        data: { position },
+      }),
+    ),
+  )
+
+  return ok(res, true, '已更新排序')
+})
+
 router.delete('/:id/tracks/:trackId', requireAuth, async (req: AuthedRequest, res) => {
   const playlist = await prisma.playlist.findUnique({ where: { id: req.params.id } })
   if (!playlist) return fail(res, 40401, '歌单不存在', 404)

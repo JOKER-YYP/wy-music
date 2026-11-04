@@ -11,9 +11,11 @@
       :tracks="tracks"
       :allow-delete="allowDelete"
       :allow-remove="allowRemove"
+      :allow-reorder="allowReorder"
       :playlist-id="playlistId"
       :empty-text="emptyText"
       @refresh="emit('refresh')"
+      @reorder="(list) => emit('reorder', list)"
     />
   </div>
 </template>
@@ -30,12 +32,16 @@ withDefaults(
     tracks: Array<TrackDto | QueueTrack>
     allowDelete?: boolean
     allowRemove?: boolean
+    allowReorder?: boolean
     playlistId?: string
     emptyText?: string
   }>(),
-  { allowDelete: true, allowRemove: false },
+  { allowDelete: true, allowRemove: false, allowReorder: false },
 )
-const emit = defineEmits<{ refresh: [] }>()
+const emit = defineEmits<{
+  refresh: []
+  reorder: [tracks: Array<TrackDto | QueueTrack>]
+}>()
 const batchMode = ref(false)
 </script>
 

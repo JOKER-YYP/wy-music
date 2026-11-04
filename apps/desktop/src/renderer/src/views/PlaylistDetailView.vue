@@ -99,9 +99,11 @@
           :tracks="filteredTracks"
           :allow-delete="false"
           :allow-remove="isOwner && Boolean(detail && !detail.isSystem)"
+          :allow-reorder="canReorder"
           :playlist-id="detail.id"
           :empty-text="emptySongsText"
           @refresh="onTracksRefresh"
+          @reorder="onReorder"
         />
       </div>
 
@@ -122,6 +124,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Edit, MoreFilled, Search, VideoPlay } from '@element-plus/icons-vue'
+import type { TrackDto } from '@wy-music/shared'
 import { mediaUrl } from '../services/http'
 import { usePlayerStore } from '../stores/player'
 import { usePlaylistStore, type PlaylistDetail } from '../stores/playlist'
@@ -140,6 +143,7 @@ const activeTab = ref<'songs' | 'comments' | 'collectors'>('songs')
 const keyword = ref('')
 const batchMode = ref(false)
 const savingAs = ref(false)
+const reordering = ref(false)
 
 const isOwner = computed(() => {
   if (!detail.value || !user.user?.id) return false
@@ -150,6 +154,13 @@ const canSaveAs = computed(() => {
   if (!detail.value) return false
   if (detail.value.isSystem) return false
   return !isOwner.value
+})
+
+/** 所有者可排序；搜索过滤时禁用，避免只排子集打乱全量 */
+const canReorder = computed(() => {
+  if (!detail.value || !isOwner.value || batchMode.value) return false
+  if (keyword.value.trim()) return false
+  return (detail.value.tracks?.length || 0) > 1
 })
 
 const coverStyle = computed(() => {
@@ -210,6 +221,24 @@ async function load(opts?: { keepBatch?: boolean }) {
 async function onTracksRefresh() {
   await load({ keepBatch: batchMode.value })
   await playlistStore.fetchMine()
+}
+
+async function onReorder(next: TrackDto[]) {
+  if (!detail.value || !canReorder.value || reordering.value) return
+  const playlistId = detail.value.id
+  const prev = detail.value.tracks
+  const trackIds = next.map((t) => t.id)
+  detail.value = { ...detail.value, tracks: next }
+  reordering.value = true
+  try {
+    await playlistStore.reorderTracks(playlistId, trackIds)
+  } catch {
+    if (detail.value?.id === playlistId) {
+      detail.value = { ...detail.value, tracks: prev }
+    }
+  } finally {
+    reordering.value = false
+  }
 }
 
 function playAll() {

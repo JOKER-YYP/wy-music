@@ -62,6 +62,9 @@ export const usePlaylistStore = defineStore('playlist', {
       await http.post(`/api/playlists/${playlistId}/tracks`, { trackId })
       await this.fetchMine()
     },
+    async reorderTracks(playlistId: string, trackIds: string[]) {
+      await http.put(`/api/playlists/${playlistId}/tracks/reorder`, { trackIds })
+    },
     async saveAs(id: string, options?: { name?: string; isPublic?: boolean }) {
       const { data } = await http.post(`/api/playlists/${id}/save-as`, {
         name: options?.name,

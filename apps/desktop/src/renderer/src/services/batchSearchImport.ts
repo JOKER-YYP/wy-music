@@ -10,6 +10,9 @@ export type BatchQueryRow = {
   keyword: string
 }
 
+/** 匹配置信度：用于结果筛选与展示 */
+export type MatchConfidence = 'high' | 'medium' | 'low'
+
 export type BatchSearchHit = {
   /** 列表行唯一键（同曲不同查询可并存） */
   rowKey: string
@@ -21,6 +24,20 @@ export type BatchSearchHit = {
   score: number
   /** 歌名与歌手均与清单一致（规范化后） */
   exactMatch: boolean
+  /** 综合分数划分的可信度 */
+  confidence: MatchConfidence
+}
+
+export function matchConfidenceOf(score: number, exactMatch: boolean): MatchConfidence {
+  if (exactMatch || score >= 200) return 'high'
+  if (score >= 100) return 'medium'
+  return 'low'
+}
+
+export function confidenceLabel(c: MatchConfidence): string {
+  if (c === 'high') return '高'
+  if (c === 'medium') return '中'
+  return '低'
 }
 
 export type BatchQueryProgress = {
@@ -324,16 +341,20 @@ export async function runBatchExternalSearch(
         // 展示时：匹配分高的在前，同分按源稳定排序
         picked.sort((a, b) => b.score - a.score)
 
-        const chunk: BatchSearchHit[] = picked.map((item) => ({
-          rowKey: `${q.index}:${item.track.id}`,
-          queryIndex: q.index,
-          queryKeyword: q.keyword,
-          queryName: q.name,
-          queryArtist: q.artist,
-          track: item.track,
-          score: item.score,
-          exactMatch: isExactMatch(item.track, q.name, q.artist),
-        }))
+        const chunk: BatchSearchHit[] = picked.map((item) => {
+          const exactMatch = isExactMatch(item.track, q.name, q.artist)
+          return {
+            rowKey: `${q.index}:${item.track.id}`,
+            queryIndex: q.index,
+            queryKeyword: q.keyword,
+            queryName: q.name,
+            queryArtist: q.artist,
+            track: item.track,
+            score: item.score,
+            exactMatch,
+            confidence: matchConfidenceOf(item.score, exactMatch),
+          }
+        })
         hits.push(...chunk)
         if (chunk.length) opts?.onHits?.(chunk)
       } catch {

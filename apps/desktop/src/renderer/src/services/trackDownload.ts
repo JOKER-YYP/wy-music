@@ -5,6 +5,14 @@ import { importExternalToLibrary, resolveExternalDetail } from './externalMusic'
 import { http, streamUrl } from './http'
 import { isElectronApp } from './localUpload'
 
+/** 批量下载策略：全量 / 只补缺文件 / 只补缺词 */
+export type BatchDownloadStrategy = 'all' | 'missing_file' | 'missing_lyric'
+
+export type BatchDownloadPlan = {
+  dest: 'library' | 'folder'
+  strategy: BatchDownloadStrategy
+}
+
 async function reportDownloadStat(trackId: string) {
   if (!trackId || trackId.startsWith('local:') || trackId.startsWith('ext:')) return
   try {
@@ -295,6 +303,60 @@ export async function pickBatchDownloadMode(): Promise<'library' | 'folder' | nu
     if (action === 'cancel') return 'folder'
     return null
   }
+}
+
+/**
+ * 批量下载计划：先选策略（全量 / 缺文件 / 缺词），再选保存位置。
+ * 「只补缺词」固定写入曲库歌词，不再选文件夹。
+ */
+export async function pickBatchDownloadPlan(
+  presetStrategy?: BatchDownloadStrategy,
+): Promise<BatchDownloadPlan | null> {
+  let strategy: BatchDownloadStrategy = presetStrategy || 'all'
+
+  if (!presetStrategy) {
+    try {
+      await ElMessageBox.confirm(
+        '全部已选：下载勾选的全部结果\n\n也可点「补缺策略」选择只补缺文件 / 只补缺词',
+        '批量下载',
+        {
+          distinguishCancelAndClose: true,
+          confirmButtonText: '全部已选',
+          cancelButtonText: '补缺策略…',
+          type: 'info',
+          closeOnClickModal: false,
+        },
+      )
+      strategy = 'all'
+    } catch (action) {
+      if (action !== 'cancel') return null
+      try {
+        await ElMessageBox.confirm(
+          '只补缺文件：跳过曲库已有，只下缺失音频\n只补缺词：对已入库且缺 LRC 的曲写回歌词',
+          '选择补缺策略',
+          {
+            distinguishCancelAndClose: true,
+            confirmButtonText: '只补缺文件',
+            cancelButtonText: '只补缺词',
+            type: 'info',
+            closeOnClickModal: false,
+          },
+        )
+        strategy = 'missing_file'
+      } catch (action2) {
+        if (action2 === 'cancel') strategy = 'missing_lyric'
+        else return null
+      }
+    }
+  }
+
+  if (strategy === 'missing_lyric') {
+    return { dest: 'library', strategy }
+  }
+
+  const dest = await pickBatchDownloadMode()
+  if (!dest) return null
+  return { dest, strategy }
 }
 
 export type BatchDownloadFailItem = {

@@ -76,6 +76,52 @@ export function buildLibraryIndex(tracks: LibraryTrackLite[]): IndexedTrack[] {
   })
 }
 
+export type MetaLookupHit = {
+  trackId: string
+  name: string
+  artists: string[]
+  hasLyric: boolean
+}
+
+/** 按歌名+歌手在曲库中查找（用于批量「缺文件/缺词」） */
+export function lookupLibraryByMeta(
+  query: { name: string; artists: string[] },
+  library: Array<LibraryTrackLite & { lyricText?: string | null }>,
+): MetaLookupHit | null {
+  const norm = normalizeText(query.name)
+  if (!norm) return null
+  const index = buildLibraryIndex(library)
+  const candidates = index.filter((t) => t.normName === norm)
+  const queryHasArtist = normalizeArtistList(query.artists).length > 0
+
+  let hit: IndexedTrack | undefined
+  if (candidates.length) {
+    if (queryHasArtist) {
+      hit = candidates.find((t) => artistsOverlap(query.artists, t.artists))
+    } else if (candidates.length === 1) {
+      hit = candidates[0]
+    }
+  }
+  if (!hit && queryHasArtist) {
+    hit = index.find(
+      (t) =>
+        t.normName &&
+        (t.normName.includes(norm) || norm.includes(t.normName)) &&
+        artistsOverlap(query.artists, t.artists),
+    )
+  }
+  if (!hit) return null
+  const raw = library.find((t) => t.id === hit!.id)
+  const lyric = String(raw?.lyricText || '').trim()
+  const hasLyric = Boolean(lyric) && !(/暂无歌词|无效歌词/.test(lyric) && lyric.length < 40)
+  return {
+    trackId: hit.id,
+    name: hit.name,
+    artists: hit.artists,
+    hasLyric,
+  }
+}
+
 export function matchExternalSongs(
   remotes: ExternalSong[],
   library: LibraryTrackLite[],

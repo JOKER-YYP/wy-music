@@ -4,10 +4,14 @@
       <div>
         <h1>批量搜歌</h1>
         <p class="sub">
-          歌名（含括号）与歌手都一致才算完全匹配；其余结果可在下方展开挑选其它源
+          任务可回看 · 按置信度筛选 · 一键只补缺词/缺文件；完全匹配优先，其它源可展开挑选
         </p>
       </div>
       <div class="head-actions">
+        <el-button round @click="taskCenterOpen = true">
+          任务中心
+          <span v-if="jobHistory.length" class="job-badge">{{ jobHistory.length }}</span>
+        </el-button>
         <el-button round @click="onDownloadTemplate">下载导入模板</el-button>
         <el-button type="danger" round :loading="searching" @click="triggerImport">
           导入 Excel 搜索
@@ -21,6 +25,67 @@
         />
       </div>
     </div>
+
+    <el-drawer v-model="taskCenterOpen" title="批量搜歌 · 任务中心" size="420px" append-to-body>
+      <div class="task-center">
+        <div class="task-center-head">
+          <span class="task-center-tip">最近 {{ jobHistory.length }} 次任务（本机保存）</span>
+          <el-button
+            size="small"
+            text
+            type="danger"
+            :disabled="!jobHistory.length || searching || downloading"
+            @click="onClearJobHistory"
+          >
+            清空
+          </el-button>
+        </div>
+        <el-empty v-if="!jobHistory.length" description="暂无历史任务" :image-size="64" />
+        <ul v-else class="task-list">
+          <li
+            v-for="j in jobHistory"
+            :key="j.id"
+            class="task-item"
+            :class="{ active: j.id === currentJobId, running: j.status === 'running' }"
+          >
+            <div class="task-main">
+              <div class="task-name" :title="j.name">{{ j.name }}</div>
+              <div class="task-meta">
+                <span :class="['task-status', j.status]">{{ jobStatusLabel(j.status) }}</span>
+                <span>{{ formatJobTime(j.createdAt) }}</span>
+                <span>清单 {{ j.queryCount }}</span>
+                <span v-if="j.hitCount">结果 {{ j.hitCount }}</span>
+              </div>
+              <div v-if="j.hitCount" class="task-conf">
+                <span class="conf-dot high">高 {{ j.highCount }}</span>
+                <span class="conf-dot medium">中 {{ j.mediumCount }}</span>
+                <span class="conf-dot low">低 {{ j.lowCount }}</span>
+              </div>
+              <div v-if="j.errorMessage" class="task-err">{{ j.errorMessage }}</div>
+            </div>
+            <div class="task-actions">
+              <el-button
+                size="small"
+                round
+                :disabled="!j.hasSnapshot || searching || downloading"
+                @click="onRestoreJob(j.id)"
+              >
+                打开
+              </el-button>
+              <el-button
+                size="small"
+                text
+                type="danger"
+                :disabled="j.status === 'running' || searching || downloading"
+                @click="onRemoveJob(j.id)"
+              >
+                删除
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </el-drawer>
 
     <SearchSourcePicker
       v-model="enabledSources"
@@ -44,6 +109,7 @@
     <div v-if="queries.length && (hits.length || searching)" class="summary">
       清单 {{ queries.length }} 条 · 结果 {{ hits.length }} 首
       <span v-if="exactHitCount">· 完全匹配 {{ exactHitCount }}</span>
+      <span v-if="confidenceCounts.high">· 高置信 {{ confidenceCounts.high }}</span>
       <span v-if="unmatchedQueries.length">· 未完全匹配 {{ unmatchedQueries.length }}</span>
       <span v-if="selectedCount">· 已选 {{ selectedCount }}</span>
     </div>
@@ -59,6 +125,14 @@
           <input v-model="exactOnly" type="checkbox" :disabled="downloading" />
           仅完全匹配
         </label>
+        <div class="conf-filter">
+          <span class="mode-label">置信度</span>
+          <el-radio-group v-model="confidenceFilter" size="small" :disabled="downloading">
+            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="high">仅高</el-radio-button>
+            <el-radio-button value="high_medium">高+中</el-radio-button>
+          </el-radio-group>
+        </div>
       </div>
       <p class="mode-hint">
         「每首歌一首」优先有词，再按点选来源顺序跨源兜底；点选序号即优先级
@@ -108,6 +182,24 @@
         @click="onBatchDownload"
       >
         批量下载（已选 {{ selectedCount }}）
+      </el-button>
+      <el-button
+        round
+        size="small"
+        :disabled="!selectedCount || downloading"
+        :loading="downloading"
+        @click="onFillMissingFile"
+      >
+        只补缺文件
+      </el-button>
+      <el-button
+        round
+        size="small"
+        :disabled="!selectedCount || downloading"
+        :loading="downloading"
+        @click="onFillMissingLyric"
+      >
+        只补缺词
       </el-button>
       <el-button round size="small" :disabled="downloading" @click="selectCurrentPage">
         全选本页
@@ -301,8 +393,11 @@
           {{ (row.track.artists || []).join(' / ') || '—' }}
         </template>
       </el-table-column>
-      <el-table-column label="匹配" width="120">
+      <el-table-column label="匹配" width="168">
         <template #default="{ row }">
+          <span :class="['match-tag', 'conf', row.confidence || 'low']">
+            {{ confidenceLabel(row.confidence || 'low') }}
+          </span>
           <span :class="['match-tag', row.exactMatch ? 'exact' : 'partial']">
             {{ row.exactMatch ? '完全' : '部分' }}
           </span>
@@ -348,15 +443,17 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { MusicSource, TrackDto } from '@wy-music/shared'
 import { MUSIC_SOURCES, MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import {
+  confidenceLabel,
   downloadBatchSearchTemplate,
   sourceLabel,
   trackHasLyric,
   type BatchSearchHit,
 } from '../services/batchSearchImport'
+import { clearAllBatchJobs, type BatchJobStatus } from '../services/batchJobHistory'
 import { saveSearchSources } from '../services/searchSources'
 import type { BatchDownloadFailItem } from '../services/trackDownload'
 import SearchSourcePicker from '../components/SearchSourcePicker.vue'
@@ -377,12 +474,20 @@ const {
   enabledSources,
   selectMode,
   exactOnly,
+  confidenceFilter,
   filterSource,
   pickedSources,
   hideUnmatched,
   page,
   pageSize,
+  jobHistory,
+  currentJobId,
 } = storeToRefs(jobs)
+
+const taskCenterOpen = ref(false)
+const confidenceCounts = computed(() => jobs.confidenceCounts)
+
+jobs.refreshJobHistory()
 
 const selectedKeySet = computed({
   get: () => jobs.selectedKeySet,
@@ -533,6 +638,11 @@ const filteredHits = computed(() => {
   }
   if (exactOnly.value) {
     list = list.filter((h) => h.exactMatch)
+  }
+  if (confidenceFilter.value === 'high') {
+    list = list.filter((h) => h.confidence === 'high')
+  } else if (confidenceFilter.value === 'high_medium') {
+    list = list.filter((h) => h.confidence === 'high' || h.confidence === 'medium')
   }
   return list
 })
@@ -704,6 +814,11 @@ function collectKeysForSources(
 ): Set<string> {
   let scoped = hits.value
   if (exact) scoped = scoped.filter((h) => h.exactMatch)
+  if (confidenceFilter.value === 'high') {
+    scoped = scoped.filter((h) => h.confidence === 'high')
+  } else if (confidenceFilter.value === 'high_medium') {
+    scoped = scoped.filter((h) => h.confidence === 'high' || h.confidence === 'medium')
+  }
 
   if (mode === 'all') {
     if (sources?.length) {
@@ -839,7 +954,7 @@ function onSourceTagClick(source: string) {
 /** 换源勾选时临时关闭，避免 exactOnly 切换把选中结果冲掉 */
 let suppressModeWatch = false
 
-watch([selectMode, exactOnly], () => {
+watch([selectMode, exactOnly, confidenceFilter], () => {
   if (suppressModeWatch) return
   if (!hits.value.length) return
   if (pickedSources.value.length) {
@@ -923,12 +1038,50 @@ async function restorePageSelection() {
   syncingSelection = false
 }
 
-watch([page, pageSize, filterSource, exactOnly], () => {
+watch([page, pageSize, filterSource, exactOnly, confidenceFilter], () => {
   void restorePageSelection()
 })
 
 function playOne(track: TrackDto) {
   player.playTrack(track, [track])
+}
+
+function jobStatusLabel(status: BatchJobStatus): string {
+  if (status === 'running') return '进行中'
+  if (status === 'done') return '完成'
+  if (status === 'cancelled') return '已取消'
+  return '失败'
+}
+
+function formatJobTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  } catch {
+    return iso
+  }
+}
+
+function onRestoreJob(id: string) {
+  if (jobs.restoreJob(id)) taskCenterOpen.value = false
+}
+
+function onRemoveJob(id: string) {
+  jobs.removeJob(id)
+}
+
+async function onClearJobHistory() {
+  try {
+    await ElMessageBox.confirm('清空全部历史任务？不可恢复。', '任务中心', {
+      type: 'warning',
+      confirmButtonText: '清空',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  clearAllBatchJobs()
+  jobs.refreshJobHistory()
 }
 
 async function onFilePicked(ev: Event) {
@@ -946,6 +1099,16 @@ async function onFilePicked(ev: Event) {
 async function onBatchDownload() {
   if (!selectedKeySet.value.size) return
   await jobs.startDownload()
+}
+
+async function onFillMissingFile() {
+  if (!selectedKeySet.value.size) return
+  await jobs.startDownload({ strategy: 'missing_file' })
+}
+
+async function onFillMissingLyric() {
+  if (!selectedKeySet.value.size) return
+  await jobs.startDownload({ strategy: 'missing_lyric' })
 }
 </script>
 
@@ -986,6 +1149,128 @@ async function onBatchDownload() {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  flex-shrink: 0;
+}
+.job-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--wy-brand-soft-strong);
+  color: var(--wy-brand);
+}
+.conf-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+.task-center {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+.task-center-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.task-center-tip {
+  font-size: 12px;
+  color: var(--wy-text-muted);
+}
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+}
+.task-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: var(--wy-radius-md);
+  border: 1px solid var(--wy-border);
+  background: var(--wy-surface-muted);
+  &.active {
+    border-color: rgba(236, 65, 65, 0.35);
+    background: var(--wy-brand-soft);
+  }
+  &.running {
+    border-color: rgba(236, 65, 65, 0.25);
+  }
+}
+.task-main {
+  flex: 1;
+  min-width: 0;
+}
+.task-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wy-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--wy-text-muted);
+}
+.task-status {
+  font-weight: 600;
+  &.done {
+    color: #2f9b5f;
+  }
+  &.running {
+    color: var(--wy-brand);
+  }
+  &.cancelled,
+  &.failed {
+    color: var(--wy-text-secondary);
+  }
+}
+.task-conf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.conf-dot {
+  &.high {
+    color: #2f9b5f;
+  }
+  &.medium {
+    color: #c48a1a;
+  }
+  &.low {
+    color: var(--wy-text-muted);
+  }
+}
+.task-err {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--wy-brand);
+}
+.task-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   flex-shrink: 0;
 }
 .file-input {
@@ -1181,6 +1466,20 @@ async function onBatchDownload() {
     color: var(--wy-brand);
     background: var(--wy-brand-soft);
     font-weight: 600;
+  }
+  &.conf.high {
+    color: #1f7a4d;
+    background: rgba(47, 155, 95, 0.14);
+    font-weight: 700;
+  }
+  &.conf.medium {
+    color: #9a6b10;
+    background: rgba(196, 138, 26, 0.16);
+    font-weight: 600;
+  }
+  &.conf.low {
+    color: var(--wy-text-muted);
+    background: var(--wy-surface-muted);
   }
 }
 .source-tags {

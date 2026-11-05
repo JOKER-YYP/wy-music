@@ -105,6 +105,53 @@ router.get('/mine', requireAuth, async (req: AuthedRequest, res) => {
   return ok(res, list.map((t) => toTrackDto(t)))
 })
 
+/**
+ * 按歌名+歌手批量查询曲库是否已有、是否缺词。
+ * body: { items: [{ name, artists: string[] }] }
+ */
+router.post('/lookup-meta', requireAuth, async (req: AuthedRequest, res) => {
+  const raw = Array.isArray(req.body?.items) ? req.body.items : []
+  const items = raw
+    .slice(0, 500)
+    .map((it: any) => ({
+      name: String(it?.name || '').trim(),
+      artists: Array.isArray(it?.artists)
+        ? it.artists.map(String).filter(Boolean)
+        : String(it?.artist || it?.artists || '')
+            .split(/[,，/、]/)
+            .map((s: string) => s.trim())
+            .filter(Boolean),
+    }))
+    .filter((it: { name: string }) => it.name)
+
+  if (!items.length) return ok(res, { results: [] })
+
+  const names = [...new Set(items.map((i: { name: string }) => i.name))]
+  // 先按歌名粗筛，再内存精确匹配
+  const or = names.slice(0, 200).map((name: string) => ({ name: { contains: name.slice(0, 40) } }))
+  const library = await prisma.track.findMany({
+    where: {
+      status: { in: ['published', 'pending'] },
+      OR: or.length ? or : undefined,
+    },
+    select: { id: true, name: true, artists: true, lyricText: true },
+    take: 5000,
+  })
+
+  const { lookupLibraryByMeta } = await import('../services/trackMatch.js')
+  const results = items.map((q: { name: string; artists: string[] }) => {
+    const hit = lookupLibraryByMeta(q, library)
+    return {
+      name: q.name,
+      artists: q.artists,
+      trackId: hit?.trackId || null,
+      hasLyric: hit?.hasLyric || false,
+      inLibrary: Boolean(hit),
+    }
+  })
+  return ok(res, { results })
+})
+
 /** 批量核对 fileHash，用于上传扫描列表标注「曲库已有 / 新曲」 */
 router.post('/check-library', requireAuth, async (req: AuthedRequest, res) => {
   const raw = Array.isArray(req.body?.hashes) ? req.body.hashes : []
@@ -753,6 +800,38 @@ router.post('/import-external', requireAuth, async (req: AuthedRequest, res) => 
     }
     return fail(res, 40014, e?.message || '导入失败')
   }
+})
+
+/**
+ * 仅补空歌词：任意登录用户可对「无有效歌词」的已发布/待审曲写回 LRC。
+ * 不覆盖已有歌词，也不改元数据。
+ */
+router.post('/:id/fill-lyric', requireAuth, async (req: AuthedRequest, res) => {
+  const track = await prisma.track.findUnique({
+    where: { id: req.params.id },
+    include: { uploader: { select: { nickname: true } } },
+  })
+  if (!track) return fail(res, 40401, '歌曲不存在', 404)
+  if (track.status === 'offline') return fail(res, 40401, '歌曲不存在', 404)
+
+  const lyricText = String(req.body?.lyricText || '').trim()
+  if (!lyricText || (/暂无歌词|无效歌词/.test(lyricText) && lyricText.length < 40)) {
+    return fail(res, 40001, '歌词无效')
+  }
+
+  const existing = String(track.lyricText || '').trim()
+  const hasLyric =
+    Boolean(existing) && !(/暂无歌词|无效歌词/.test(existing) && existing.length < 40)
+  if (hasLyric) {
+    return ok(res, toTrackDto(track), '已有歌词，已跳过')
+  }
+
+  const updated = await prisma.track.update({
+    where: { id: track.id },
+    data: { lyricText },
+    include: { uploader: { select: { nickname: true } } },
+  })
+  return ok(res, toTrackDto(updated), '已补全歌词')
 })
 
 router.put('/:id', requireAuth, async (req: AuthedRequest, res) => {

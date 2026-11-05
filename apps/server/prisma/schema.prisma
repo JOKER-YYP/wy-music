@@ -76,11 +76,18 @@ model Playlist {
   tags        String?
   isSystem    Boolean  @default(false)
   isPublic    Boolean  @default(false)
+  /** 运营推荐位（需公开）；发现页/广场优先展示 */
+  featured    Boolean  @default(false)
+  /** 推荐排序，数值越小越靠前 */
+  recommendSort Int    @default(0)
   ownerId     String
   owner       User     @relation(fields: [ownerId], references: [id])
   createdAt   DateTime @default(now())
   tracks      PlaylistTrack[]
   favorites   PlaylistFavorite[]
+
+  @@index([featured, recommendSort])
+  @@index([isPublic, featured, recommendSort])
 }
 
 model PlaylistTrack {

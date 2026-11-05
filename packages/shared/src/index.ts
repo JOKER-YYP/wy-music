@@ -240,6 +240,10 @@ export interface PlaylistDto {
   tags?: string | null
   isSystem: boolean
   isPublic: boolean
+  /** 运营推荐位 */
+  featured?: boolean
+  /** 推荐排序（越小越靠前） */
+  recommendSort?: number
   ownerId: string
   trackCount?: number
   /** 被收藏次数 */

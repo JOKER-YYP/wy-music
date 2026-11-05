@@ -23,6 +23,7 @@
           @click="openPlaylist(p)"
         >
           <div class="cover" :style="coverStyle(p)">
+            <span v-if="p.featured" class="feat-badge">推荐</span>
             <span class="badge">
               <el-icon :size="12"><Headset /></el-icon>
               {{ formatCount(p.trackCount || p.playCount || 0) }}
@@ -79,6 +80,8 @@ export type PlazaPlaylist = {
   collectCount?: number
   playCount?: number
   ownerNickname?: string
+  featured?: boolean
+  recommendSort?: number
 }
 
 const props = defineProps<{ hotTracks?: TrackDto[] }>()
@@ -190,6 +193,22 @@ onMounted(async () => {
   background-position: center;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
   transition: transform 0.15s;
+}
+.feat-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--wy-brand);
+  color: var(--wy-text-on-brand);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 .badge {
   position: absolute;

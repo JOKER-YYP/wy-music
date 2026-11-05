@@ -42,6 +42,7 @@
             @click="openPlaylist(item.id)"
           >
             <div class="cover" :style="playlistCoverStyle(item)">
+              <span v-if="item.featured" class="feat-badge">推荐</span>
               <span class="play-count">▷ {{ formatCount(item.playCount) }}</span>
               <button class="play-fab" type="button" @click.stop="playPlaylist(item.id)">
                 <span class="iconfont icon-play" aria-hidden="true" />
@@ -100,6 +101,8 @@ type RecommendPlaylistCard = {
   playCount: number
   ownerNickname?: string
   tags?: string | null
+  featured?: boolean
+  recommendSort?: number
 }
 
 const router = useRouter()
@@ -397,6 +400,22 @@ onMounted(async () => {
   transition:
     transform var(--wy-duration) var(--wy-ease-out),
     box-shadow var(--wy-duration) var(--wy-ease);
+}
+.feat-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--wy-brand);
+  color: var(--wy-text-on-brand);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 .play-count {
   position: absolute;

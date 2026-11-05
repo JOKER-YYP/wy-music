@@ -49,6 +49,8 @@ function toPlaylistDto(
     tags?: string | null
     isSystem: boolean
     isPublic: boolean
+    featured?: boolean
+    recommendSort?: number
     ownerId: string
     createdAt: Date
     _count?: { tracks?: number; favorites?: number }
@@ -67,6 +69,8 @@ function toPlaylistDto(
     tags: p.tags ?? null,
     isSystem: p.isSystem,
     isPublic: p.isPublic,
+    featured: Boolean(p.featured),
+    recommendSort: p.recommendSort ?? 0,
     ownerId: p.ownerId,
     trackCount: p._count?.tracks ?? 0,
     collectCount: p._count?.favorites ?? 0,

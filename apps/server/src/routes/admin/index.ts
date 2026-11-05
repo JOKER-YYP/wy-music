@@ -791,9 +791,11 @@ router.get('/playlists', async (req, res) => {
   const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 20))
   const keyword = String(req.query.keyword || '').trim()
   const onlyPublic = String(req.query.public || '') === '1'
+  const onlyFeatured = String(req.query.featured || '') === '1'
   const where = {
     isSystem: false,
     ...(onlyPublic ? { isPublic: true } : {}),
+    ...(onlyFeatured ? { featured: true } : {}),
     ...(keyword
       ? {
           OR: [
@@ -811,7 +813,7 @@ router.get('/playlists', async (req, res) => {
         owner: { select: { id: true, nickname: true, account: true } },
         _count: { select: { tracks: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ featured: 'desc' }, { recommendSort: 'asc' }, { createdAt: 'desc' }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -824,6 +826,8 @@ router.get('/playlists', async (req, res) => {
       description: p.description,
       tags: p.tags,
       isPublic: p.isPublic,
+      featured: p.featured,
+      recommendSort: p.recommendSort,
       isSystem: p.isSystem,
       ownerId: p.ownerId,
       ownerNickname: p.owner.nickname,
@@ -838,7 +842,8 @@ router.get('/playlists', async (req, res) => {
 })
 
 router.patch('/playlists/:id', async (req, res) => {
-  const playlist = await prisma.playlist.findUnique({ where: { id: req.params.id } })
+  const id = Array.isArray(req.params.id) ? String(req.params.id[0] || '') : String(req.params.id || '')
+  const playlist = await prisma.playlist.findUnique({ where: { id } })
   if (!playlist) return fail(res, 40401, '歌单不存在', 404)
   if (playlist.isSystem) return fail(res, 40002, '系统歌单不可修改')
   const data: Record<string, unknown> = {}
@@ -848,12 +853,38 @@ router.patch('/playlists/:id', async (req, res) => {
     if (!name) return fail(res, 40001, '名称不能为空')
     data.name = name.slice(0, 40)
   }
+  if (req.body.featured !== undefined) data.featured = Boolean(req.body.featured)
+  if (req.body.recommendSort !== undefined) {
+    const n = Number(req.body.recommendSort)
+    if (!Number.isFinite(n)) return fail(res, 40001, '排序值无效')
+    data.recommendSort = Math.max(0, Math.min(9999, Math.round(n)))
+  }
+
+  // 推荐位必须公开；取消公开则同步取消推荐
+  const nextPublic =
+    data.isPublic !== undefined ? Boolean(data.isPublic) : playlist.isPublic
+  const nextFeatured =
+    data.featured !== undefined ? Boolean(data.featured) : playlist.featured
+  if (nextFeatured && !nextPublic) {
+    if (data.featured === true && data.isPublic === undefined) {
+      data.isPublic = true
+    } else if (data.isPublic === false) {
+      data.featured = false
+    }
+  }
+
   const updated = await prisma.playlist.update({ where: { id: playlist.id }, data })
-  return ok(res, {
-    id: updated.id,
-    name: updated.name,
-    isPublic: updated.isPublic,
-  }, '已更新')
+  return ok(
+    res,
+    {
+      id: updated.id,
+      name: updated.name,
+      isPublic: updated.isPublic,
+      featured: updated.featured,
+      recommendSort: updated.recommendSort,
+    },
+    '已更新',
+  )
 })
 
 router.delete('/playlists/:id', async (req, res) => {

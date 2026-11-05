@@ -2,6 +2,7 @@
   <div class="admin-page">
     <div class="head">
       <el-checkbox v-model="onlyPublic" @change="onFilter">仅公开</el-checkbox>
+      <el-checkbox v-model="onlyFeatured" @change="onFilter">仅推荐位</el-checkbox>
       <el-input
         v-model="keyword"
         placeholder="搜索歌单名 / 创建者"
@@ -26,11 +27,34 @@
           </el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="推荐位" width="100">
+        <template #default="{ row }">
+          <el-tag v-if="row.featured" type="danger" size="small">推荐</el-tag>
+          <span v-else class="muted">—</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="排序" width="110">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="row.featured"
+            :model-value="row.recommendSort"
+            :min="0"
+            :max="9999"
+            size="small"
+            controls-position="right"
+            @change="(v: number | undefined) => onSortChange(row, v)"
+          />
+          <span v-else class="muted">{{ row.recommendSort ?? 0 }}</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="createdAt" label="创建时间" width="170" />
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="togglePublic(row)">
             {{ row.isPublic ? '设为私密' : '设为公开' }}
+          </el-button>
+          <el-button link :type="row.featured ? 'warning' : 'success'" @click="toggleFeatured(row)">
+            {{ row.featured ? '取消推荐' : '设为推荐' }}
           </el-button>
           <el-button link type="danger" @click="remove(row)">删除</el-button>
         </template>
@@ -59,6 +83,8 @@ type PlaylistRow = {
   ownerNickname: string
   trackCount: number
   isPublic: boolean
+  featured: boolean
+  recommendSort: number
   createdAt: string
 }
 
@@ -69,6 +95,8 @@ const pageSize = 20
 const total = ref(0)
 const keyword = ref('')
 const onlyPublic = ref(false)
+const onlyFeatured = ref(false)
+const sortSaving = ref<string | null>(null)
 
 async function load() {
   loading.value = true
@@ -79,6 +107,7 @@ async function load() {
         pageSize,
         keyword: keyword.value || undefined,
         public: onlyPublic.value ? '1' : undefined,
+        featured: onlyFeatured.value ? '1' : undefined,
       },
     })
     list.value = data.data.list
@@ -93,10 +122,39 @@ function onFilter() {
   load()
 }
 
+async function patchPlaylist(id: string, body: Record<string, unknown>, okMsg: string) {
+  await http.patch(`/api/admin/playlists/${id}`, body)
+  ElMessage.success(okMsg)
+  await load()
+}
+
 async function togglePublic(row: PlaylistRow) {
-  await http.patch(`/api/admin/playlists/${row.id}`, { isPublic: !row.isPublic })
-  ElMessage.success('已更新')
-  load()
+  await patchPlaylist(row.id, { isPublic: !row.isPublic }, '已更新公开状态')
+}
+
+async function toggleFeatured(row: PlaylistRow) {
+  const next = !row.featured
+  await patchPlaylist(
+    row.id,
+    {
+      featured: next,
+      ...(next && !row.isPublic ? { isPublic: true } : {}),
+    },
+    next ? '已设为推荐位（将自动公开）' : '已取消推荐',
+  )
+}
+
+async function onSortChange(row: PlaylistRow, value: number | undefined) {
+  if (value == null || value === row.recommendSort) return
+  if (sortSaving.value === row.id) return
+  sortSaving.value = row.id
+  try {
+    await http.patch(`/api/admin/playlists/${row.id}`, { recommendSort: value })
+    row.recommendSort = value
+    ElMessage.success('排序已更新')
+  } finally {
+    sortSaving.value = null
+  }
 }
 
 async function remove(row: PlaylistRow) {
@@ -121,5 +179,9 @@ onMounted(load)
 .pager {
   margin-top: 16px;
   justify-content: flex-end;
+}
+.muted {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 </style>

@@ -53,7 +53,7 @@ router.get('/', optionalAuth, async (_req, res) => {
   })
 })
 
-/** 歌单广场：仅展示用户公开歌单 */
+/** 歌单广场：仅展示用户公开歌单（推荐位置顶） */
 router.get('/playlists', optionalAuth, async (_req, res) => {
   const list = await prisma.playlist.findMany({
     where: {
@@ -69,7 +69,7 @@ router.get('/playlists', optionalAuth, async (_req, res) => {
         include: { track: { select: { coverUrl: true, playCount: true, status: true } } },
       },
     },
-    orderBy: [{ createdAt: 'desc' }],
+    orderBy: [{ featured: 'desc' }, { recommendSort: 'asc' }, { createdAt: 'desc' }],
     take: 80,
   })
 
@@ -86,6 +86,8 @@ router.get('/playlists', optionalAuth, async (_req, res) => {
         playCount: published.reduce((s, t) => s + (t.track.playCount || 0), 0),
         ownerNickname: p.owner.nickname,
         isSystem: p.isSystem,
+        featured: p.featured,
+        recommendSort: p.recommendSort,
       }
     })
 
@@ -216,6 +218,8 @@ router.get('/recommended-playlists', optionalAuth, async (req: AuthedRequest, re
     playCount: number
     ownerNickname: string
     tags: string | null
+    featured: boolean
+    recommendSort: number
     score: number
   }
 
@@ -243,6 +247,11 @@ router.get('/recommended-playlists', optionalAuth, async (req: AuthedRequest, re
       for (const tag of tags) score += (tagScore.get(tag) || 0) * 4
     }
 
+    // 运营推荐位绝对优先，同推荐池内按 recommendSort 升序
+    if (p.featured) {
+      score += 1_000_000 - Math.min(9999, p.recommendSort || 0)
+    }
+
     return {
       id: p.id,
       name: p.name,
@@ -252,11 +261,19 @@ router.get('/recommended-playlists', optionalAuth, async (req: AuthedRequest, re
       playCount,
       ownerNickname: p.owner.nickname,
       tags: p.tags ?? null,
+      featured: Boolean(p.featured),
+      recommendSort: p.recommendSort ?? 0,
       score,
     }
   })
 
-  scored.sort((a, b) => b.score - a.score || b.playCount - a.playCount)
+  scored.sort(
+    (a, b) =>
+      Number(b.featured) - Number(a.featured) ||
+      (a.featured && b.featured ? a.recommendSort - b.recommendSort : 0) ||
+      b.score - a.score ||
+      b.playCount - a.playCount,
+  )
   const list = scored.slice(0, limit).map(({ score: _s, ...rest }) => rest)
 
   return ok(res, {

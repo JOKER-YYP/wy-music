@@ -1030,7 +1030,7 @@ function onLogout() {
   }
 }
 .search-wrap {
-  height: 30px;
+  height: 32px;
   border-radius: var(--wy-radius-pill);
   background: var(--wy-topbar-control);
   display: flex;
@@ -1043,6 +1043,16 @@ function onLogout() {
   &.focused {
     background: var(--wy-topbar-control-hover);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--wy-topbar-fg) 28%, transparent);
+  }
+}
+
+/* 暗夜顶栏搜索胶囊：更深灰、更接近参考图 */
+:global(html.dark) .search-wrap,
+:global([data-theme-mode='dark']) .search-wrap {
+  background: rgba(255, 255, 255, 0.1);
+  &.focused {
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
   }
 }
 .search-icon {

@@ -503,6 +503,43 @@ router.post('/tracks/batch', async (req, res) => {
   return ok(res, { ok: okCount, total: ids.length }, `已处理 ${okCount}/${ids.length}`)
 })
 
+/** 缺歌词曲目数量（可选 ids 限定范围） */
+router.get('/tracks/missing-lyrics-count', async (req, res) => {
+  const ids = String(req.query.ids || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const { countTracksMissingLyrics } = await import('../../services/matchTrackLyrics.js')
+  const missing = await countTracksMissingLyrics(ids.length ? ids : undefined)
+  return ok(res, { missing })
+})
+
+/**
+ * 一键为缺词曲目匹配外部歌词。
+ * body: { ids?: string[], limit?: number, concurrency?: number }
+ * 建议每批 limit≤20；前端可循环调用直到 remaining=0。
+ */
+router.post('/tracks/match-lyrics', async (req, res) => {
+  const ids = Array.isArray(req.body?.ids)
+    ? [...new Set((req.body.ids as unknown[]).map(String).filter(Boolean))]
+    : undefined
+  const limit = Number(req.body?.limit)
+  const concurrency = Number(req.body?.concurrency)
+  const { matchMissingTrackLyrics } = await import('../../services/matchTrackLyrics.js')
+  try {
+    const report = await matchMissingTrackLyrics({
+      ids: ids?.length ? ids : undefined,
+      limit: Number.isFinite(limit) ? limit : 15,
+      concurrency: Number.isFinite(concurrency) ? concurrency : 2,
+    })
+    const msg = `本批扫描 ${report.scanned} 首：成功 ${report.matched.length}，失败 ${report.failed.length}，仍缺词 ${report.remaining}`
+    return ok(res, report, msg)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '匹配歌词失败'
+    return fail(res, 50001, msg, 500)
+  }
+})
+
 router.get('/tracks/:id', async (req, res) => {
   const track = await prisma.track.findUnique({
     where: { id: req.params.id },

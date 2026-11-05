@@ -27,6 +27,9 @@
         />
         <el-button type="danger" @click="onFilter">查询</el-button>
         <el-button @click="loadDuplicates">重复检测</el-button>
+        <el-button type="primary" plain :loading="lyricMatching" @click="startMatchLyrics">
+          匹配歌词
+        </el-button>
       </div>
       <div v-if="selected.length" class="batch">
         <span>已选 {{ selected.length }}</span>
@@ -34,6 +37,9 @@
         <el-button size="small" type="warning" @click="batch('reject')">批量驳回</el-button>
         <el-button size="small" @click="batch('offline')">批量下架</el-button>
         <el-button size="small" type="danger" @click="batch('delete')">批量删除</el-button>
+        <el-button size="small" type="primary" :loading="lyricMatching" @click="startMatchLyrics">
+          匹配歌词
+        </el-button>
       </div>
     </div>
 
@@ -59,6 +65,12 @@
         </template>
       </el-table-column>
       <el-table-column prop="playCount" label="播放" width="64" />
+      <el-table-column label="歌词" width="72">
+        <template #default="{ row }">
+          <el-tag v-if="hasLyric(row.lyricText)" size="small" type="success">有</el-tag>
+          <el-tag v-else size="small" type="info">无</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="360" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="preview(row)">试听</el-button>
@@ -179,6 +191,65 @@
         </div>
       </div>
     </el-dialog>
+
+    <el-dialog
+      v-model="lyricReportVisible"
+      title="歌词匹配结果"
+      width="780px"
+      destroy-on-close
+      :close-on-click-modal="false"
+    >
+      <div class="lyric-summary">
+        <el-tag type="success">成功 {{ lyricReport.matched.length }}</el-tag>
+        <el-tag type="danger">失败 {{ lyricReport.failed.length }}</el-tag>
+        <el-tag type="info">仍缺词 {{ lyricReport.remaining }}</el-tag>
+        <span v-if="lyricMatching" class="lyric-progress">正在匹配… {{ lyricProgressText }}</span>
+      </div>
+
+      <template v-if="lyricReport.matched.length">
+        <div class="lyric-section-title">匹配成功</div>
+        <el-table :data="lyricReport.matched" size="small" max-height="220" stripe>
+          <el-table-column prop="name" label="歌曲" min-width="140" show-overflow-tooltip />
+          <el-table-column label="歌手" min-width="120" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.artists?.join(' / ') }}</template>
+          </el-table-column>
+          <el-table-column prop="sourceLabel" label="来源" width="100" />
+          <el-table-column label="字数" width="72">
+            <template #default="{ row }">{{ row.lyricChars }}</template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <template v-if="lyricReport.failed.length">
+        <div class="lyric-section-title">搜索 / 下载失败</div>
+        <el-table :data="lyricReport.failed" size="small" max-height="280" stripe>
+          <el-table-column prop="name" label="歌曲" min-width="130" show-overflow-tooltip />
+          <el-table-column label="歌手" min-width="110" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.artists?.join(' / ') }}</template>
+          </el-table-column>
+          <el-table-column label="阶段" width="88">
+            <template #default="{ row }">{{ stageLabel(row.stage) }}</template>
+          </el-table-column>
+          <el-table-column prop="reason" label="原因" min-width="180" show-overflow-tooltip />
+        </el-table>
+      </template>
+
+      <el-empty
+        v-if="!lyricMatching && !lyricReport.matched.length && !lyricReport.failed.length"
+        description="本批没有需要处理的曲目"
+      />
+
+      <template #footer>
+        <el-button
+          v-if="lyricReport.remaining > 0 && !lyricMatching"
+          type="primary"
+          @click="continueMatchLyrics"
+        >
+          继续匹配剩余 {{ lyricReport.remaining }} 首
+        </el-button>
+        <el-button @click="lyricReportVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -226,6 +297,50 @@ const audioRef = ref<HTMLAudioElement | null>(null)
 
 const dupVisible = ref(false)
 const dupGroups = ref<Array<{ fileHash: string; count: number; tracks: TrackDto[] }>>([])
+
+type LyricMatchOk = {
+  trackId: string
+  name: string
+  artists: string[]
+  source: string
+  sourceLabel: string
+  lyricChars: number
+}
+type LyricMatchFail = {
+  trackId: string
+  name: string
+  artists: string[]
+  stage: 'search' | 'match' | 'download' | 'write'
+  reason: string
+}
+
+const lyricMatching = ref(false)
+const lyricReportVisible = ref(false)
+const lyricProgressText = ref('')
+const lyricScopeIds = ref<string[] | null>(null)
+const lyricReport = reactive({
+  matched: [] as LyricMatchOk[],
+  failed: [] as LyricMatchFail[],
+  remaining: 0,
+})
+
+function hasLyric(text?: string | null) {
+  const t = String(text || '').trim()
+  if (!t) return false
+  if (/暂无歌词|无效歌词/.test(t) && t.length < 40) return false
+  return true
+}
+
+function stageLabel(stage: string) {
+  return (
+    {
+      search: '搜索',
+      match: '匹配',
+      download: '下载',
+      write: '写入',
+    }[stage] || stage
+  )
+}
 
 function formatDuration(ms: number) {
   const s = Math.floor((ms || 0) / 1000)
@@ -408,6 +523,85 @@ async function loadDuplicates() {
   dupVisible.value = true
 }
 
+async function startMatchLyrics() {
+  if (lyricMatching.value) return
+
+  const selectedIds = selected.value.map((t) => t.id)
+  const scopeIds = selectedIds.length ? selectedIds : undefined
+
+  const countParams = scopeIds?.length
+    ? { params: { ids: scopeIds.join(',') } }
+    : undefined
+  const { data: countRes } = await http.get('/api/admin/tracks/missing-lyrics-count', countParams)
+  const missing = Number(countRes.data?.missing || 0)
+  if (!missing) {
+    ElMessage.info(scopeIds?.length ? '所选曲目均已有歌词' : '曲库暂无缺歌词的歌曲')
+    return
+  }
+
+  const scopeText = scopeIds?.length
+    ? `已选 ${scopeIds.length} 首中缺词 ${missing} 首`
+    : `全库缺词约 ${missing} 首`
+  await ElMessageBox.confirm(
+    `${scopeText}。将通过外部搜索拉取歌词并写入曲库，每批约 15 首，可随后继续。是否开始？`,
+    '匹配歌词',
+    { type: 'info', confirmButtonText: '开始匹配' },
+  )
+
+  lyricScopeIds.value = scopeIds || null
+  lyricReport.matched = []
+  lyricReport.failed = []
+  lyricReport.remaining = missing
+  lyricReportVisible.value = true
+  await runMatchLyricsBatches()
+}
+
+async function continueMatchLyrics() {
+  if (lyricMatching.value || lyricReport.remaining <= 0) return
+  await runMatchLyricsBatches()
+}
+
+async function runMatchLyricsBatches() {
+  lyricMatching.value = true
+  lyricProgressText.value = '准备中'
+  try {
+    // 自动多批，单次会话最多 8 批，避免一次卡太久
+    const maxBatches = 8
+    for (let i = 0; i < maxBatches; i++) {
+      lyricProgressText.value = `第 ${i + 1} 批…`
+      const { data } = await http.post(
+        '/api/admin/tracks/match-lyrics',
+        {
+          ids: lyricScopeIds.value || undefined,
+          limit: 15,
+          concurrency: 2,
+        },
+        { timeout: 10 * 60 * 1000 },
+      )
+      const report = data.data as {
+        matched?: LyricMatchOk[]
+        failed?: LyricMatchFail[]
+        remaining?: number
+        scanned?: number
+      }
+      if (report.matched?.length) lyricReport.matched.push(...report.matched)
+      if (report.failed?.length) lyricReport.failed.push(...report.failed)
+      lyricReport.remaining = Number(report.remaining || 0)
+
+      if (!report.scanned || lyricReport.remaining <= 0) break
+      // 本批无成功也无失败推进（异常空扫）则停
+      if (!(report.matched?.length || report.failed?.length)) break
+    }
+    ElMessage.success(
+      `匹配完成：成功 ${lyricReport.matched.length}，失败 ${lyricReport.failed.length}`,
+    )
+    load()
+  } finally {
+    lyricMatching.value = false
+    lyricProgressText.value = ''
+  }
+}
+
 watch(
   () => route.query.status,
   (v) => {
@@ -491,5 +685,22 @@ onMounted(load)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.lyric-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.lyric-progress {
+  font-size: 12px;
+  color: var(--wy-text-muted);
+}
+.lyric-section-title {
+  margin: 12px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wy-text-secondary);
 }
 </style>

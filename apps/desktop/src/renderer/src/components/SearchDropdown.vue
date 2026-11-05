@@ -284,17 +284,54 @@ defineExpose({ pushHistory })
 
 <style scoped lang="scss">
 .search-dropdown {
+  --sd-panel-bg: var(--wy-surface);
+  --sd-panel-border: var(--wy-border);
+  --sd-panel-shadow: var(--wy-shadow-sm);
+  --sd-title: var(--wy-text);
+  --sd-muted: var(--wy-text-muted);
+  --sd-pill-bg: var(--wy-surface-muted);
+  --sd-pill-fg: var(--wy-text-secondary);
+  --sd-pill-hover: color-mix(in srgb, var(--wy-text) 8%, var(--wy-surface-muted));
+  --sd-icon-hover: var(--wy-surface-muted);
+  --sd-board-bg: var(--wy-surface-muted);
+  --sd-board-title: var(--wy-text-secondary);
+  --sd-board-text: var(--wy-text);
+  --sd-board-muted: var(--wy-text-muted);
+  --sd-board-hover: rgba(0, 0, 0, 0.04);
+  --sd-suggest-hover: var(--wy-surface-muted);
+
   max-height: min(640px, calc(100vh - 120px));
   overflow: auto;
-  background: var(--wy-surface);
-  border-radius: var(--wy-radius-md);
-  border: 1px solid var(--wy-border);
-  box-shadow: var(--wy-shadow-sm);
-  padding: 14px 16px 16px;
+  background: var(--sd-panel-bg);
+  border-radius: 16px;
+  border: 1px solid var(--sd-panel-border);
+  box-shadow: var(--sd-panel-shadow);
+  padding: 16px 16px 18px;
 }
+
+/* 暗夜：深色面板 + 深色标签 + 白底榜单（对齐参考图） */
+:global(html.dark) .search-dropdown,
+:global([data-theme-mode='dark']) .search-dropdown {
+  --sd-panel-bg: #2a2a2a;
+  --sd-panel-border: rgba(255, 255, 255, 0.06);
+  --sd-panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --sd-title: rgba(255, 255, 255, 0.95);
+  --sd-muted: rgba(255, 255, 255, 0.45);
+  --sd-pill-bg: rgba(255, 255, 255, 0.1);
+  --sd-pill-fg: rgba(255, 255, 255, 0.88);
+  --sd-pill-hover: rgba(255, 255, 255, 0.16);
+  --sd-icon-hover: rgba(255, 255, 255, 0.1);
+  --sd-board-bg: #ffffff;
+  --sd-board-title: #8a8a8a;
+  --sd-board-text: #2b2b2b;
+  --sd-board-muted: #b0b0b0;
+  --sd-board-hover: rgba(0, 0, 0, 0.045);
+  --sd-suggest-hover: rgba(255, 255, 255, 0.08);
+}
+
 .sec {
   & + .sec {
-    margin-top: 16px;
+    margin-top: 18px;
   }
 }
 .sec-head {
@@ -306,22 +343,36 @@ defineExpose({ pushHistory })
 .sec-title {
   font-size: 14px;
   font-weight: 700;
-  color: var(--wy-text);
+  color: var(--sd-title);
+}
+.board .sec-title {
+  color: var(--sd-board-title);
+  font-weight: 600;
+  font-size: 13px;
 }
 .icon-plain,
 .play-mini {
   border: none;
   background: transparent;
-  color: var(--wy-text-muted);
+  color: var(--sd-muted);
   cursor: pointer;
   width: 26px;
   height: 26px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  transition: background 0.15s ease, color 0.15s ease;
   &:hover {
-    background: #f2f2f2;
-    color: var(--wy-text-secondary);
+    background: var(--sd-icon-hover);
+    color: var(--sd-title);
+  }
+}
+.board .icon-plain,
+.board .play-mini {
+  color: var(--sd-board-muted);
+  &:hover {
+    background: var(--sd-board-hover);
+    color: var(--sd-board-text);
   }
 }
 .tags {
@@ -331,8 +382,8 @@ defineExpose({ pushHistory })
 }
 .tag-pill {
   border: none;
-  background: #f2f3f4;
-  color: #555;
+  background: var(--sd-pill-bg);
+  color: var(--sd-pill-fg);
   font-size: 12px;
   line-height: 1;
   padding: 8px 12px;
@@ -342,9 +393,10 @@ defineExpose({ pushHistory })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
   &:hover {
-    background: #ebebeb;
-    color: var(--wy-text);
+    background: var(--sd-pill-hover);
+    color: var(--sd-title);
   }
 }
 .tag-more {
@@ -354,8 +406,8 @@ defineExpose({ pushHistory })
   place-items: center;
 }
 .board {
-  background: #f7f7f8;
-  border-radius: 10px;
+  background: var(--sd-board-bg);
+  border-radius: 12px;
   padding: 12px 12px 8px;
 }
 .rank-grid {
@@ -376,7 +428,7 @@ defineExpose({ pushHistory })
   cursor: pointer;
   text-align: left;
   &:hover {
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--sd-board-hover);
   }
 }
 .rank-num {
@@ -384,7 +436,7 @@ defineExpose({ pushHistory })
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
-  color: var(--wy-text-muted);
+  color: var(--sd-board-muted);
   text-align: center;
   &.top {
     color: var(--wy-brand);
@@ -394,7 +446,7 @@ defineExpose({ pushHistory })
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: var(--wy-text);
+  color: var(--sd-board-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -423,22 +475,22 @@ defineExpose({ pushHistory })
   gap: 10px;
   height: 40px;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   text-align: left;
   &:hover {
-    background: var(--wy-surface-muted);
+    background: var(--sd-suggest-hover);
   }
 }
 .suggest-icon {
-  color: var(--wy-text-muted);
+  color: var(--sd-muted);
   font-size: 14px;
 }
 .suggest-text {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: var(--wy-text);
+  color: var(--sd-title);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -461,7 +513,7 @@ defineExpose({ pushHistory })
 .empty-tip {
   padding: 24px 0;
   text-align: center;
-  color: #aaa;
+  color: var(--sd-muted);
   font-size: 13px;
 }
 </style>

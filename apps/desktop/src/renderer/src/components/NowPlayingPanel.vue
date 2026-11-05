@@ -92,8 +92,13 @@
               </div>
 
               <div class="karaoke-dock" :class="{ on: player.karaokeMode }">
-                <Transition name="karaoke-slide">
-                  <div v-if="player.karaokeMode" class="karaoke-slider-wrap" title="人声比例">
+                <div
+                  v-show="player.karaokeMode"
+                  class="karaoke-slider-wrap"
+                  title="人声大小（上高下低）"
+                >
+                  <span class="karaoke-hint high">人声</span>
+                  <div class="karaoke-slider-rail">
                     <input
                       class="karaoke-slider"
                       type="range"
@@ -103,10 +108,11 @@
                       :value="player.karaokeVocalLevel"
                       :style="{ '--vocal': String(player.karaokeVocalLevel) }"
                       @input="onKaraokeVocal"
-                      aria-label="人声比例"
+                      aria-label="人声大小"
                     />
                   </div>
-                </Transition>
+                  <span class="karaoke-hint low">低</span>
+                </div>
                 <button
                   class="karaoke-mic"
                   type="button"
@@ -710,82 +716,106 @@ watch(
 }
 .karaoke-dock {
   position: absolute;
-  right: 4px;
-  bottom: 72px;
-  z-index: 3;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-42%);
+  z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   pointer-events: none;
   > * {
     pointer-events: auto;
   }
 }
 .karaoke-slider-wrap {
-  height: 120px;
-  width: 28px;
+  width: 40px;
+  height: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-radius: 20px;
+  background: rgba(18, 18, 18, 0.55);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 8px 24px rgba(0, 0, 0, 0.28);
+}
+.karaoke-hint {
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.55);
+  user-select: none;
+  &.high {
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+.karaoke-slider-rail {
+  position: relative;
+  width: 112px;
+  height: 112px;
   display: grid;
   place-items: center;
-  padding: 10px 0;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(8px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 .karaoke-slider {
-  -webkit-appearance: slider-vertical;
-  appearance: slider-vertical;
-  writing-mode: vertical-lr;
-  direction: rtl;
-  width: 8px;
-  height: 100px;
-  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 112px;
+  height: 6px;
   margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  transform: rotate(-90deg);
   cursor: pointer;
-  background: transparent;
-  accent-color: #fff;
-  /* 竖滑：底部为人声低（填充用 CSS 变量提示） */
-  &::-webkit-slider-runnable-track {
-    width: 6px;
-    border-radius: 999px;
-    background: linear-gradient(
-      to top,
-      rgba(255, 255, 255, 0.92) 0%,
-      rgba(255, 255, 255, 0.92) calc(var(--vocal, 0.22) * 100%),
-      rgba(255, 255, 255, 0.22) calc(var(--vocal, 0.22) * 100%),
-      rgba(255, 255, 255, 0.22) 100%
-    );
-  }
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.95) calc(var(--vocal, 0.22) * 100%),
+    rgba(255, 255, 255, 0.22) calc(var(--vocal, 0.22) * 100%),
+    rgba(255, 255, 255, 0.22) 100%
+  );
+  outline: none;
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 14px;
-    height: 14px;
-    margin-left: -4px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: #fff;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+  }
+  &::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
     cursor: pointer;
   }
 }
 .karaoke-mic {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
   border-radius: 50%;
   display: grid;
   place-items: center;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.78);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(8px);
   transition:
     background var(--wy-duration-fast) var(--wy-ease),
     color var(--wy-duration-fast) var(--wy-ease),
     transform var(--wy-duration-fast) var(--wy-ease-out);
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.22);
     color: #fff;
   }
   &:active {
@@ -800,19 +830,8 @@ watch(
 .karaoke-label {
   font-size: 11px;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.78);
   user-select: none;
-}
-.karaoke-slide-enter-active,
-.karaoke-slide-leave-active {
-  transition:
-    opacity 0.2s var(--wy-ease),
-    transform 0.2s var(--wy-ease-out);
-}
-.karaoke-slide-enter-from,
-.karaoke-slide-leave-to {
-  opacity: 0;
-  transform: translateY(8px);
 }
 .song-name {
   margin: 0;

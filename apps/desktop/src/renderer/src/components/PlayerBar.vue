@@ -118,21 +118,57 @@
         >
           <el-icon :size="18"><FolderAdd /></el-icon>
         </button>
-        <button
-          class="icon-btn"
-          type="button"
-          :title="player.karaokeMode ? '关闭随心唱' : '随心唱'"
-          :class="{ on: player.karaokeMode }"
+        <el-popover
+          placement="top"
+          :width="180"
+          trigger="click"
+          :teleported="true"
           :disabled="!track"
-          @click="player.toggleKaraokeMode()"
         >
-          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
-            />
-          </svg>
-        </button>
+          <template #reference>
+            <button
+              class="icon-btn"
+              type="button"
+              :title="player.karaokeMode ? '随心唱（已开启）' : '随心唱'"
+              :class="{ on: player.karaokeMode }"
+              :disabled="!track"
+            >
+              <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
+                />
+              </svg>
+            </button>
+          </template>
+          <div class="karaoke-pop">
+            <div class="karaoke-pop-head">
+              <span>随心唱</span>
+              <button
+                class="karaoke-switch"
+                type="button"
+                :class="{ on: player.karaokeMode }"
+                @click="player.toggleKaraokeMode()"
+              >
+                {{ player.karaokeMode ? '开' : '关' }}
+              </button>
+            </div>
+            <div class="karaoke-pop-row" :class="{ dim: !player.karaokeMode }">
+              <span>人声</span>
+              <input
+                class="karaoke-vol"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                :disabled="!player.karaokeMode"
+                :value="player.karaokeVocalLevel"
+                @input="onKaraokeVocal"
+              />
+            </div>
+            <div class="karaoke-pop-tip">滑杆调低可压低原唱人声</div>
+          </div>
+        </el-popover>
         <button class="icon-btn lyric-btn" type="button" title="歌词" :disabled="!track" @click="openNowPlaying">
           词
         </button>
@@ -409,6 +445,10 @@ function onSeekCommit(e: Event) {
 
 function onVolume(e: Event) {
   player.setVolume(Number((e.target as HTMLInputElement).value))
+}
+
+function onKaraokeVocal(e: Event) {
+  player.setKaraokeVocalLevel(Number((e.target as HTMLInputElement).value))
 }
 
 async function toggleLike() {
@@ -854,6 +894,60 @@ onBeforeUnmount(() => {
   width: 100%;
   accent-color: var(--wy-brand);
   cursor: pointer;
+}
+.karaoke-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 0;
+}
+.karaoke-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wy-text);
+}
+.karaoke-switch {
+  min-width: 36px;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 11px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--wy-text-muted);
+  background: var(--wy-bg-elevated, rgba(0, 0, 0, 0.06));
+  transition: background 0.15s ease, color 0.15s ease;
+  &.on {
+    color: #fff;
+    background: var(--wy-brand);
+  }
+}
+.karaoke-pop-row {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--wy-text-muted);
+  &.dim {
+    opacity: 0.45;
+  }
+}
+.karaoke-vol {
+  width: 100%;
+  accent-color: var(--wy-brand);
+  cursor: pointer;
+  &:disabled {
+    cursor: default;
+  }
+}
+.karaoke-pop-tip {
+  font-size: 11px;
+  color: var(--wy-text-muted);
+  line-height: 1.4;
 }
 
 @media (prefers-reduced-motion: reduce) {

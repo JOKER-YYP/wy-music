@@ -71,6 +71,18 @@
         </div>
 
         <div
+          v-if="subTab === 'recent'"
+          class="plist-card rank-card radar-card"
+          @click="router.push('/recommend/radar')"
+        >
+          <div class="cover rank-cover radar-cover">
+            <span class="radar-emoji">雷达</span>
+          </div>
+          <div class="plist-name">私人雷达</div>
+          <div class="plist-sub">周报 · 因为你听了</div>
+        </div>
+
+        <div
           v-for="p in displayPlaylists"
           :key="p.id"
           class="plist-card"
@@ -386,6 +398,15 @@ onMounted(load)
   background: linear-gradient(145deg, #ff8fb8 0%, #7ec8ff 100%);
   display: grid;
   place-items: center;
+}
+.radar-cover {
+  background: linear-gradient(145deg, #a855f7 0%, #6366f1 100%);
+}
+.radar-emoji {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
 }
 .bars {
   display: flex;

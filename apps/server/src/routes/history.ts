@@ -43,11 +43,18 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
   }
 
   const userId = req.user!.id
-  // 同一用户同一首歌只保留一条记录，刷新 playedAt
+  // 最近播放：一人一歌一条；事件流：每次追加（周报/雷达统计）
   await prisma.$transaction([
     prisma.playHistory.deleteMany({ where: { userId, trackId } }),
     prisma.playHistory.create({
       data: { userId, trackId },
+    }),
+    prisma.playEvent.create({
+      data: {
+        userId,
+        trackId,
+        durationMs: track.durationMs || 0,
+      },
     }),
     prisma.track.update({
       where: { id: trackId },
@@ -58,7 +65,11 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
 })
 
 router.delete('/', requireAuth, async (req: AuthedRequest, res) => {
-  await prisma.playHistory.deleteMany({ where: { userId: req.user!.id } })
+  const userId = req.user!.id
+  await prisma.$transaction([
+    prisma.playHistory.deleteMany({ where: { userId } }),
+    prisma.playEvent.deleteMany({ where: { userId } }),
+  ])
   return ok(res, true)
 })
 

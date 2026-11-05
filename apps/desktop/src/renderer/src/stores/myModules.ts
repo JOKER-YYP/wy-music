@@ -3,11 +3,12 @@ import type { Component } from 'vue'
 import {
   Calendar,
   Clock,
+  DataAnalysis,
   FolderOpened,
   Star,
 } from '@element-plus/icons-vue'
 
-export type MyModuleId = 'liked' | 'recent' | 'daily' | 'mine'
+export type MyModuleId = 'liked' | 'recent' | 'daily' | 'radar' | 'mine'
 
 export interface MyModuleDef {
   id: MyModuleId
@@ -23,12 +24,13 @@ export const MY_MODULE_DEFS: MyModuleDef[] = [
   { id: 'liked', label: '我喜欢的音乐', to: '/liked', icon: Star, fixed: true, auth: true },
   { id: 'recent', label: '最近播放', to: '/recent', icon: Clock, auth: true },
   { id: 'daily', label: '每日推荐', to: '/recommend/daily', icon: Calendar, auth: true },
+  { id: 'radar', label: '私人雷达', to: '/recommend/radar', icon: DataAnalysis, auth: true },
   { id: 'mine', label: '我的上传', to: '/mine', icon: FolderOpened, auth: true },
 ]
 
-const STORAGE_KEY = 'wy.myModules.v1'
+const STORAGE_KEY = 'wy.myModules.v2'
 const ALL_IDS = MY_MODULE_DEFS.map((d) => d.id)
-const DEFAULT_PINNED: MyModuleId[] = ['liked', 'recent', 'daily']
+const DEFAULT_PINNED: MyModuleId[] = ['liked', 'recent', 'daily', 'radar']
 const DEFAULT_FOLDED: MyModuleId[] = ['mine']
 
 function uniqueValid(ids: string[]): MyModuleId[] {

@@ -65,6 +65,12 @@ const router = createRouter({
           meta: { auth: true },
         },
         {
+          path: 'recommend/radar',
+          name: 'personal-radar',
+          component: () => import('../views/PersonalRadarView.vue'),
+          meta: { auth: true },
+        },
+        {
           path: 'liked',
           name: 'liked',
           component: () => import('../views/LikedView.vue'),

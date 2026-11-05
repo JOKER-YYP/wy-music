@@ -31,6 +31,7 @@ model User {
   playlistFavorites PlaylistFavorite[]
   likes        Like[]
   histories    PlayHistory[]
+  playEvents   PlayEvent[]
   comments     Comment[]
   commentLikes CommentLike[]
   notifications UserNotification[]
@@ -60,6 +61,7 @@ model Track {
   updatedAt     DateTime @updatedAt
   likes        Like[]
   histories    PlayHistory[]
+  playEvents   PlayEvent[]
   playlistTracks PlaylistTrack[]
   comments     Comment[]
 
@@ -132,6 +134,21 @@ model PlayHistory {
   track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@index([userId, playedAt])
+}
+
+/** 播放事件流（周报/雷达统计用，可多次） */
+model PlayEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  trackId   String
+  playedAt  DateTime @default(now())
+  /** 可选：当时曲目时长，便于估算听歌时长 */
+  durationMs Int     @default(0)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId, playedAt])
+  @@index([trackId, playedAt])
 }
 
 model Comment {

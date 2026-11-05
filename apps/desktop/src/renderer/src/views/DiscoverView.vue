@@ -132,6 +132,12 @@ const FALLBACK_BANNERS: BannerCard[] = [
     bg: 'linear-gradient(135deg,#ff6b6b,#ee5a24)',
     to: '/recommend/daily',
   },
+  {
+    title: '私人雷达',
+    sub: '本周听歌报告 · 因为你听了',
+    bg: 'linear-gradient(135deg,#a855f7,#6366f1)',
+    to: '/recommend/radar',
+  },
   { title: '新歌速递', sub: '发现刚上传的好声音', bg: 'linear-gradient(135deg,#54a0ff,#2e86de)' },
   { title: '热门精选', sub: '大家正在听', bg: 'linear-gradient(135deg,#5f27cd,#341f97)' },
 ]

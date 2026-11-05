@@ -214,6 +214,38 @@ export interface TrackDto {
   payTag?: string | null
 }
 
+/** 听歌周报 */
+export interface WeeklyListeningReport {
+  weekStart: string
+  weekEnd: string
+  rangeLabel: string
+  playCount: number
+  uniqueTracks: number
+  listenMinutes: number
+  newLikes: number
+  topArtists: Array<{ name: string; playCount: number; trackCount: number }>
+  topTracks: Array<{ track: TrackDto; playCount: number }>
+  daily: Array<{ date: string; playCount: number }>
+  summary: string
+}
+
+/** 「因为你听了…」分块 */
+export interface BecauseYouListenedSection {
+  id: string
+  reasonTrackId: string
+  reasonTitle: string
+  reasonArtists: string[]
+  reasonCoverUrl?: string | null
+  headline: string
+  tracks: TrackDto[]
+}
+
+export interface PersonalRadarDto {
+  weekly: WeeklyListeningReport
+  sections: BecauseYouListenedSection[]
+  generatedAt: string
+}
+
 export type NotificationChannel = 'dm' | 'comment' | 'mention' | 'notice'
 
 export interface UserNotificationDto {

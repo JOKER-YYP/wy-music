@@ -993,6 +993,44 @@ router.get('/daily', requireAuth, async (req: AuthedRequest, res) => {
   })
 })
 
+/** 听歌周报：本周播放次数 / 歌手 / 趋势 */
+router.get('/weekly-report', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const { buildWeeklyReport } = await import('../services/listeningRadar.js')
+    const report = await buildWeeklyReport(req.user!.id)
+    return ok(res, report)
+  } catch (e) {
+    console.warn('[discover/weekly-report]', e)
+    return fail(res, 50001, '生成周报失败', 500)
+  }
+})
+
+/** 私人雷达：「因为你听了…」分块推荐 */
+router.get('/radar', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const { buildBecauseYouListened, buildWeeklyReport } = await import(
+      '../services/listeningRadar.js'
+    )
+    const sectionsN = Number(req.query.sections)
+    const per = Number(req.query.per)
+    const [radar, weekly] = await Promise.all([
+      buildBecauseYouListened(req.user!.id, {
+        sections: Number.isFinite(sectionsN) ? sectionsN : undefined,
+        perSection: Number.isFinite(per) ? per : undefined,
+      }),
+      buildWeeklyReport(req.user!.id),
+    ])
+    return ok(res, {
+      weekly,
+      sections: radar.sections,
+      generatedAt: radar.generatedAt,
+    })
+  } catch (e) {
+    console.warn('[discover/radar]', e)
+    return fail(res, 50001, '生成私人雷达失败', 500)
+  }
+})
+
 /** 多源并行搜索：本地曲库 + migu/vkeys/tang/kw */
 router.get('/music-search', optionalAuth, async (req: AuthedRequest, res) => {
   const keyword = String(req.query.keyword || req.query.q || '').trim()

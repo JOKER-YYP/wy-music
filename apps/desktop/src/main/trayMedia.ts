@@ -13,11 +13,13 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 export type ShellPrefs = {
   /** 显示系统托盘图标 */
   showTray: boolean
-  /** 关闭主窗口时最小化到托盘（需 showTray） */
+  /** 关闭主窗口时最小化到托盘（需 showTray）；默认关闭，点 X / 任务栏关闭即退出 */
   closeToTray: boolean
   /** 启用全局媒体键 */
   mediaKeysEnabled: boolean
 }
+
+type StoredShellPrefs = Partial<ShellPrefs> & { prefsVersion?: number }
 
 export type PlayerTrayState = {
   name?: string
@@ -26,9 +28,12 @@ export type PlayerTrayState = {
   hasTrack?: boolean
 } | null
 
+/** 配置版本：v2 起默认「关闭=退出」，不再默认藏到托盘 */
+const PREFS_VERSION = 2
+
 const DEFAULT_PREFS: ShellPrefs = {
   showTray: true,
-  closeToTray: true,
+  closeToTray: false,
   mediaKeysEnabled: true,
 }
 
@@ -63,14 +68,29 @@ function prefsFilePath() {
   return prefsPath
 }
 
+function writePrefsFile(data: ShellPrefs & { prefsVersion: number }) {
+  try {
+    writeFileSync(prefsFilePath(), JSON.stringify(data, null, 2), 'utf8')
+  } catch (e) {
+    console.warn('[tray] save prefs failed', e)
+  }
+}
+
 export function loadShellPrefs(): ShellPrefs {
   try {
     const raw = readFileSync(prefsFilePath(), 'utf8')
-    const parsed = JSON.parse(raw) as Partial<ShellPrefs>
+    const parsed = JSON.parse(raw) as StoredShellPrefs
+    const version = Number(parsed.prefsVersion) || 1
     prefs = {
       showTray: parsed.showTray !== false,
-      closeToTray: parsed.closeToTray !== false,
+      // 仅显式开启才启用；旧版默认 true，升级时关掉以免「关不掉」
+      closeToTray: parsed.closeToTray === true,
       mediaKeysEnabled: parsed.mediaKeysEnabled !== false,
+    }
+    if (!prefs.showTray) prefs.closeToTray = false
+    if (version < PREFS_VERSION) {
+      prefs.closeToTray = false
+      writePrefsFile({ ...prefs, prefsVersion: PREFS_VERSION })
     }
   } catch {
     prefs = { ...DEFAULT_PREFS }
@@ -92,11 +112,7 @@ export function saveShellPrefs(partial: Partial<ShellPrefs>): ShellPrefs {
     // 无托盘时关闭到托盘无意义
     prefs.closeToTray = false
   }
-  try {
-    writeFileSync(prefsFilePath(), JSON.stringify(prefs, null, 2), 'utf8')
-  } catch (e) {
-    console.warn('[tray] save prefs failed', e)
-  }
+  writePrefsFile({ ...prefs, prefsVersion: PREFS_VERSION })
   applyTrayVisibility()
   applyMediaKeys()
   return { ...prefs }

@@ -68,7 +68,9 @@
           />
           <span>关闭窗口时最小化到托盘</span>
         </div>
-        <div class="lib-tip">关闭到托盘后，从托盘菜单选择「退出」可彻底退出应用。</div>
+        <div class="lib-tip">
+          默认关闭窗口（右上角 × / 任务栏「关闭窗口」）会退出应用并停止播放。若开启此项，关闭仅隐藏到托盘，需在托盘菜单点「退出 WY Music」才真正退出。
+        </div>
       </el-descriptions-item>
       <el-descriptions-item v-if="isDesktop" label="全局媒体键">
         <div class="shell-row">
@@ -119,7 +121,7 @@ const rememberPlayback = ref(isRememberPlaybackEnabled())
 const shellSaving = ref(false)
 const shell = reactive({
   showTray: true,
-  closeToTray: true,
+  closeToTray: false,
   mediaKeysEnabled: true,
 })
 

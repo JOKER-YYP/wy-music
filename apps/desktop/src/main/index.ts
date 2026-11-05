@@ -1379,17 +1379,19 @@ function createTaskbarPreviewWindow() {
   win.on('close', (e) => {
     if (taskbarPreviewAllowClose) return
     e.preventDefault()
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindowCollapsed = false
-      try {
-        if (!mainWindow.isVisible()) mainWindow.show()
-      } catch {
-        /* ignore */
+    if (shouldCloseToTray()) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindowCollapsed = false
+        try {
+          if (!mainWindow.isVisible()) mainWindow.show()
+        } catch {
+          /* ignore */
+        }
+        mainWindow.close()
       }
-      mainWindow.close()
       return
     }
-    app.quit()
+    requestAppQuit()
   })
 
   win.on('closed', () => {
@@ -1648,9 +1650,9 @@ app.whenReady().then(() => {
     return win.isMaximized()
   })
   ipcMain.handle('window:close', () => {
+    // 开启「关闭到托盘」时仅隐藏；否则真正退出进程
     if (handleCloseButton()) return true
-    const win = mainWindow
-    if (win && !win.isDestroyed()) win.close()
+    requestAppQuit()
     return true
   })
   ipcMain.handle('window:isMaximized', () => {

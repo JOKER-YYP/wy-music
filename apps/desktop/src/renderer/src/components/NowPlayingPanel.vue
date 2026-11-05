@@ -61,32 +61,67 @@
               <button type="button" class="tab" disabled>相似推荐</button>
             </div>
 
-            <div
-              v-show="tab === 'lyric'"
-              class="lyric-box"
-              ref="lyricBoxRef"
-              @wheel="onLyricWheel"
-              @scroll="onLyricScroll"
-            >
-              <div v-if="!lines.length" class="lyric-empty">暂无歌词，可在上传时填写 LRC</div>
+            <div class="lyric-stage">
               <div
-                v-for="(line, i) in lines"
-                :key="i"
-                class="lyric-line"
-                :class="{ active: i === activeIndex, near: Math.abs(i - activeIndex) === 1 }"
-                :ref="(el) => setLineRef(el, i)"
+                v-show="tab === 'lyric'"
+                class="lyric-box"
+                ref="lyricBoxRef"
+                @wheel="onLyricWheel"
+                @scroll="onLyricScroll"
               >
-                <span class="lyric-text">{{ line.text }}</span>
-                <button
-                  v-if="line.time >= 0"
-                  type="button"
-                  class="lyric-seek"
-                  :title="`从此处播放 ${formatTime(line.time)}`"
-                  @click.stop="playFromLine(line)"
+                <div v-if="!lines.length" class="lyric-empty">暂无歌词，可在上传时填写 LRC</div>
+                <div
+                  v-for="(line, i) in lines"
+                  :key="i"
+                  class="lyric-line"
+                  :class="{ active: i === activeIndex, near: Math.abs(i - activeIndex) === 1 }"
+                  :ref="(el) => setLineRef(el, i)"
                 >
-                  <span class="iconfont icon-play lyric-play-ico" aria-hidden="true" />
-                  <span>{{ formatTime(line.time) }}</span>
+                  <span class="lyric-text">{{ line.text }}</span>
+                  <button
+                    v-if="line.time >= 0"
+                    type="button"
+                    class="lyric-seek"
+                    :title="`从此处播放 ${formatTime(line.time)}`"
+                    @click.stop="playFromLine(line)"
+                  >
+                    <span class="iconfont icon-play lyric-play-ico" aria-hidden="true" />
+                    <span>{{ formatTime(line.time) }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="karaoke-dock" :class="{ on: player.karaokeMode }">
+                <Transition name="karaoke-slide">
+                  <div v-if="player.karaokeMode" class="karaoke-slider-wrap" title="人声比例">
+                    <input
+                      class="karaoke-slider"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      :value="player.karaokeVocalLevel"
+                      :style="{ '--vocal': String(player.karaokeVocalLevel) }"
+                      @input="onKaraokeVocal"
+                      aria-label="人声比例"
+                    />
+                  </div>
+                </Transition>
+                <button
+                  class="karaoke-mic"
+                  type="button"
+                  :class="{ on: player.karaokeMode }"
+                  :title="player.karaokeMode ? '关闭随心唱' : '随心唱（降低人声）'"
+                  @click="player.toggleKaraokeMode()"
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
+                    />
+                  </svg>
                 </button>
+                <span v-if="player.karaokeMode" class="karaoke-label">随心唱</span>
               </div>
             </div>
 
@@ -248,6 +283,11 @@ function formatTime(sec: number) {
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+function onKaraokeVocal(e: Event) {
+  const v = Number((e.target as HTMLInputElement).value)
+  player.setKaraokeVocalLevel(v)
 }
 
 function onSeek(e: Event) {
@@ -661,6 +701,119 @@ watch(
   min-height: 0;
   padding-top: 18px;
 }
+.lyric-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.karaoke-dock {
+  position: absolute;
+  right: 4px;
+  bottom: 72px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  > * {
+    pointer-events: auto;
+  }
+}
+.karaoke-slider-wrap {
+  height: 120px;
+  width: 28px;
+  display: grid;
+  place-items: center;
+  padding: 10px 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.karaoke-slider {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 8px;
+  height: 100px;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: transparent;
+  accent-color: #fff;
+  /* 竖滑：底部为人声低（填充用 CSS 变量提示） */
+  &::-webkit-slider-runnable-track {
+    width: 6px;
+    border-radius: 999px;
+    background: linear-gradient(
+      to top,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.92) calc(var(--vocal, 0.22) * 100%),
+      rgba(255, 255, 255, 0.22) calc(var(--vocal, 0.22) * 100%),
+      rgba(255, 255, 255, 0.22) 100%
+    );
+  }
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+  }
+}
+.karaoke-mic {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  transition:
+    background var(--wy-duration-fast) var(--wy-ease),
+    color var(--wy-duration-fast) var(--wy-ease),
+    transform var(--wy-duration-fast) var(--wy-ease-out);
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+  }
+  &:active {
+    transform: scale(0.94);
+  }
+  &.on {
+    color: #fff;
+    background: rgba(236, 65, 65, 0.92);
+    box-shadow: 0 4px 16px rgba(236, 65, 65, 0.35);
+  }
+}
+.karaoke-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+  user-select: none;
+}
+.karaoke-slide-enter-active,
+.karaoke-slide-leave-active {
+  transition:
+    opacity 0.2s var(--wy-ease),
+    transform 0.2s var(--wy-ease-out);
+}
+.karaoke-slide-enter-from,
+.karaoke-slide-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
 .song-name {
   margin: 0;
   font-size: 30px;
@@ -702,7 +855,7 @@ watch(
   margin-top: 20px;
   flex: 1;
   overflow: auto;
-  padding: 24px 8px 100px;
+  padding: 24px 40px 100px 8px;
   scroll-behavior: smooth;
   mask-image: linear-gradient(transparent, #000 10%, #000 90%, transparent);
 }

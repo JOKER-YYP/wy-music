@@ -8,6 +8,22 @@ import {
   loadPlayerSession,
   savePlayerSession,
 } from '../services/playerSession'
+import { VocalAttenuator } from '../services/vocalAttenuator'
+
+function readStoredBool(key: string, fallback: boolean) {
+  const raw = localStorage.getItem(key)
+  if (raw == null) return fallback
+  return raw === '1' || raw === 'true'
+}
+
+function readStoredVocalLevel() {
+  const n = Number(localStorage.getItem('karaokeVocalLevel'))
+  if (!Number.isFinite(n)) return 0.22
+  return Math.min(1, Math.max(0, n))
+}
+
+/** 与 HTMLAudioElement 绑定的 WebAudio 人声处理（单例，随 ensureAudio 创建） */
+let vocalAttenuator: VocalAttenuator | null = null
 
 type PlayMode = 'order' | 'loop' | 'single' | 'shuffle'
 
@@ -158,6 +174,10 @@ export const usePlayerStore = defineStore('player', {
     nextPlayQueue: [] as QueueTrack[],
     /** 是否已从本地恢复过会话（避免重复 restore） */
     sessionReady: false,
+    /** K 歌 / 随心唱：频段 Mid 衰减 */
+    karaokeMode: readStoredBool('karaokeMode', false),
+    /** 0=最大消人声，1=原曲人声（仅 karaokeMode 开启时生效） */
+    karaokeVocalLevel: readStoredVocalLevel(),
   }),
   getters: {
     currentTrack(state): QueueTrack | null {
@@ -202,8 +222,43 @@ export const usePlayerStore = defineStore('player', {
         this.persistSession(true)
       })
       this.audio = audio
+      if (!vocalAttenuator) {
+        try {
+          vocalAttenuator = VocalAttenuator.attach(audio, {
+            karaokeMode: this.karaokeMode,
+            vocalLevel: this.karaokeVocalLevel,
+          })
+        } catch (e) {
+          console.warn('[VocalAttenuator] attach failed', e)
+        }
+      }
       bindUnloadPersist(() => this.persistSession(true))
       return audio
+    },
+
+    async resumeAudioContext() {
+      if (vocalAttenuator) await vocalAttenuator.resume()
+    },
+
+    setKaraokeMode(on: boolean) {
+      this.karaokeMode = on
+      localStorage.setItem('karaokeMode', on ? '1' : '0')
+      this.ensureAudio()
+      vocalAttenuator?.setKaraokeMode(on)
+      void this.resumeAudioContext()
+    },
+
+    toggleKaraokeMode() {
+      this.setKaraokeMode(!this.karaokeMode)
+    },
+
+    setKaraokeVocalLevel(level: number) {
+      const v = Math.min(1, Math.max(0, level))
+      this.karaokeVocalLevel = v
+      localStorage.setItem('karaokeVocalLevel', String(v))
+      this.ensureAudio()
+      vocalAttenuator?.setVocalLevel(v)
+      if (this.karaokeMode) void this.resumeAudioContext()
     },
 
     persistSession(immediate = false) {
@@ -462,6 +517,7 @@ export const usePlayerStore = defineStore('player', {
           return
         }
 
+        await this.resumeAudioContext()
         audio.volume = 0
         await safePlay(audio)
         if (token !== this.playToken) return
@@ -495,6 +551,7 @@ export const usePlayerStore = defineStore('player', {
         return
       }
       if (audio.paused) {
+        await this.resumeAudioContext()
         audio.volume = 0
         await safePlay(audio)
         // 若源已失效，整曲重载

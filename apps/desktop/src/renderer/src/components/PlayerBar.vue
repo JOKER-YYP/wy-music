@@ -118,6 +118,21 @@
         >
           <el-icon :size="18"><FolderAdd /></el-icon>
         </button>
+        <button
+          class="icon-btn"
+          type="button"
+          :title="player.karaokeMode ? '关闭随心唱' : '随心唱'"
+          :class="{ on: player.karaokeMode }"
+          :disabled="!track"
+          @click="player.toggleKaraokeMode()"
+        >
+          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
+            />
+          </svg>
+        </button>
         <button class="icon-btn lyric-btn" type="button" title="歌词" :disabled="!track" @click="openNowPlaying">
           词
         </button>

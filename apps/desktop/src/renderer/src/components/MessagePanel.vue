@@ -259,6 +259,8 @@ const conversations = computed(() => {
 })
 
 function displayName(item: UserNotificationDto) {
+  if (item.type === 'batch_search_done') return '批量搜歌'
+  if (item.type === 'batch_download_done') return '批量下载'
   return item.actorNickname || item.title || '系统通知'
 }
 
@@ -476,6 +478,13 @@ async function onItemClick(item: UserNotificationDto) {
     } catch {
       // ignore
     }
+  }
+
+  if (item.type === 'batch_search_done' || item.type === 'batch_download_done') {
+    emit('close')
+    const link = String(item.refId || '/batch-search').trim() || '/batch-search'
+    router.push(link.startsWith('/') ? link : `/${link}`)
+    return
   }
 
   if (item.trackId) {

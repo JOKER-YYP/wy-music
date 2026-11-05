@@ -330,14 +330,18 @@ function failItem(track: TrackDto, error: unknown): BatchDownloadFailItem {
   }
 }
 
+export type BatchDownloadSignal = { cancelled: boolean }
+
 export async function downloadTracksToLibrary(
   tracks: TrackDto[],
   onProgress?: (done: number, total: number, name: string) => void,
+  signal?: BatchDownloadSignal,
 ): Promise<BatchDownloadResult> {
   let ok = 0
   const failures: BatchDownloadFailItem[] = []
   const total = tracks.length
   for (let i = 0; i < tracks.length; i++) {
+    if (signal?.cancelled) break
     const track = tracks[i]
     onProgress?.(i, total, track.name)
     try {
@@ -356,6 +360,7 @@ export async function downloadTracksToLibrary(
 export async function downloadTracksToFolder(
   tracks: TrackDto[],
   onProgress?: (done: number, total: number, name: string) => void,
+  signal?: BatchDownloadSignal,
 ): Promise<BatchDownloadResult & { folder: string | null }> {
   if (!isElectronApp() || !window.wyAPI?.selectFolder || !window.wyAPI?.downloadFile) {
     throw new Error('请在桌面端使用文件夹下载')
@@ -369,6 +374,7 @@ export async function downloadTracksToFolder(
   const total = tracks.length
 
   for (let i = 0; i < tracks.length; i++) {
+    if (signal?.cancelled) break
     const track = tracks[i]
     onProgress?.(i, total, track.name)
     try {

@@ -146,6 +146,37 @@ router.post('/read', requireAuth, async (req: AuthedRequest, res) => {
   }
 })
 
+const SELF_SYSTEM_TYPES = new Set(['batch_search_done', 'batch_download_done'])
+
+/** 客户端写入「通知」频道的系统消息（批量任务完成等） */
+router.post('/system-self', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const type = String(req.body.type || '').trim()
+    const title = String(req.body.title || '').trim().slice(0, 80)
+    const body = String(req.body.body || '').trim().slice(0, 500)
+    const refId = String(req.body.refId || '').trim().slice(0, 200) || null
+    if (!SELF_SYSTEM_TYPES.has(type)) {
+      return fail(res, 40001, '不支持的通知类型')
+    }
+    if (!title || !body) return fail(res, 40001, '标题和内容不能为空')
+
+    const { createNotification } = await import('../services/notify.js')
+    const row = await createNotification({
+      userId: req.user!.id,
+      channel: 'notice',
+      type,
+      title,
+      body,
+      refId,
+      actorNickname: '系统',
+    })
+    return ok(res, row ? toDto(row) : null, '已发送')
+  } catch (e) {
+    console.warn('[notifications/system-self]', e)
+    return fail(res, 50001, '发送失败', 500)
+  }
+})
+
 /** 私信回复（存为自己发出的消息，会话按 peer 聚合） */
 router.post('/dm', requireAuth, async (req: AuthedRequest, res) => {
   try {

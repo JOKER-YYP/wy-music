@@ -21,7 +21,9 @@ http.interceptors.response.use(
   (res) => {
     const body = res.data as ApiResponse
     if (body && typeof body.code === 'number' && body.code !== 0) {
-      ElMessage.error(body.message || '请求失败')
+      if (!(res.config as { silent?: boolean }).silent) {
+        ElMessage.error(body.message || '请求失败')
+      }
       return Promise.reject(body)
     }
     return res
@@ -30,12 +32,13 @@ http.interceptors.response.use(
     if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') {
       return Promise.reject(err)
     }
+    const silent = Boolean(err?.config?.silent)
     const msg = err.response?.data?.message || err.message || '网络错误'
     if (err.response?.status === 401) {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
     }
-    ElMessage.error(msg)
+    if (!silent) ElMessage.error(msg)
     return Promise.reject(err)
   },
 )

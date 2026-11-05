@@ -228,7 +228,7 @@
           >
             换源下载
           </el-button>
-          <el-button size="small" text type="danger" @click="failList = []">关闭</el-button>
+          <el-button size="small" text type="danger" @click="clearFailList">关闭</el-button>
         </div>
       </div>
       <el-table
@@ -346,41 +346,54 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
 import type { MusicSource, TrackDto } from '@wy-music/shared'
 import { MUSIC_SOURCES, MUSIC_SOURCE_LABEL } from '@wy-music/shared'
 import {
   downloadBatchSearchTemplate,
-  parseBatchSearchFile,
-  runBatchExternalSearch,
   sourceLabel,
   trackHasLyric,
-  type BatchQueryProgress,
-  type BatchQueryRow,
   type BatchSearchHit,
 } from '../services/batchSearchImport'
-import {
-  downloadTracksToFolder,
-  downloadTracksToLibrary,
-  pickBatchDownloadMode,
-  type BatchDownloadFailItem,
-} from '../services/trackDownload'
-import { loadSearchSources, saveSearchSources } from '../services/searchSources'
+import { saveSearchSources } from '../services/searchSources'
+import type { BatchDownloadFailItem } from '../services/trackDownload'
 import SearchSourcePicker from '../components/SearchSourcePicker.vue'
 import { usePlayerStore } from '../stores/player'
-import { useUiStore } from '../stores/ui'
-import { useUserStore } from '../stores/user'
+import { useBatchJobsStore } from '../stores/batchJobs'
 
 const player = usePlayerStore()
-const user = useUserStore()
-const ui = useUiStore()
+const jobs = useBatchJobsStore()
 
-const enabledSources = ref<MusicSource[]>(loadSearchSources())
+const {
+  queries,
+  hits,
+  searching,
+  downloading,
+  downloadTip,
+  failList,
+  progress,
+  enabledSources,
+  selectMode,
+  exactOnly,
+  filterSource,
+  pickedSources,
+  hideUnmatched,
+  page,
+  pageSize,
+} = storeToRefs(jobs)
+
+const selectedKeySet = computed({
+  get: () => jobs.selectedKeySet,
+  set: (v: Set<string>) => jobs.setSelectedKeys(v),
+})
+
 watch(
   enabledSources,
   (list) => {
     saveSearchSources(list)
+    jobs.setEnabledSources(list)
   },
   { deep: true },
 )
@@ -390,36 +403,20 @@ const tableRef = ref<{
   clearSelection: () => void
   toggleRowSelection: (row: BatchSearchHit, selected?: boolean) => void
 } | null>(null)
-const queries = ref<BatchQueryRow[]>([])
-/** 大数据量用 shallowRef，避免深度响应拖垮页面 */
-const hits = shallowRef<BatchSearchHit[]>([])
-const selectedKeySet = ref<Set<string>>(new Set())
-const searching = ref(false)
-const downloading = ref(false)
-const downloadTip = ref('')
-const failList = ref<BatchDownloadFailItem[]>([])
-const progress = ref<BatchQueryProgress>({ total: 0, done: 0 })
-const cancelFlag = { cancelled: false }
-const page = ref(1)
-const pageSize = ref(100)
-/** 当前表格筛选的来源；null 表示全部（仅影响列表展示） */
-const filterSource = ref<string | null>(null)
-/** 已点选来源（顺序 = 跨源兜底优先级） */
-const pickedSources = ref<string[]>([])
-/** 标签勾选方式：全部 / 每首歌一首（跨源按优先级） */
-const selectMode = ref<'all' | 'first'>('first')
-/** 仅勾选歌名+歌手完全一致的结果 */
-const exactOnly = ref(true)
-const hideUnmatched = ref(false)
 /** 同步表格勾选时忽略 selection-change，避免覆盖跨页选中 */
 let syncingSelection = false
 
-const progressPct = computed(() => {
-  if (!progress.value.total) return 0
-  return Math.min(100, Math.round((progress.value.done / progress.value.total) * 100))
-})
+const progressPct = computed(() => jobs.progressPct)
 
-const selectedCount = computed(() => selectedKeySet.value.size)
+const selectedCount = computed(() => jobs.selectedCount)
+
+/** 搜索刚结束时按当前模式默认勾选 */
+watch(searching, (now, prev) => {
+  if (prev && !now && hits.value.length && exactOnly.value && selectMode.value === 'first') {
+    selectedKeySet.value = collectKeysForSources(null, 'first', true)
+    void restorePageSelection()
+  }
+})
 
 const exactHitCount = computed(() => hits.value.filter((h) => h.exactMatch).length)
 
@@ -864,21 +861,15 @@ function triggerImport() {
 }
 
 function cancelSearch() {
-  cancelFlag.cancelled = true
+  jobs.cancelSearch()
 }
 
 function clearResults() {
-  hits.value = []
-  queries.value = []
-  selectedKeySet.value = new Set()
-  downloadTip.value = ''
+  jobs.clearResults()
+}
+
+function clearFailList() {
   failList.value = []
-  page.value = 1
-  filterSource.value = null
-  pickedSources.value = []
-  selectMode.value = 'first'
-  exactOnly.value = true
-  hideUnmatched.value = false
 }
 
 function clearSelection() {
@@ -940,168 +931,21 @@ function playOne(track: TrackDto) {
   player.playTrack(track, [track])
 }
 
-let pendingHits: BatchSearchHit[] = []
-let flushTimer: ReturnType<typeof setTimeout> | null = null
-
-function flushPendingHits() {
-  if (flushTimer) {
-    clearTimeout(flushTimer)
-    flushTimer = null
-  }
-  if (!pendingHits.length) return
-  const chunk = pendingHits
-  pendingHits = []
-  hits.value = hits.value.concat(chunk)
-}
-
-function queueHits(chunk: BatchSearchHit[]) {
-  if (!chunk.length) return
-  pendingHits.push(...chunk)
-  if (flushTimer) return
-  // 节流追加，避免每条查询都整表拷贝导致卡顿
-  flushTimer = setTimeout(() => {
-    flushTimer = null
-    flushPendingHits()
-  }, 400)
-}
-
 async function onFilePicked(ev: Event) {
   const input = ev.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-
   try {
-    const rows = await parseBatchSearchFile(file)
-    queries.value = rows
-    hits.value = []
-    pendingHits = []
-    if (flushTimer) {
-      clearTimeout(flushTimer)
-      flushTimer = null
-    }
-    selectedKeySet.value = new Set()
-    failList.value = []
-    page.value = 1
-    filterSource.value = null
-    pickedSources.value = []
-    hideUnmatched.value = false
-    cancelFlag.cancelled = false
-    searching.value = true
-    progress.value = { total: rows.length, done: 0 }
-    if (rows.length > 50) {
-      ElMessage.info(`共 ${rows.length} 条，将逐条搜索，可随时取消`)
-    }
-
-    const list = await runBatchExternalSearch(rows, {
-      perSource: 3,
-      pageSize: 20,
-      sources: [...enabledSources.value],
-      onProgress: (p) => {
-        progress.value = { ...p }
-      },
-      onHits: (chunk) => {
-        queueHits(chunk)
-      },
-      signal: cancelFlag,
-    })
-    flushPendingHits()
-    // 以最终结果为准（避免并发拼接顺序问题导致遗漏）
-    hits.value = list
-    // 默认：仅完全匹配 + 每首歌一首（跨源按默认顺序兜底）
-    if (list.length && exactOnly.value && selectMode.value === 'first') {
-      selectedKeySet.value = collectKeysForSources(null, 'first', true)
-      void restorePageSelection()
-    }
-    if (cancelFlag.cancelled) {
-      ElMessage.info(`已取消，当前得到 ${list.length} 首`)
-    } else if (!list.length) {
-      ElMessage.warning('未搜索到匹配结果')
-    } else if (exactOnly.value && selectMode.value === 'first') {
-      ElMessage.success(
-        `完成 ${list.length} 首候选 · 已按源顺序勾选完全匹配 ${selectedKeySet.value.size} 首`,
-      )
-    } else {
-      ElMessage.success(`完成，共 ${list.length} 首候选（分页浏览）`)
-    }
+    await jobs.startSearchFromFile(file)
   } catch (e: any) {
     ElMessage.error(e?.message || '导入失败')
-  } finally {
-    searching.value = false
   }
-}
-
-function enrichFailures(
-  failures: BatchDownloadFailItem[],
-  selectedHits: BatchSearchHit[],
-): BatchDownloadFailItem[] {
-  const byId = new Map(selectedHits.map((h) => [h.track.id, h]))
-  return failures.map((f) => {
-    const hit = byId.get(f.trackId)
-    return {
-      ...f,
-      queryIndex: hit?.queryIndex ?? f.queryIndex,
-      source: hit ? String(hit.track.source || '') : f.source,
-    }
-  })
 }
 
 async function onBatchDownload() {
   if (!selectedKeySet.value.size) return
-  const selected = hits.value.filter((h) => selectedKeySet.value.has(h.rowKey))
-  if (!selected.length) return
-
-  const tracks = selected.map((h) => h.track)
-  const seen = new Set<string>()
-  const unique: TrackDto[] = []
-  const uniqueHits: BatchSearchHit[] = []
-  for (const h of selected) {
-    const t = h.track
-    if (!t?.id || seen.has(t.id)) continue
-    seen.add(t.id)
-    unique.push(t)
-    uniqueHits.push(h)
-  }
-
-  const mode = await pickBatchDownloadMode()
-  if (!mode) return
-
-  if (mode === 'library' && !user.accessToken) {
-    ui.openLogin('login')
-    return
-  }
-
-  downloading.value = true
-  downloadTip.value = ''
-  failList.value = []
-  try {
-    if (mode === 'library') {
-      const { ok, fail, failures } = await downloadTracksToLibrary(unique, (done, total, name) => {
-        downloadTip.value =
-          done >= total ? '' : `曲库下载中 ${done + 1}/${total}${name ? ` · ${name}` : ''}`
-      })
-      failList.value = enrichFailures(failures, uniqueHits)
-      if (fail) ElMessage.warning(`曲库下载完成：成功 ${ok}，失败 ${fail}`)
-      else ElMessage.success(`曲库下载完成：成功 ${ok}`)
-    } else {
-      const { ok, fail, failures, folder } = await downloadTracksToFolder(
-        unique,
-        (done, total, name) => {
-          downloadTip.value =
-            done >= total ? '' : `本地下载中 ${done + 1}/${total}${name ? ` · ${name}` : ''}`
-        },
-      )
-      if (!folder) return
-      failList.value = enrichFailures(failures, uniqueHits)
-      if (fail) ElMessage.warning(`已保存到文件夹：成功 ${ok}，失败 ${fail}`)
-      else ElMessage.success(`已保存到文件夹：成功 ${ok}`)
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '批量下载失败')
-  } finally {
-    downloading.value = false
-    downloadTip.value = ''
-  }
+  await jobs.startDownload()
 }
 </script>
 

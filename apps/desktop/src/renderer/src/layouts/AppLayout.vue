@@ -290,6 +290,20 @@
       @changed="refreshUnreadCount"
     />
     <EditMyModulesModal />
+
+    <!-- 批量任务跨页进度条：不在批量搜歌页时显示 -->
+    <Transition name="job-banner">
+      <button
+        v-if="showBatchJobBanner"
+        type="button"
+        class="batch-job-banner"
+        @click="goBatchSearch"
+      >
+        <span class="job-dot" />
+        <span class="job-text">{{ batchJobs.busyLabel }}</span>
+        <span class="job-go">查看</span>
+      </button>
+    </Transition>
   </div>
 </template>
 
@@ -317,6 +331,7 @@ import type { PlaylistDto } from '@wy-music/shared'
 import { useUserStore } from '../stores/user'
 import { useUiStore } from '../stores/ui'
 import { usePlaylistStore } from '../stores/playlist'
+import { useBatchJobsStore } from '../stores/batchJobs'
 import { useMyModulesStore } from '../stores/myModules'
 import { http, mediaUrl } from '../services/http'
 import PlayerBar from '../components/PlayerBar.vue'
@@ -338,6 +353,10 @@ const user = useUserStore()
 const ui = useUiStore()
 const playlistStore = usePlaylistStore()
 const myModules = useMyModulesStore()
+const batchJobs = useBatchJobsStore()
+const showBatchJobBanner = computed(
+  () => batchJobs.isBusy && route.name !== 'batch-search',
+)
 const keyword = ref('')
 const searchOpen = ref(false)
 const searchAnchorRef = ref<HTMLElement | null>(null)
@@ -429,6 +448,7 @@ onMounted(() => {
   }
   document.addEventListener('mousedown', onDocPointerDown)
   window.addEventListener('resize', updateSearchPanelPos)
+  window.addEventListener('wy:notifications-changed', refreshUnreadCount)
 })
 
 onBeforeUnmount(() => {
@@ -440,6 +460,7 @@ onBeforeUnmount(() => {
   unsubBaiduLogin = null
   document.removeEventListener('mousedown', onDocPointerDown)
   window.removeEventListener('resize', updateSearchPanelPos)
+  window.removeEventListener('wy:notifications-changed', refreshUnreadCount)
 })
 
 watch(
@@ -1373,5 +1394,69 @@ function onLogout() {
   overflow-y: auto;
   padding: 16px 28px 28px;
   overscroll-behavior: contain;
+}
+.batch-job-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--wy-player-h, 72px) + 16px);
+  transform: translateX(-50%);
+  z-index: 1600;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100vw - 48px));
+  padding: 10px 14px;
+  border: 1px solid var(--wy-border);
+  border-radius: 999px;
+  background: var(--wy-surface);
+  color: var(--wy-text);
+  box-shadow: var(--wy-shadow-sm);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.3;
+  &:hover {
+    border-color: color-mix(in srgb, var(--wy-brand) 45%, var(--wy-border));
+  }
+}
+.job-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wy-brand);
+  flex-shrink: 0;
+  animation: job-pulse 1.2s ease-in-out infinite;
+}
+.job-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.job-go {
+  flex-shrink: 0;
+  color: var(--wy-brand);
+  font-weight: 600;
+}
+@keyframes job-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+.job-banner-enter-active,
+.job-banner-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.job-banner-enter-from,
+.job-banner-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
 }
 </style>

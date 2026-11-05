@@ -29,7 +29,11 @@
             </span>
           </div>
           <div class="title">{{ p.name }}</div>
-          <div class="sub">{{ p.trackCount || 0 }} 首 · {{ p.ownerNickname || '用户' }}</div>
+          <div class="sub">
+            {{ p.trackCount || 0 }} 首
+            <template v-if="(p.collectCount || 0) > 0"> · {{ p.collectCount }} 收藏</template>
+            · {{ p.ownerNickname || '用户' }}
+          </div>
         </div>
       </div>
       <el-empty v-if="!filtered.length && !loading" description="暂无公开歌单，去创建并设为公开吧" />
@@ -72,6 +76,7 @@ export type PlazaPlaylist = {
   name: string
   coverUrl?: string | null
   trackCount?: number
+  collectCount?: number
   playCount?: number
   ownerNickname?: string
 }

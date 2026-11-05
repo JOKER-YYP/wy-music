@@ -13,6 +13,11 @@ import { requireAuth, type AuthedRequest } from '../middleware/auth.js'
 
 const router = Router()
 
+function paramId(req: { params: Record<string, string | string[] | undefined> }, key = 'id') {
+  const raw = req.params[key]
+  return Array.isArray(raw) ? String(raw[0] || '') : String(raw || '')
+}
+
 const coverUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
@@ -35,19 +40,23 @@ const coverUpload = multer({
   },
 })
 
-function toPlaylistDto(p: {
-  id: string
-  name: string
-  coverUrl: string | null
-  description: string | null
-  tags?: string | null
-  isSystem: boolean
-  isPublic: boolean
-  ownerId: string
-  createdAt: Date
-  _count?: { tracks: number }
-  tracks?: { track: { coverUrl: string | null } }[]
-}) {
+function toPlaylistDto(
+  p: {
+    id: string
+    name: string
+    coverUrl: string | null
+    description: string | null
+    tags?: string | null
+    isSystem: boolean
+    isPublic: boolean
+    ownerId: string
+    createdAt: Date
+    _count?: { tracks?: number; favorites?: number }
+    tracks?: { track: { coverUrl: string | null } }[]
+    owner?: { nickname?: string | null; avatarUrl?: string | null }
+  },
+  extras?: { collected?: boolean },
+) {
   const coverFromTrack = p.tracks?.[0]?.track?.coverUrl
   return {
     id: p.id,
@@ -60,15 +69,27 @@ function toPlaylistDto(p: {
     isPublic: p.isPublic,
     ownerId: p.ownerId,
     trackCount: p._count?.tracks ?? 0,
+    collectCount: p._count?.favorites ?? 0,
+    collected: extras?.collected,
+    ownerNickname: p.owner?.nickname ?? undefined,
+    ownerAvatar: p.owner?.avatarUrl ? toPublicUrl(p.owner.avatarUrl) : p.owner?.avatarUrl,
     createdAt: p.createdAt.toISOString(),
   }
+}
+
+async function assertCanViewPlaylist(
+  playlist: { ownerId: string; isPublic: boolean },
+  user: { id: string; role: string },
+) {
+  if (playlist.ownerId === user.id || playlist.isPublic || user.role === 'admin') return true
+  return false
 }
 
 router.get('/', requireAuth, async (req: AuthedRequest, res) => {
   const list = await prisma.playlist.findMany({
     where: { ownerId: req.user!.id },
     include: {
-      _count: { select: { tracks: true } },
+      _count: { select: { tracks: true, favorites: true } },
       tracks: {
         orderBy: { position: 'asc' },
         take: 1,
@@ -77,7 +98,35 @@ router.get('/', requireAuth, async (req: AuthedRequest, res) => {
     },
     orderBy: [{ isSystem: 'desc' }, { createdAt: 'desc' }],
   })
-  return ok(res, list.map(toPlaylistDto))
+  return ok(res, list.map((p) => toPlaylistDto(p)))
+})
+
+/** 我收藏的公开歌单 */
+router.get('/collected', requireAuth, async (req: AuthedRequest, res) => {
+  const rows = await prisma.playlistFavorite.findMany({
+    where: { userId: req.user!.id },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      playlist: {
+        include: {
+          owner: { select: { nickname: true, avatarUrl: true } },
+          _count: { select: { tracks: true, favorites: true } },
+          tracks: {
+            orderBy: { position: 'asc' },
+            take: 1,
+            include: { track: { select: { coverUrl: true } } },
+          },
+        },
+      },
+    },
+  })
+
+  const list = rows
+    .map((r) => r.playlist)
+    .filter((p) => p.isPublic || p.ownerId === req.user!.id)
+    .map((p) => toPlaylistDto(p, { collected: true }))
+
+  return ok(res, list)
 })
 
 router.post('/import/preview', requireAuth, async (req: AuthedRequest, res) => {
@@ -272,10 +321,12 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
 })
 
 router.get('/:id', requireAuth, async (req: AuthedRequest, res) => {
+  const id = paramId(req)
+  if (!id) return fail(res, 40001, '缺少歌单 id')
   const playlist = await prisma.playlist.findUnique({
-    where: { id: req.params.id },
+    where: { id },
     include: {
-      _count: { select: { tracks: true } },
+      _count: { select: { tracks: true, favorites: true } },
       tracks: {
         orderBy: { position: 'asc' },
         include: {
@@ -288,7 +339,7 @@ router.get('/:id', requireAuth, async (req: AuthedRequest, res) => {
   if (!playlist) {
     return fail(res, 40401, '歌单不存在', 404)
   }
-  if (playlist.ownerId !== req.user!.id && !playlist.isPublic && req.user!.role !== 'admin') {
+  if (!(await assertCanViewPlaylist(playlist, req.user!))) {
     return fail(res, 40301, '无权查看该歌单', 403)
   }
 
@@ -302,13 +353,92 @@ router.get('/:id', requireAuth, async (req: AuthedRequest, res) => {
     likedSet = new Set(likes.map((l) => l.trackId))
   }
 
+  const fav = await prisma.playlistFavorite.findUnique({
+    where: {
+      userId_playlistId: { userId: req.user!.id, playlistId: playlist.id },
+    },
+    select: { userId: true },
+  })
+
   return ok(res, {
-    ...toPlaylistDto(playlist),
-    ownerNickname: playlist.owner.nickname,
-    ownerAvatar: playlist.owner.avatarUrl,
+    ...toPlaylistDto(playlist, { collected: Boolean(fav) }),
     tracks: playlist.tracks
       .filter((t) => t.track.status === 'published' || playlist.ownerId === req.user!.id)
       .map((t) => toTrackDto(t.track, likedSet.has(t.trackId))),
+  })
+})
+
+/** 收藏公开歌单 */
+router.post('/:id/collect', requireAuth, async (req: AuthedRequest, res) => {
+  const id = paramId(req)
+  if (!id) return fail(res, 40001, '缺少歌单 id')
+  const playlist = await prisma.playlist.findUnique({ where: { id } })
+  if (!playlist) return fail(res, 40401, '歌单不存在', 404)
+  if (playlist.isSystem) return fail(res, 40002, '系统歌单不可收藏', 400)
+  if (playlist.ownerId === req.user!.id) return fail(res, 40003, '不能收藏自己的歌单', 400)
+  if (!playlist.isPublic && req.user!.role !== 'admin') {
+    return fail(res, 40301, '仅可收藏公开歌单', 403)
+  }
+
+  await prisma.playlistFavorite.upsert({
+    where: {
+      userId_playlistId: { userId: req.user!.id, playlistId: playlist.id },
+    },
+    create: { userId: req.user!.id, playlistId: playlist.id },
+    update: {},
+  })
+
+  const collectCount = await prisma.playlistFavorite.count({ where: { playlistId: playlist.id } })
+  return ok(res, { collected: true, collectCount }, '已收藏')
+})
+
+/** 取消收藏 */
+router.delete('/:id/collect', requireAuth, async (req: AuthedRequest, res) => {
+  const playlistId = paramId(req)
+  if (!playlistId) return fail(res, 40001, '缺少歌单 id')
+  await prisma.playlistFavorite.deleteMany({
+    where: { userId: req.user!.id, playlistId },
+  })
+  const collectCount = await prisma.playlistFavorite.count({ where: { playlistId } })
+  return ok(res, { collected: false, collectCount }, '已取消收藏')
+})
+
+/** 收藏者列表 */
+router.get('/:id/collectors', requireAuth, async (req: AuthedRequest, res) => {
+  const id = paramId(req)
+  if (!id) return fail(res, 40001, '缺少歌单 id')
+  const playlist = await prisma.playlist.findUnique({ where: { id } })
+  if (!playlist) return fail(res, 40401, '歌单不存在', 404)
+  if (!(await assertCanViewPlaylist(playlist, req.user!))) {
+    return fail(res, 40301, '无权查看', 403)
+  }
+
+  const page = Math.max(1, Number(req.query.page) || 1)
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 30))
+  const where = { playlistId: playlist.id }
+  const [total, rows] = await Promise.all([
+    prisma.playlistFavorite.count({ where }),
+    prisma.playlistFavorite.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        user: { select: { id: true, nickname: true, avatarUrl: true } },
+      },
+    }),
+  ])
+
+  return ok(res, {
+    total,
+    page,
+    pageSize,
+    list: rows.map((r) => ({
+      userId: r.user.id,
+      nickname: r.user.nickname,
+      avatarUrl: toPublicUrl(r.user.avatarUrl),
+      collectedAt: r.createdAt.toISOString(),
+    })),
   })
 })
 

@@ -62,7 +62,7 @@ router.get('/playlists', optionalAuth, async (_req, res) => {
     },
     include: {
       owner: { select: { nickname: true } },
-      _count: { select: { tracks: true } },
+      _count: { select: { tracks: true, favorites: true } },
       tracks: {
         orderBy: { position: 'asc' },
         take: 30,
@@ -82,6 +82,7 @@ router.get('/playlists', optionalAuth, async (_req, res) => {
         name: p.name,
         coverUrl: toPublicUrl(p.coverUrl || published[0]?.track?.coverUrl),
         trackCount: p._count.tracks,
+        collectCount: p._count.favorites,
         playCount: published.reduce((s, t) => s + (t.track.playCount || 0), 0),
         ownerNickname: p.owner.nickname,
         isSystem: p.isSystem,
@@ -107,7 +108,7 @@ router.get('/recommended-playlists', optionalAuth, async (req: AuthedRequest, re
     },
     include: {
       owner: { select: { nickname: true } },
-      _count: { select: { tracks: true } },
+      _count: { select: { tracks: true, favorites: true } },
       tracks: {
         orderBy: { position: 'asc' },
         take: 40,
@@ -211,6 +212,7 @@ router.get('/recommended-playlists', optionalAuth, async (req: AuthedRequest, re
     name: string
     coverUrl: string | null
     trackCount: number
+    collectCount: number
     playCount: number
     ownerNickname: string
     tags: string | null
@@ -220,7 +222,11 @@ router.get('/recommended-playlists', optionalAuth, async (req: AuthedRequest, re
   const scored: ScoredCard[] = candidates.map((p) => {
     const published = p.tracks.filter((t) => t.track.status === 'published')
     const playCount = published.reduce((s, t) => s + (t.track.playCount || 0), 0)
-    let score = Math.log10(playCount + 1) * 1.2 + Math.min(published.length, 30) * 0.05
+    const collectCount = p._count.favorites
+    let score =
+      Math.log10(playCount + 1) * 1.2 +
+      Math.log10(collectCount + 1) * 1.6 +
+      Math.min(published.length, 30) * 0.05
 
     if (hasTaste) {
       for (const pt of published) {
@@ -242,6 +248,7 @@ router.get('/recommended-playlists', optionalAuth, async (req: AuthedRequest, re
       name: p.name,
       coverUrl: toPublicUrl(p.coverUrl || published[0]?.track?.coverUrl),
       trackCount: p._count.tracks,
+      collectCount,
       playCount,
       ownerNickname: p.owner.nickname,
       tags: p.tags ?? null,

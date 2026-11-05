@@ -242,7 +242,20 @@ export interface PlaylistDto {
   isPublic: boolean
   ownerId: string
   trackCount?: number
+  /** 被收藏次数 */
+  collectCount?: number
+  /** 当前用户是否已收藏（仅登录态详情/列表可能返回） */
+  collected?: boolean
+  ownerNickname?: string | null
+  ownerAvatar?: string | null
   createdAt: string
+}
+
+export interface PlaylistCollectorDto {
+  userId: string
+  nickname: string
+  avatarUrl?: string | null
+  collectedAt: string
 }
 
 export interface CommentDto {

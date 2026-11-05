@@ -237,6 +237,32 @@
             点击 + 创建歌单
           </div>
         </div>
+
+        <div v-if="user.accessToken" class="nav-title playlist-head">
+          <span>收藏的歌单 {{ playlistStore.collected.length || '' }}</span>
+        </div>
+        <div v-if="user.accessToken" class="nav-group">
+          <router-link
+            v-for="p in playlistStore.collected"
+            :key="'c-' + p.id"
+            :to="`/playlist/${p.id}`"
+            class="nav-item playlist-item"
+            :class="{ active: isActive(`/playlist/${p.id}`) }"
+            @click="onNavClick({ to: `/playlist/${p.id}`, auth: true }, $event)"
+          >
+            <img
+              v-if="plistCoverSrc(p)"
+              class="plist-cover"
+              :src="plistCoverSrc(p)"
+              alt=""
+            />
+            <span v-else class="plist-cover plist-cover--empty" />
+            <span class="plist-name">{{ p.name }}</span>
+          </router-link>
+          <div v-if="!playlistStore.collected.length" class="empty-tip">
+            收藏公开歌单后会出现在这里
+          </div>
+        </div>
       </nav>
     </aside>
 
@@ -397,6 +423,7 @@ onMounted(() => {
     ui.openLogin('login')
   } else {
     void playlistStore.fetchMine()
+    void playlistStore.fetchCollected()
     void checkTrackRemovedNotices()
     void refreshUnreadCount()
   }
@@ -420,10 +447,12 @@ watch(
   (token) => {
     if (token) {
       void playlistStore.fetchMine()
+      void playlistStore.fetchCollected()
       void checkTrackRemovedNotices()
       void refreshUnreadCount()
     } else {
       playlistStore.list = []
+      playlistStore.collected = []
       unreadTotal.value = 0
       messageOpen.value = false
     }
@@ -758,6 +787,7 @@ function onPlaylistMenu(command: string | number) {
 function onLogout() {
   user.logout()
   playlistStore.list = []
+  playlistStore.collected = []
   ui.openLogin('login')
   router.push('/discover')
 }

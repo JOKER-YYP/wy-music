@@ -31,6 +31,22 @@
               播放全部
             </el-button>
             <el-button
+              v-if="canCollect"
+              round
+              :type="detail.collected ? 'primary' : 'default'"
+              :loading="collecting"
+              @click="toggleCollect"
+            >
+              <el-icon>
+                <StarFilled v-if="detail.collected" />
+                <Star v-else />
+              </el-icon>
+              {{ detail.collected ? '已收藏' : '收藏' }}
+              <span v-if="(detail.collectCount || 0) > 0" class="collect-n">
+                {{ detail.collectCount }}
+              </span>
+            </el-button>
+            <el-button
               round
               :disabled="!detail.tracks?.length"
               :loading="downloading"
@@ -53,14 +69,23 @@
                   <el-dropdown-item command="batch">批量操作</el-dropdown-item>
                   <el-dropdown-item command="addAll">添加全部至播放列表</el-dropdown-item>
                   <el-dropdown-item
+                    v-if="canCollect"
+                    command="toggleCollect"
+                    divided
+                  >
+                    {{ detail.collected ? '取消收藏' : '收藏歌单' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item
                     v-if="canSaveAs"
                     command="saveAs"
-                    divided
+                    :divided="!canCollect"
                   >
                     另存为自己的歌单
                   </el-dropdown-item>
                   <template v-if="isOwner && !detail.isSystem">
-                    <el-dropdown-item command="edit" :divided="!canSaveAs">编辑歌单信息</el-dropdown-item>
+                    <el-dropdown-item command="edit" :divided="!(canSaveAs || canCollect)">
+                      编辑歌单信息
+                    </el-dropdown-item>
                     <el-dropdown-item command="delete">删除歌单</el-dropdown-item>
                   </template>
                 </el-dropdown-menu>
@@ -93,7 +118,7 @@
           :class="{ active: activeTab === 'collectors' }"
           @click="activeTab = 'collectors'"
         >
-          收藏者
+          收藏者{{ (detail.collectCount || 0) > 0 ? ` ${detail.collectCount}` : '' }}
         </button>
         <div class="tab-search">
           <el-icon class="tab-search-icon"><Search /></el-icon>
@@ -119,8 +144,26 @@
       <div v-show="!batchMode && activeTab === 'comments'" class="placeholder">
         <el-empty description="评论功能暂未开放" :image-size="72" />
       </div>
-      <div v-show="!batchMode && activeTab === 'collectors'" class="placeholder">
-        <el-empty description="收藏者列表暂未开放" :image-size="72" />
+      <div v-show="!batchMode && activeTab === 'collectors'" class="collectors" v-loading="collectorsLoading">
+        <div v-if="collectors.length" class="collector-list">
+          <div v-for="c in collectors" :key="c.userId" class="collector-row">
+            <span
+              class="collector-avatar"
+              :style="collectorAvatarStyle(c.avatarUrl)"
+            >
+              {{ c.avatarUrl ? '' : (c.nickname || '用').slice(0, 1) }}
+            </span>
+            <div class="collector-meta">
+              <div class="collector-name">{{ c.nickname || '用户' }}</div>
+              <div class="collector-time">{{ formatCollectorTime(c.collectedAt) }} 收藏</div>
+            </div>
+          </div>
+        </div>
+        <el-empty
+          v-else-if="!collectorsLoading"
+          description="还没有人收藏这个歌单"
+          :image-size="72"
+        />
       </div>
     </template>
 
@@ -132,8 +175,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Edit, MoreFilled, Search, VideoPlay } from '@element-plus/icons-vue'
-import type { TrackDto } from '@wy-music/shared'
+import { Download, Edit, MoreFilled, Search, Star, StarFilled, VideoPlay } from '@element-plus/icons-vue'
+import type { PlaylistCollectorDto, TrackDto } from '@wy-music/shared'
 import { mediaUrl } from '../services/http'
 import { isElectronApp } from '../services/localUpload'
 import { downloadTracksToFolder } from '../services/trackDownload'
@@ -158,6 +201,9 @@ const batchMode = ref(false)
 const savingAs = ref(false)
 const reordering = ref(false)
 const downloading = ref(false)
+const collecting = ref(false)
+const collectorsLoading = ref(false)
+const collectors = ref<PlaylistCollectorDto[]>([])
 
 const isOwner = computed(() => {
   if (!detail.value || !user.user?.id) return false
@@ -168,6 +214,14 @@ const canSaveAs = computed(() => {
   if (!detail.value) return false
   if (detail.value.isSystem) return false
   return !isOwner.value
+})
+
+/** 非本人、非系统、公开歌单可收藏 */
+const canCollect = computed(() => {
+  if (!detail.value) return false
+  if (detail.value.isSystem) return false
+  if (isOwner.value) return false
+  return Boolean(detail.value.isPublic)
 })
 
 /** 所有者可排序；搜索过滤时禁用，避免只排子集打乱全量 */
@@ -216,12 +270,63 @@ const emptySongsText = computed(() => {
   return '暂无歌曲'
 })
 
+async function loadCollectors() {
+  if (!detail.value) {
+    collectors.value = []
+    return
+  }
+  collectorsLoading.value = true
+  try {
+    const data = await playlistStore.fetchCollectors(detail.value.id)
+    collectors.value = data.list || []
+    if (detail.value) detail.value.collectCount = data.total
+  } catch {
+    collectors.value = []
+  } finally {
+    collectorsLoading.value = false
+  }
+}
+
+function collectorAvatarStyle(url?: string | null) {
+  const src = mediaUrl(url)
+  if (!src) return {}
+  return { backgroundImage: `url(${src})`, color: 'transparent' }
+}
+
+function formatCollectorTime(iso: string) {
+  if (!iso) return ''
+  return iso.slice(0, 10)
+}
+
+async function toggleCollect() {
+  if (!detail.value || !canCollect.value || collecting.value) return
+  if (!user.accessToken) {
+    ui.openLogin('login')
+    return
+  }
+  collecting.value = true
+  try {
+    const next = detail.value.collected
+      ? await playlistStore.uncollect(detail.value.id)
+      : await playlistStore.collect(detail.value.id)
+    detail.value.collected = next.collected
+    detail.value.collectCount = next.collectCount
+    ElMessage.success(next.collected ? '已收藏歌单' : '已取消收藏')
+    if (activeTab.value === 'collectors') void loadCollectors()
+  } catch {
+    // interceptor toasts
+  } finally {
+    collecting.value = false
+  }
+}
+
 async function load(opts?: { keepBatch?: boolean }) {
   const id = String(route.params.id || '')
   if (!id) return
   loading.value = true
   activeTab.value = 'songs'
   keyword.value = ''
+  collectors.value = []
   if (!opts?.keepBatch) batchMode.value = false
   try {
     detail.value = await playlistStore.fetchDetail(id)
@@ -376,6 +481,7 @@ function onMoreCommand(cmd: string) {
   else if (cmd === 'edit') goEdit()
   else if (cmd === 'delete') void onDelete()
   else if (cmd === 'saveAs') void onSaveAs()
+  else if (cmd === 'toggleCollect') void toggleCollect()
   else if (cmd === 'share') ElMessage.info('分享功能暂未开放')
 }
 
@@ -386,6 +492,9 @@ watch(
     void load()
   },
 )
+watch(activeTab, (tab) => {
+  if (tab === 'collectors') void loadCollectors()
+})
 </script>
 
 <style scoped lang="scss">
@@ -500,6 +609,12 @@ watch(
   align-items: center;
   gap: 10px;
   margin-top: 22px;
+  flex-wrap: wrap;
+}
+.collect-n {
+  margin-left: 4px;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
 }
 .tabs {
   display: flex;
@@ -565,6 +680,53 @@ watch(
 }
 .placeholder {
   padding: 48px 0;
+}
+.collectors {
+  min-height: 160px;
+  padding: 8px 0 24px;
+}
+.collector-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.collector-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: var(--wy-radius-sm);
+  transition: background var(--wy-duration-fast) var(--wy-ease);
+  &:hover {
+    background: var(--wy-brand-soft);
+  }
+}
+.collector-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--wy-brand);
+  color: var(--wy-text-on-brand);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+.collector-meta {
+  min-width: 0;
+}
+.collector-name {
+  font-size: 14px;
+  color: var(--wy-text);
+  font-weight: 600;
+}
+.collector-time {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--wy-text-muted);
 }
 @media (max-width: 720px) {
   .header {

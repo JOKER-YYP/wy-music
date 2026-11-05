@@ -159,19 +159,24 @@ const likedPlaylist = computed(() => playlistStore.systemPlaylists[0] || null)
 
 const displayPlaylists = computed(() => {
   if (subTab.value === 'created') return playlistStore.createdPlaylists
-  if (subTab.value === 'collect') {
-    return likedPlaylist.value ? [likedPlaylist.value] : []
-  }
-  // 近期：喜欢的音乐 + 创建的歌单
+  if (subTab.value === 'collect') return playlistStore.collected
+  // 近期：喜欢的音乐 + 创建的歌单 + 收藏的歌单（去重）
   const list: PlaylistDto[] = []
-  if (likedPlaylist.value) list.push(likedPlaylist.value)
-  list.push(...playlistStore.createdPlaylists)
+  const seen = new Set<string>()
+  const push = (p: PlaylistDto) => {
+    if (seen.has(p.id)) return
+    seen.add(p.id)
+    list.push(p)
+  }
+  if (likedPlaylist.value) push(likedPlaylist.value)
+  for (const p of playlistStore.createdPlaylists) push(p)
+  for (const p of playlistStore.collected.slice(0, 6)) push(p)
   return list
 })
 
 const emptyTip = computed(() => {
   if (subTab.value === 'created') return '还没有创建歌单，去左侧点 + 新建吧'
-  if (subTab.value === 'collect') return '暂无收藏歌单'
+  if (subTab.value === 'collect') return '暂无收藏歌单，去歌单广场逛逛吧'
   return '暂无内容'
 })
 
@@ -200,7 +205,7 @@ async function load() {
   if (!user.accessToken) return
   loading.value = true
   try {
-    await Promise.all([user.fetchMe(), playlistStore.fetchMine()])
+    await Promise.all([user.fetchMe(), playlistStore.fetchMine(), playlistStore.fetchCollected()])
     const { data } = await http.get('/api/history')
     historyCount.value = (data.data || []).length
   } finally {

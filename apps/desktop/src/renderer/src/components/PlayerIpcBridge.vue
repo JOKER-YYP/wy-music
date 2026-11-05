@@ -120,7 +120,9 @@ let timer: number | undefined
 
 onMounted(() => {
   unsub = window.wyAPI?.onPlayerCommand?.(onCommand)
-  void ensureLyric().then(pushState)
+  void player.restoreSession().finally(() => {
+    void ensureLyric().then(pushState)
+  })
   timer = window.setInterval(pushState, 400)
 })
 

@@ -2,6 +2,12 @@ import { defineStore } from 'pinia'
 import type { MusicSource, TrackDto } from '@wy-music/shared'
 import { isExternalTrackId, parseExternalTrackId } from '@wy-music/shared'
 import { http, streamUrl } from '../services/http'
+import {
+  clearPlayerSession,
+  isRememberPlaybackEnabled,
+  loadPlayerSession,
+  savePlayerSession,
+} from '../services/playerSession'
 
 type PlayMode = 'order' | 'loop' | 'single' | 'shuffle'
 
@@ -119,6 +125,21 @@ function rampVolume(audio: HTMLAudioElement, target: number, ms: number): Promis
   })
 }
 
+let persistTimer: number | null = null
+let lastProgressPersistAt = 0
+let sessionRestored = false
+let unloadBound = false
+
+function bindUnloadPersist(getSnap: () => void) {
+  if (unloadBound || typeof window === 'undefined') return
+  unloadBound = true
+  const flush = () => getSnap()
+  window.addEventListener('pagehide', flush)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush()
+  })
+}
+
 export const usePlayerStore = defineStore('player', {
   state: () => ({
     queue: [] as QueueTrack[],
@@ -135,6 +156,8 @@ export const usePlayerStore = defineStore('player', {
     playToken: 0,
     /** 「下一首播放」优先队列：不改动 queue 排序，任意模式下优先于 mode 跳转 */
     nextPlayQueue: [] as QueueTrack[],
+    /** 是否已从本地恢复过会话（避免重复 restore） */
+    sessionReady: false,
   }),
   getters: {
     currentTrack(state): QueueTrack | null {
@@ -150,6 +173,11 @@ export const usePlayerStore = defineStore('player', {
       audio.volume = this.volume
       audio.addEventListener('timeupdate', () => {
         if (!this.seeking) this.currentTime = audio.currentTime
+        const now = Date.now()
+        if (now - lastProgressPersistAt >= 2000) {
+          lastProgressPersistAt = now
+          this.persistSession(true)
+        }
       })
       audio.addEventListener('loadedmetadata', () => {
         if (Number.isFinite(audio.duration) && audio.duration > 0) {
@@ -171,9 +199,74 @@ export const usePlayerStore = defineStore('player', {
       })
       audio.addEventListener('pause', () => {
         this.playing = false
+        this.persistSession(true)
       })
       this.audio = audio
+      bindUnloadPersist(() => this.persistSession(true))
       return audio
+    },
+
+    persistSession(immediate = false) {
+      if (!isRememberPlaybackEnabled()) return
+      const write = () => {
+        if (!this.queue.length || this.currentIndex < 0) {
+          clearPlayerSession()
+          return
+        }
+        savePlayerSession({
+          queue: this.queue,
+          nextPlayQueue: this.nextPlayQueue,
+          currentIndex: this.currentIndex,
+          currentTime: this.currentTime,
+          mode: this.mode,
+        })
+      }
+      if (immediate) {
+        if (persistTimer != null) {
+          window.clearTimeout(persistTimer)
+          persistTimer = null
+        }
+        write()
+        return
+      }
+      if (persistTimer != null) window.clearTimeout(persistTimer)
+      persistTimer = window.setTimeout(() => {
+        persistTimer = null
+        write()
+      }, 350)
+    },
+
+    /** 启动时恢复队列与进度（不自动播放，遵守浏览器策略） */
+    async restoreSession() {
+      if (sessionRestored) {
+        this.sessionReady = true
+        return
+      }
+      sessionRestored = true
+      if (!isRememberPlaybackEnabled()) {
+        this.sessionReady = true
+        return
+      }
+      const snap = loadPlayerSession()
+      if (!snap) {
+        this.sessionReady = true
+        return
+      }
+      this.queue = snap.queue
+      this.nextPlayQueue = snap.nextPlayQueue
+      this.currentIndex = snap.currentIndex
+      this.mode = snap.mode
+      this.currentTime = snap.currentTime
+      this.sessionReady = true
+      try {
+        await this.playCurrent({ autoplay: false, seekTo: snap.currentTime })
+      } catch (e) {
+        console.warn('[restoreSession]', e)
+      }
+    },
+
+    clearSessionMemory() {
+      clearPlayerSession()
     },
 
     revokeObjectUrl() {
@@ -268,12 +361,14 @@ export const usePlayerStore = defineStore('player', {
       this.queue = tracks
       this.nextPlayQueue = []
       this.currentIndex = startIndex
+      this.persistSession()
       void this.playCurrent()
     },
 
     playAt(index: number) {
       if (index < 0 || index >= this.queue.length) return
       this.currentIndex = index
+      this.persistSession()
       void this.playCurrent()
     },
 
@@ -289,18 +384,21 @@ export const usePlayerStore = defineStore('player', {
         this.queue.push(track)
         this.currentIndex = this.queue.length - 1
       }
+      this.persistSession()
       void this.playCurrent()
     },
 
-    async playCurrent() {
+    async playCurrent(opts?: { autoplay?: boolean; seekTo?: number }) {
       const track = this.currentTrack
       if (!track) return
 
+      const autoplay = opts?.autoplay !== false
+      const seekTo = opts?.seekTo
       const token = ++this.playToken
       const audio = this.ensureAudio()
       this.loading = true
       this.seeking = false
-      this.currentTime = 0
+      this.currentTime = seekTo && seekTo > 0 ? seekTo : 0
       this.duration = track.durationMs > 0 ? track.durationMs / 1000 : 0
 
       try {
@@ -342,12 +440,35 @@ export const usePlayerStore = defineStore('player', {
         })
 
         if (token !== this.playToken) return
+
+        if (seekTo != null && seekTo > 0 && Number.isFinite(seekTo)) {
+          try {
+            const max =
+              Number.isFinite(audio.duration) && audio.duration > 0
+                ? Math.max(0, audio.duration - 0.35)
+                : seekTo
+            audio.currentTime = Math.min(seekTo, max)
+            this.currentTime = audio.currentTime
+          } catch {
+            /* ignore seek failure */
+          }
+        }
+
+        if (!autoplay) {
+          audio.pause()
+          audio.volume = this.volume
+          this.playing = false
+          this.persistSession(true)
+          return
+        }
+
         audio.volume = 0
         await safePlay(audio)
         if (token !== this.playToken) return
         void rampVolume(audio, this.volume, 220)
 
         this.playing = true
+        this.persistSession()
         if (
           !track.localPath &&
           !track.previewFile &&
@@ -403,6 +524,7 @@ export const usePlayerStore = defineStore('player', {
       this.currentTime = 0
       this.duration = 0
       this.playToken++
+      clearPlayerSession()
     },
 
     playUploadedTrack(track: TrackDto) {
@@ -422,6 +544,7 @@ export const usePlayerStore = defineStore('player', {
       this.currentTime = 0
       this.duration = 0
       this.playToken++
+      clearPlayerSession()
     },
 
     /**
@@ -444,6 +567,7 @@ export const usePlayerStore = defineStore('player', {
       const pending = this.nextPlayQueue.findIndex((t) => t.id === track.id)
       if (pending >= 0) this.nextPlayQueue.splice(pending, 1)
       this.nextPlayQueue.push({ ...track })
+      this.persistSession()
     },
 
     /** 消费一条「下一首播放」；成功则已开始播放并返回 true */
@@ -474,6 +598,7 @@ export const usePlayerStore = defineStore('player', {
       }
       if (!this.queue.length) return 0
       if (this.currentIndex < 0) this.currentIndex = 0
+      this.persistSession()
       return added
     },
 
@@ -495,6 +620,7 @@ export const usePlayerStore = defineStore('player', {
           if (this.seeking) {
             this.currentTime = audio.currentTime
             this.seeking = false
+            this.persistSession(true)
           }
         }, 300)
       } catch (e) {
@@ -524,12 +650,14 @@ export const usePlayerStore = defineStore('player', {
           audio.pause()
           audio.currentTime = 0
           this.currentTime = 0
+          this.persistSession(true)
           return
         }
         this.currentIndex += 1
       } else {
         this.currentIndex = (this.currentIndex + 1) % this.queue.length
       }
+      this.persistSession()
       void this.playCurrent()
     },
 
@@ -540,6 +668,7 @@ export const usePlayerStore = defineStore('player', {
       } else {
         this.currentIndex = (this.currentIndex - 1 + this.queue.length) % this.queue.length
       }
+      this.persistSession()
       void this.playCurrent()
     },
 
@@ -560,6 +689,7 @@ export const usePlayerStore = defineStore('player', {
       const modes: PlayMode[] = ['order', 'loop', 'single', 'shuffle']
       const i = modes.indexOf(this.mode)
       this.mode = modes[(i + 1) % modes.length]
+      this.persistSession(true)
     },
   },
 })

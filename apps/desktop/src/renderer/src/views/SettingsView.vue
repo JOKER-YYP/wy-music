@@ -38,6 +38,16 @@
         <div class="lib-tip">参照网易云皮肤思路：顶栏配色 + 强调色；选择后立即生效并记住。</div>
       </el-descriptions-item>
 
+      <el-descriptions-item label="播放记忆">
+        <div class="shell-row">
+          <el-switch v-model="rememberPlayback" @change="onRememberChange" />
+          <span>记住播放列表与进度</span>
+        </div>
+        <div class="lib-tip">
+          重启客户端后恢复上次队列、播放模式与进度（默认暂停，需手动继续播放）。网页临时试听文件无法记忆。
+        </div>
+      </el-descriptions-item>
+
       <el-descriptions-item label="公共曲库来源">
         <div class="lib-sources">
           <span>{{ sourcesLabel }}</span>
@@ -90,15 +100,22 @@ import {
 } from '../services/librarySources'
 import { useUserStore } from '../stores/user'
 import { useThemeStore } from '../stores/theme'
+import { usePlayerStore } from '../stores/player'
 import type { ThemeId } from '../themes'
+import {
+  isRememberPlaybackEnabled,
+  setRememberPlaybackEnabled,
+} from '../services/playerSession'
 
 const user = useUserStore()
 const theme = useThemeStore()
+const player = usePlayerStore()
 const router = useRouter()
 const sourcesOpen = ref(false)
 const prefs = ref(loadLibrarySources())
 const sourcesLabel = computed(() => librarySourcesSummary(prefs.value))
 const isDesktop = computed(() => Boolean(window.wyAPI?.getShellPrefs))
+const rememberPlayback = ref(isRememberPlaybackEnabled())
 const shellSaving = ref(false)
 const shell = reactive({
   showTray: true,
@@ -154,7 +171,19 @@ function onShowTrayChange() {
   void persistShell()
 }
 
+function onRememberChange() {
+  setRememberPlaybackEnabled(rememberPlayback.value)
+  if (rememberPlayback.value) {
+    player.persistSession(true)
+    ElMessage.success('已开启播放记忆')
+  } else {
+    player.clearSessionMemory()
+    ElMessage.success('已关闭并清除本地播放记忆')
+  }
+}
+
 onMounted(() => {
+  rememberPlayback.value = isRememberPlaybackEnabled()
   void loadShell()
 })
 </script>

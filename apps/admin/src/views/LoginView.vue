@@ -72,7 +72,7 @@ async function onSubmit() {
 }
 .card {
   width: min(400px, 100%);
-  border-radius: 14px;
+  border-radius: var(--wy-radius-md);
   border: 1px solid var(--wy-border);
   box-shadow: var(--wy-shadow-sm);
 }
@@ -85,11 +85,11 @@ async function onSubmit() {
 .mark {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--wy-radius-md);
   display: grid;
   place-items: center;
   background: var(--wy-brand);
-  color: #fff;
+  color: var(--wy-text-on-brand);
   font-size: 13px;
   font-weight: 800;
   flex-shrink: 0;
@@ -99,10 +99,12 @@ h2 {
   font-size: 18px;
   font-weight: 700;
   color: var(--wy-text);
+  letter-spacing: -0.01em;
 }
 .sub {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
   color: var(--wy-text-muted);
 }
 .form :deep(.el-form-item) {

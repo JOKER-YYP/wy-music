@@ -1,28 +1,82 @@
 :root {
-  --el-color-primary: #ec4141;
+  /* Brand — aligned with desktop / DESIGN.md */
   --wy-brand: #ec4141;
   --wy-brand-hover: #e03535;
   --wy-brand-soft: rgba(236, 65, 65, 0.08);
   --wy-brand-soft-strong: rgba(236, 65, 65, 0.14);
+  --wy-brand-tint: #ff8a80;
 
+  /* Surfaces — cooler page canvas for admin Operate density */
   --wy-bg: #f3f4f7;
   --wy-sidebar: #f7f7f9;
   --wy-surface: #ffffff;
   --wy-surface-muted: #f5f5f7;
-  --wy-border: #e6e8ee;
+  --wy-border: #ebebed;
   --wy-border-strong: #e0e0e4;
+
+  /* Text */
   --wy-text: #1a1a1a;
   --wy-text-secondary: #5c5c66;
   --wy-text-muted: #8a8a96;
   --wy-text-on-brand: #ffffff;
+  --wy-on-brand-muted: rgba(255, 255, 255, 0.72);
+  --wy-on-brand-soft: rgba(255, 255, 255, 0.88);
+
+  /* Layout */
+  --wy-aside-w: 220px;
+  --wy-header-h: 54px;
   --wy-radius-sm: 6px;
   --wy-radius-md: 10px;
-  --wy-shadow-sm: 0 1px 2px rgba(16, 16, 24, 0.05), 0 8px 24px rgba(16, 16, 24, 0.04);
+  --wy-radius-pill: 999px;
+  --wy-shadow-sm: 0 1px 2px rgba(16, 16, 24, 0.06), 0 4px 12px rgba(16, 16, 24, 0.04);
+  --wy-cover-gradient: linear-gradient(135deg, var(--wy-brand-tint), var(--wy-brand));
+
+  /* Motion */
+  --wy-duration-fast: 150ms;
+  --wy-duration: 220ms;
+  --wy-duration-slow: 380ms;
+  --wy-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --wy-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --wy-ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Focus / chrome */
   --wy-focus-ring: 0 0 0 2px #fff, 0 0 0 4px rgba(236, 65, 65, 0.45);
   --wy-scrollbar: #c8c8d0;
-  --wy-aside-w: 220px;
-  --wy-duration-fast: 150ms;
-  --wy-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --wy-scrollbar-hover: #b0b0ba;
+
+  /* Element Plus — same mapping as desktop */
+  --el-color-primary: var(--wy-brand);
+  --el-color-primary-light-3: #f06a6a;
+  --el-color-primary-light-5: #f49090;
+  --el-color-primary-light-7: #f8b6b6;
+  --el-color-primary-light-8: #fac9c9;
+  --el-color-primary-light-9: #fcdcdc;
+  --el-color-primary-dark-2: var(--wy-brand-hover);
+  --el-bg-color: var(--wy-surface);
+  --el-bg-color-page: var(--wy-bg);
+  --el-bg-color-overlay: var(--wy-surface);
+  --el-text-color-primary: var(--wy-text);
+  --el-text-color-regular: var(--wy-text-secondary);
+  --el-text-color-secondary: var(--wy-text-muted);
+  --el-text-color-placeholder: var(--wy-text-muted);
+  --el-border-color: var(--wy-border);
+  --el-border-color-light: var(--wy-border);
+  --el-border-color-lighter: var(--wy-border);
+  --el-border-color-extra-light: var(--wy-surface-muted);
+  --el-fill-color-blank: var(--wy-surface);
+  --el-fill-color-light: var(--wy-surface-muted);
+  --el-fill-color-lighter: var(--wy-surface-muted);
+  --el-border-radius-base: var(--wy-radius-sm);
+  --el-border-radius-small: 4px;
+  --el-border-radius-round: var(--wy-radius-pill);
+  --el-box-shadow: var(--wy-shadow-sm);
+  --el-box-shadow-light: var(--wy-shadow-sm);
+  --el-font-family:
+    'Segoe UI',
+    'PingFang SC',
+    'Microsoft YaHei',
+    system-ui,
+    sans-serif;
 }
 
 * {
@@ -34,15 +88,12 @@ body,
 #app {
   margin: 0;
   height: 100%;
-  font-family:
-    'Segoe UI',
-    'PingFang SC',
-    'Microsoft YaHei',
-    system-ui,
-    sans-serif;
+  font-family: var(--el-font-family);
   background: var(--wy-bg);
   color: var(--wy-text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  caret-color: var(--wy-brand);
 }
 
 ::selection {
@@ -55,34 +106,65 @@ body,
   box-shadow: var(--wy-focus-ring);
 }
 
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  box-shadow: none;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: var(--wy-scrollbar);
-  border-radius: 999px;
+  border-radius: var(--wy-radius-pill);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wy-scrollbar-hover);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
 
-.el-button--danger {
+.el-button--danger,
+.el-button--primary {
   --el-button-bg-color: var(--wy-brand);
   --el-button-border-color: var(--wy-brand);
   --el-button-hover-bg-color: var(--wy-brand-hover);
   --el-button-hover-border-color: var(--wy-brand-hover);
+  --el-button-active-bg-color: var(--wy-brand-hover);
+  --el-button-active-border-color: var(--wy-brand-hover);
+}
+
+.el-button:focus-visible {
+  box-shadow: var(--wy-focus-ring);
 }
 
 .el-card {
   border-radius: var(--wy-radius-md);
   border-color: var(--wy-border);
+  box-shadow: none;
 }
 
 .el-table {
   --el-table-header-bg-color: var(--wy-surface-muted);
   --el-table-row-hover-bg-color: var(--wy-brand-soft);
+  --el-table-current-row-bg-color: var(--wy-brand-soft-strong);
   --el-table-border-color: var(--wy-border);
+  --el-table-bg-color: var(--wy-surface);
+  --el-table-tr-bg-color: var(--wy-surface);
+  color: var(--wy-text);
   width: 100%;
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--wy-brand) inset !important;
 }
 
 .el-tabs__item.is-active {
@@ -95,7 +177,41 @@ body,
   background-color: var(--wy-brand);
 }
 
-/* 管理端页面统一铺满主内容区，不再人为收窄 */
+.el-dialog {
+  --el-dialog-bg-color: var(--wy-surface);
+  --el-dialog-border-radius: var(--wy-radius-md);
+  box-shadow: var(--wy-shadow-sm);
+}
+
+.el-dropdown-menu {
+  border-color: var(--wy-border);
+  border-radius: var(--wy-radius-sm);
+  box-shadow: var(--wy-shadow-sm);
+}
+
+.el-dropdown-menu__item:not(.is-disabled):hover,
+.el-dropdown-menu__item:not(.is-disabled):focus {
+  background: var(--wy-brand-soft);
+  color: var(--wy-brand);
+}
+
+.el-message {
+  border-radius: var(--wy-radius-sm);
+  box-shadow: var(--wy-shadow-sm);
+}
+
+.el-message-box {
+  border-radius: var(--wy-radius-md);
+  box-shadow: var(--wy-shadow-sm);
+}
+
+.el-popover.el-popper {
+  border-color: var(--wy-border);
+  border-radius: var(--wy-radius-md);
+  box-shadow: var(--wy-shadow-sm);
+}
+
+/* 管理端页面统一铺满主内容区 */
 .admin-page {
   width: 100%;
   max-width: none;
@@ -106,7 +222,7 @@ body,
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   margin-bottom: 16px;
 }
 
@@ -122,5 +238,22 @@ body,
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--wy-text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
+  max-width: 56ch;
+}
+
+/* 列表页工具条：与 page-head 同节奏 */
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.admin-toolbar.is-end {
+  justify-content: flex-end;
+}
+.admin-toolbar.is-split {
+  justify-content: space-between;
+  gap: 12px;
 }

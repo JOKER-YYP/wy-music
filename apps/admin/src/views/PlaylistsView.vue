@@ -1,6 +1,6 @@
 <template>
   <div class="admin-page">
-    <div class="head">
+    <div class="admin-toolbar is-end">
       <el-checkbox v-model="onlyPublic" @change="onFilter">仅公开</el-checkbox>
       <el-checkbox v-model="onlyFeatured" @change="onFilter">仅推荐位</el-checkbox>
       <el-input
@@ -168,20 +168,12 @@ onMounted(load)
 </script>
 
 <style scoped>
-.head {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: flex-end;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
 .pager {
   margin-top: 16px;
   justify-content: flex-end;
 }
 .muted {
-  color: var(--el-text-color-secondary);
+  color: var(--wy-text-muted);
   font-size: 12px;
 }
 </style>

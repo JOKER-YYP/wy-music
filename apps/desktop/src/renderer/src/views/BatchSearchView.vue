@@ -1,9 +1,9 @@
 <template>
   <div class="batch-page">
-    <div class="page-head">
+    <div class="wy-page-head">
       <div>
-        <h1>批量搜歌</h1>
-        <p class="sub">
+        <h1 class="wy-page-title">批量搜歌</h1>
+        <p class="wy-page-desc">
           任务可回看 · 按置信度筛选 · 一键只补缺词/缺文件；完全匹配优先，其它源可展开挑选
         </p>
       </div>
@@ -1114,36 +1114,15 @@ async function onFillMissingLyric() {
 
 <style scoped lang="scss">
 .batch-page {
-  padding: 4px 2px 20px;
+  padding: 0 0 8px;
   min-height: 100%;
 }
 .source-picker-block {
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   padding: 12px 14px;
   border-radius: var(--wy-radius-md);
   background: var(--wy-surface-muted);
   border: 1px solid var(--wy-border);
-}
-.page-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-  h1 {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--wy-text);
-    letter-spacing: 0.2px;
-  }
-}
-.sub {
-  margin: 6px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--wy-text-muted);
-  max-width: 52ch;
 }
 .head-actions {
   display: flex;

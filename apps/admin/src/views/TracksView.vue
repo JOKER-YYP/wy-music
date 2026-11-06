@@ -1,6 +1,6 @@
 <template>
   <div class="admin-page">
-    <div class="head">
+    <div class="admin-toolbar is-split">
       <div class="filters">
         <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="onFilter">
           <el-option label="全部" value="" />
@@ -618,18 +618,11 @@ onMounted(load)
 </script>
 
 <style scoped>
-.head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
-  gap: 12px;
-  flex-wrap: wrap;
-}
 .filters {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
 }
 .batch {
   display: flex;

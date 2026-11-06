@@ -21,7 +21,7 @@
       </el-menu>
     </el-aside>
     <el-container class="main-wrap">
-      <el-header class="header" height="56px">
+      <el-header class="header" :height="headerHeight">
         <div class="header-title">{{ pageTitle }}</div>
         <div class="header-right">
           <span class="uname">{{ admin.user?.nickname || '管理员' }}</span>
@@ -43,7 +43,8 @@ import { useAdminStore } from '../stores/admin'
 const route = useRoute()
 const router = useRouter()
 const admin = useAdminStore()
-const asideWidth = '220px'
+const asideWidth = 'var(--wy-aside-w)'
+const headerHeight = 'var(--wy-header-h)'
 
 const pageTitle = computed(() => {
   const map: Record<string, string> = {
@@ -76,11 +77,11 @@ function logout() {
   flex-direction: column;
 }
 .logo {
-  height: 56px;
+  height: var(--wy-header-h);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 18px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--wy-border);
   flex-shrink: 0;
   background: var(--wy-sidebar);
@@ -90,7 +91,7 @@ function logout() {
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--wy-radius-sm);
   background: var(--wy-brand);
   color: var(--wy-text-on-brand);
   font-size: 11px;
@@ -158,7 +159,7 @@ function logout() {
   width: 100%;
   max-width: none;
   min-width: 0;
-  padding: 20px 24px 32px;
+  padding: 20px 24px 28px;
   background: var(--wy-bg);
 }
 .main :deep(> *) {

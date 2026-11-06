@@ -1,6 +1,6 @@
 <template>
   <div class="admin-page">
-    <div class="head">
+    <div class="admin-toolbar is-end">
       <el-input
         v-model="keyword"
         placeholder="搜索评论内容 / 用户 / 歌曲"
@@ -90,12 +90,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.head {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-bottom: 14px;
-}
 .pager {
   margin-top: 16px;
   justify-content: flex-end;

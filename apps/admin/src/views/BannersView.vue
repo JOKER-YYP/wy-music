@@ -1,6 +1,6 @@
 <template>
   <div class="admin-page">
-    <div class="head">
+    <div class="admin-toolbar is-end">
       <el-button type="danger" @click="openCreate">新增 Banner</el-button>
     </div>
 
@@ -172,16 +172,11 @@ onMounted(load)
 </script>
 
 <style scoped>
-.head {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 14px;
-}
 .thumb,
 .preview {
   width: 96px;
   height: 54px;
-  border-radius: 6px;
+  border-radius: var(--wy-radius-sm);
   background-size: cover;
   background-position: center;
   border: 1px solid var(--wy-border);

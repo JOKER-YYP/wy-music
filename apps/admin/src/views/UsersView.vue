@@ -1,6 +1,6 @@
 <template>
   <div class="admin-page">
-    <div class="head">
+    <div class="admin-toolbar is-end">
       <el-select v-model="status" clearable placeholder="状态" style="width: 120px" @change="onFilter">
         <el-option label="全部" value="" />
         <el-option label="正常" value="1" />
@@ -156,14 +156,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.head {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin-bottom: 14px;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 .pager {
   margin-top: 16px;
   justify-content: flex-end;

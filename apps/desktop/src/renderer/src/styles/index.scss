@@ -154,6 +154,30 @@ select:focus-visible {
   min-height: 0;
 }
 
+.wy-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.wy-page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--wy-text);
+  letter-spacing: -0.01em;
+}
+
+.wy-page-desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--wy-text-muted);
+  max-width: 56ch;
+}
+
 .wy-chip {
   display: inline-flex;
   align-items: center;

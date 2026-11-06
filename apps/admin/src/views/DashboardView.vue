@@ -104,6 +104,9 @@ const SERIES_A = '#5c6bc0'
 const SERIES_B = '#26a69a'
 const SERIES_C = '#78909c'
 const STATUS_COLORS = ['#26a69a', '#ffa726', '#ec4141', '#90a4ae']
+const AXIS = '#8a8a96'
+const AXIS_LINE = '#ebebed'
+const MUTED = '#5c5c66'
 
 const loading = ref(false)
 const stats = ref<DashboardStats | null>(null)
@@ -186,7 +189,7 @@ function rankOption(list: DashboardRankItem[], color: string, emptyText: string)
         text: emptyText,
         left: 'center',
         top: 'middle',
-        textStyle: { color: '#999', fontSize: 13, fontWeight: 400 },
+        textStyle: { color: AXIS, fontSize: 13, fontWeight: 400 },
       },
     }
   }
@@ -206,15 +209,15 @@ function rankOption(list: DashboardRankItem[], color: string, emptyText: string)
     xAxis: {
       type: 'value',
       minInterval: 1,
-      splitLine: { lineStyle: { type: 'dashed', color: '#eee' } },
-      axisLabel: { color: '#999' },
+      splitLine: { lineStyle: { type: 'dashed', color: AXIS_LINE } },
+      axisLabel: { color: AXIS },
     },
     yAxis: {
       type: 'category',
       data: rows.map((r) => shortName(r.name)),
       axisTick: { show: false },
       axisLine: { show: false },
-      axisLabel: { color: '#666', width: 96, overflow: 'truncate' },
+      axisLabel: { color: MUTED, width: 96, overflow: 'truncate' },
     },
     series: [
       {
@@ -228,7 +231,7 @@ function rankOption(list: DashboardRankItem[], color: string, emptyText: string)
         label: {
           show: true,
           position: 'right',
-          color: '#666',
+          color: MUTED,
           fontSize: 11,
         },
       },
@@ -252,21 +255,21 @@ function renderCharts() {
       icon: 'circle',
       itemWidth: 8,
       itemHeight: 8,
-      textStyle: { color: '#5c5c66' },
+      textStyle: { color: MUTED },
     },
     grid: { left: 40, right: 20, top: 36, bottom: 28 },
     xAxis: {
       type: 'category',
       data: (s.trends || []).map((t) => t.date.slice(5)),
       axisTick: { show: false },
-      axisLine: { lineStyle: { color: '#e6e8ee' } },
-      axisLabel: { color: '#8a8a96' },
+      axisLine: { lineStyle: { color: AXIS_LINE } },
+      axisLabel: { color: AXIS },
     },
     yAxis: {
       type: 'value',
       minInterval: 1,
-      splitLine: { lineStyle: { type: 'dashed', color: '#eef0f4' } },
-      axisLabel: { color: '#8a8a96' },
+      splitLine: { lineStyle: { type: 'dashed', color: AXIS_LINE } },
+      axisLabel: { color: AXIS },
     },
     series: [
       {
@@ -301,7 +304,7 @@ function renderCharts() {
       top: 'middle',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { color: '#5c5c66' },
+      textStyle: { color: MUTED },
     },
     series: [
       {

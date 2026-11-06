@@ -37,7 +37,7 @@ Admin canvas may use a slightly cooler page bg (`#f3f4f7`) with white surfaces; 
 
 Hover/selection washes use `--wy-brand-soft` / `--wy-brand-soft-strong` (nav, rows, tags) — not flat gray.
 
-Shared utilities: `.wy-page` (page padding), `.wy-chip` / `.wy-chip.is-on` (filter / source pills).
+Shared utilities: `.wy-page` (page padding), `.wy-page-head` / `.wy-page-title` / `.wy-page-desc` (content page headers), `.wy-chip` / `.wy-chip.is-on` (filter / source pills). Admin: `.admin-page-head` / `.admin-toolbar` (same 16px section rhythm).
 
 ## Typography
 

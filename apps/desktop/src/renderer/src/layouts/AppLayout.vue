@@ -1392,7 +1392,7 @@ function onLogout() {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 16px 28px 28px;
+  padding: 20px 24px 28px;
   overscroll-behavior: contain;
 }
 .batch-job-banner {

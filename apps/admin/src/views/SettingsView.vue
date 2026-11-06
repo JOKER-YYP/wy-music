@@ -90,10 +90,11 @@ onMounted(load)
 <style scoped>
 .settings-form {
   max-width: 720px;
-  padding: 18px 20px;
+  padding: 16px 18px;
   background: var(--wy-surface);
   border: 1px solid var(--wy-border);
   border-radius: var(--wy-radius-md);
+  box-shadow: var(--wy-shadow-sm);
 }
 .tip {
   margin-left: 10px;

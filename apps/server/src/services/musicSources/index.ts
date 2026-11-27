@@ -7,6 +7,7 @@ import { detailKw, searchKw } from './kw.js'
 import { detailXm, searchXm } from './xm.js'
 import { detailLiumingye, searchLiumingye } from './liumingye.js'
 import { detailAacCx, searchAacCx } from './aacCx.js'
+import { detailGequbao, getGequbaoPanDetail, searchGequbao } from './gequbao.js'
 import { toSearchTrackDto, type MusicDetail, type MusicSearchHit } from './types.js'
 
 export type SourceSearchStat = {
@@ -40,6 +41,7 @@ const searchFns: Partial<
   liumingye_quark: (kw, num) => searchLiumingye(kw, num, 'liumingye_quark'),
   liumingye_baidu: (kw, num) => searchLiumingye(kw, num, 'liumingye_baidu'),
   aac_cx: searchAacCx,
+  gequbao: searchGequbao,
   netease: xmSearch('netease'),
   qq: xmSearch('qq'),
   kugou: xmSearch('kugou'),
@@ -64,6 +66,7 @@ const detailFns: Partial<Record<MusicSource, (id: string) => Promise<MusicDetail
   liumingye_quark: detailLiumingye,
   liumingye_baidu: detailLiumingye,
   aac_cx: detailAacCx,
+  gequbao: detailGequbao,
   netease: xmDetail('netease'),
   qq: xmDetail('qq'),
   kugou: xmDetail('kugou'),
@@ -182,5 +185,5 @@ export function searchFnsForSource(
   return searchFns[source]
 }
 
-export { toSearchTrackDto, searchXm, detailXm, XM_MUSIC_SOURCES }
+export { toSearchTrackDto, searchXm, detailXm, getGequbaoPanDetail, XM_MUSIC_SOURCES }
 export type { MusicDetail, MusicSearchHit }

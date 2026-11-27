@@ -455,7 +455,7 @@ function tagLiumingyeHits(
   return raw.map((it) => ({ ...it, source }))
 }
 
-function pickLiumingyeQuarkShare(
+function pickQuarkShare(
   downloads: { url?: string; quality?: string }[],
 ): { url: string; quality: string } | null {
   const list = downloads.filter((d) => d.url && /pan\.quark\.cn\/s\//i.test(String(d.url)))
@@ -471,7 +471,7 @@ function pickLiumingyeQuarkShare(
   return { url: String(list[0].url), quality: String(list[0].quality || '夸克') }
 }
 
-function pickLiumingyeBaiduShare(
+function pickBaiduShare(
   downloads: { url?: string; quality?: string }[],
 ): { url: string; quality: string } | null {
   const list = downloads.filter((d) => d.url && /pan\.baidu\.com/i.test(String(d.url)))
@@ -484,6 +484,74 @@ function pickLiumingyeBaiduShare(
   }
   list.sort((a, b) => score(String(b.quality || '')) - score(String(a.quality || '')))
   return { url: String(list[0].url), quality: String(list[0].quality || '百度') }
+}
+
+/** 用夸克/百度分享链解析直链（下歌吧 / 歌曲宝共用） */
+async function resolvePanDownloads(
+  downloads: { url?: string; quality?: string }[],
+  meta: {
+    coverUrl?: string | null
+    lyricText?: string | null
+    name?: string
+    artists?: string[]
+    album?: string | null
+  },
+  prefer: 'quark' | 'baidu' | 'auto' = 'auto',
+  label = '网盘源',
+): Promise<MusicDetailResult> {
+  const quark = pickQuarkShare(downloads)
+  const baidu = pickBaiduShare(downloads)
+
+  const resolveQuark = async () => {
+    if (!quark) throw new Error(`${label}未返回夸克分享链接`)
+    if (!window.wyAPI?.quarkResolveShare) {
+      throw new Error(`请在桌面端下载${label}夸克资源`)
+    }
+    const resolved = await window.wyAPI.quarkResolveShare(quark.url)
+    return {
+      musicUrl: resolved.url,
+      ...meta,
+      fileName: resolved.fileName,
+      viaQuark: true as const,
+      link: quark.url,
+    }
+  }
+
+  const resolveBaidu = async () => {
+    if (!baidu) throw new Error(`${label}未返回百度分享链接`)
+    if (!window.wyAPI?.baiduResolveShare) {
+      throw new Error(`请在桌面端下载${label}百度资源`)
+    }
+    const resolved = await window.wyAPI.baiduResolveShare(baidu.url)
+    return {
+      musicUrl: resolved.url,
+      ...meta,
+      fileName: resolved.fileName,
+      viaBaidu: true as const,
+      link: baidu.url,
+    }
+  }
+
+  const order: Array<'quark' | 'baidu'> =
+    prefer === 'baidu'
+      ? ['baidu', 'quark']
+      : prefer === 'quark'
+        ? ['quark', 'baidu']
+        : ['quark', 'baidu']
+
+  let lastErr: unknown
+  for (const which of order) {
+    const has = which === 'quark' ? quark : baidu
+    if (!has) continue
+    try {
+      return which === 'quark' ? await resolveQuark() : await resolveBaidu()
+    } catch (e) {
+      lastErr = e
+    }
+  }
+
+  if (lastErr) throw lastErr
+  throw new Error(`${label}未返回可下载的夸克/百度分享链接`)
 }
 
 async function detailLiumingye(
@@ -520,60 +588,54 @@ async function detailLiumingye(
     artists: j.artist ? [String(j.artist)] : undefined,
     album: j.album || null,
   }
-  const downloads = j.downloads || []
-  const quark = pickLiumingyeQuarkShare(downloads)
-  const baidu = pickLiumingyeBaiduShare(downloads)
+  return resolvePanDownloads(j.downloads || [], meta, prefer, '下歌吧')
+}
 
-  const resolveQuark = async () => {
-    if (!quark) throw new Error('下歌吧未返回夸克分享链接')
-    if (!window.wyAPI?.quarkResolveShare) {
-      throw new Error('请在桌面端下载下歌吧夸克资源')
+/** 歌曲宝：优先网盘高码率；失败则回退 common-play-url 试听直链 */
+async function detailGequbao(externalId: string): Promise<MusicDetailResult> {
+  const { data } = await http.get<{
+    code: number
+    data?: {
+      name?: string
+      artists?: string[]
+      coverUrl?: string | null
+      lyricText?: string | null
+      album?: string | null
+      playUrl?: string | null
+      downloads?: { url?: string; quality?: string }[]
     }
-    const resolved = await window.wyAPI.quarkResolveShare(quark.url)
-    return {
-      musicUrl: resolved.url,
-      ...meta,
-      fileName: resolved.fileName,
-      viaQuark: true as const,
-      link: quark.url,
-    }
+    message?: string
+  }>('/api/discover/music-pan-detail', {
+    params: { source: 'gequbao', id: externalId },
+    ...({ silent: true } as never),
+  })
+  const d = data?.data
+  if (!d) throw new Error(data?.message || '歌曲宝详情失败')
+
+  const meta = {
+    coverUrl: d.coverUrl || null,
+    lyricText: normalizeXmLyric(d.lyricText),
+    name: d.name,
+    artists: d.artists,
+    album: d.album ?? null,
   }
+  const playUrl = String(d.playUrl || '').trim()
 
-  const resolveBaidu = async () => {
-    if (!baidu) throw new Error('下歌吧未返回百度分享链接')
-    if (!window.wyAPI?.baiduResolveShare) {
-      throw new Error('请在桌面端下载下歌吧百度资源')
-    }
-    const resolved = await window.wyAPI.baiduResolveShare(baidu.url)
-    return {
-      musicUrl: resolved.url,
-      ...meta,
-      fileName: resolved.fileName,
-      viaBaidu: true as const,
-      link: baidu.url,
-    }
-  }
-
-  const order: Array<'quark' | 'baidu'> =
-    prefer === 'baidu'
-      ? ['baidu', 'quark']
-      : prefer === 'quark'
-        ? ['quark', 'baidu']
-        : ['quark', 'baidu']
-
-  let lastErr: unknown
-  for (const which of order) {
-    const has = which === 'quark' ? quark : baidu
-    if (!has) continue
+  if (d.downloads?.length) {
     try {
-      return which === 'quark' ? await resolveQuark() : await resolveBaidu()
+      return await resolvePanDownloads(d.downloads, meta, 'auto', '歌曲宝')
     } catch (e) {
-      lastErr = e
+      if (playUrl) {
+        return { musicUrl: playUrl, ...meta, link: playUrl }
+      }
+      throw e
     }
   }
 
-  if (lastErr) throw lastErr
-  throw new Error('下歌吧未返回可下载的夸克/百度分享链接')
+  if (playUrl) {
+    return { musicUrl: playUrl, ...meta, link: playUrl }
+  }
+  throw new Error(data?.message || '歌曲宝未返回网盘链接或试听地址')
 }
 
 export type ParallelSearchResult = {
@@ -614,8 +676,8 @@ function sliceHitsForPage(
       hasMore: hits.length >= cumulative,
     }
   }
-  // aac.cx HTML 搜索无稳定分页
-  if (source === 'aac_cx') {
+  // aac.cx / 歌曲宝 HTML 搜索无稳定分页
+  if (source === 'aac_cx' || source === 'gequbao') {
     return { pageHits: hits, hasMore: false }
   }
   const hasMore =
@@ -631,26 +693,32 @@ function sliceHitsForPage(
  * - 传入 onSource 时：谁先完成谁先回调，便于渐进渲染
  * - 单源超时（默认 15s）后记为失败，不影响其它源
  */
-/** aac.cx 需人机验证 cookie，经服务端代理搜索 */
-async function searchAacCxViaServer(kw: string, num: number): Promise<ExtHit[]> {
+/** 需服务端代理 HTML 的源（aac.cx / 歌曲宝） */
+async function searchViaServerSource(
+  source: 'aac_cx' | 'gequbao',
+  kw: string,
+  num: number,
+): Promise<ExtHit[]> {
   const { data } = await http.get<{
     code: number
     data?: { list?: TrackDto[] }
     message?: string
   }>('/api/discover/music-source-search', {
-    params: { source: 'aac_cx', keyword: kw, num },
+    params: { source, keyword: kw, num },
     ...({ silent: true } as never),
   })
   const list = data?.data?.list || []
-  return list.map((t) => ({
-    source: 'aac_cx' as const,
-    externalId: String(t.externalId || ''),
-    name: t.name,
-    artists: t.artists || [],
-    album: t.album ?? null,
-    coverUrl: t.coverUrl || null,
-    payTag: t.payTag || null,
-  })).filter((h) => h.externalId)
+  return list
+    .map((t) => ({
+      source,
+      externalId: String(t.externalId || ''),
+      name: t.name,
+      artists: t.artists || [],
+      album: t.album ?? null,
+      coverUrl: t.coverUrl || null,
+      payTag: t.payTag || null,
+    }))
+    .filter((h) => h.externalId)
 }
 
 function searchBySource(
@@ -670,7 +738,9 @@ function searchBySource(
     case 'kw':
       return searchKw(kw, page, pageSize)
     case 'aac_cx':
-      return page > 1 ? Promise.resolve([]) : searchAacCxViaServer(kw, pageSize)
+      return page > 1 ? Promise.resolve([]) : searchViaServerSource('aac_cx', kw, pageSize)
+    case 'gequbao':
+      return page > 1 ? Promise.resolve([]) : searchViaServerSource('gequbao', kw, pageSize)
     default:
       if (isXmMusicSource(source)) return searchXm(source, kw, page, pageSize)
       return Promise.resolve([])
@@ -798,6 +868,10 @@ export async function resolveExternalDetail(
     const prefer =
       source === 'liumingye_baidu' ? 'baidu' : source === 'liumingye_quark' ? 'quark' : 'auto'
     return detailLiumingye(externalId, prefer)
+  }
+
+  if (source === 'gequbao') {
+    return detailGequbao(externalId)
   }
 
   if (source === 'aac_cx') {

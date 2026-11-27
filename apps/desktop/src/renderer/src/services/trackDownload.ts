@@ -1,5 +1,5 @@
 import type { TrackDto } from '@wy-music/shared'
-import { isExternalTrackId, isLiumingyeSource, parseExternalTrackId } from '@wy-music/shared'
+import { isExternalTrackId, isPanImportSource, parseExternalTrackId } from '@wy-music/shared'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { importExternalToLibrary, resolveExternalDetail } from './externalMusic'
 import { http, streamUrl } from './http'
@@ -185,16 +185,16 @@ export async function downloadTrackToLocalFile(track: TrackDto): Promise<string 
 }
 
 /**
- * 下歌吧：本机用夸克/百度下到临时文件，再上传公共曲库（服务端拉不到网盘直链）
+ * 网盘源（下歌吧 / 歌曲宝）：本机用夸克/百度下到临时文件，再上传公共曲库
  */
-async function importLiumingyePanToLibrary(track: TrackDto): Promise<TrackDto> {
+async function importPanSourceToLibrary(track: TrackDto): Promise<TrackDto> {
   if (
     !window.wyAPI?.getTempDownloadPath ||
     !window.wyAPI?.uploadTrack ||
     !window.wyAPI?.quarkDownloadFile ||
     !window.wyAPI?.baiduDownloadFile
   ) {
-    throw new Error('请在桌面端将下歌吧资源下载到曲库')
+    throw new Error('请在桌面端将网盘资源下载到曲库')
   }
   const accessToken = localStorage.getItem('accessToken') || ''
   if (!accessToken) throw new Error('请先登录')
@@ -251,8 +251,8 @@ export async function downloadTrackToLibrary(track: TrackDto) {
     throw new Error('请先登录')
   }
   const imported =
-    track.source && isLiumingyeSource(track.source)
-      ? await importLiumingyePanToLibrary(track)
+    track.source && isPanImportSource(track.source)
+      ? await importPanSourceToLibrary(track)
       : await importExternalToLibrary(track)
   await reportDownloadStat(imported.id)
   ElMessage.success(
@@ -272,8 +272,8 @@ export async function importTrackToLibraryQuiet(track: TrackDto): Promise<TrackD
     throw new Error('请先登录')
   }
   const imported =
-    track.source && isLiumingyeSource(track.source)
-      ? await importLiumingyePanToLibrary(track)
+    track.source && isPanImportSource(track.source)
+      ? await importPanSourceToLibrary(track)
       : await importExternalToLibrary(track)
   await reportDownloadStat(imported.id)
   return imported

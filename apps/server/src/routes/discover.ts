@@ -1079,6 +1079,25 @@ router.get('/music-search', optionalAuth, async (req: AuthedRequest, res) => {
   })
 })
 
+/** 网盘源详情元数据（分享链等；桌面端再走夸克/百度会话） */
+router.get('/music-pan-detail', optionalAuth, async (req, res) => {
+  const source = String(req.query.source || '').trim()
+  const id = String(req.query.id || req.query.externalId || '').trim()
+  if (!id) return fail(res, 40002, '缺少曲目 id')
+
+  try {
+    if (source === 'gequbao') {
+      const { getGequbaoPanDetail } = await import('../services/musicSources/index.js')
+      const detail = await getGequbaoPanDetail(id)
+      return ok(res, detail)
+    }
+    return fail(res, 40001, '该音源不支持网盘详情')
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '解析网盘链接失败'
+    return fail(res, 50001, msg, 502)
+  }
+})
+
 /** 单源外部搜索（桌面端 aac.cx 等需服务端代理的源） */
 router.get('/music-source-search', optionalAuth, async (req, res) => {
   const { MUSIC_SOURCES } = await import('@wy-music/shared')

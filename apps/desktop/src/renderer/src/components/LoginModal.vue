@@ -186,7 +186,7 @@ async function onRegister() {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--el-mask-color, rgba(0, 0, 0, 0.45));
   display: grid;
   place-items: center;
 }
@@ -194,9 +194,11 @@ async function onRegister() {
   position: relative;
   width: 360px;
   padding: 28px 32px 22px;
-  background: #fff;
+  background: var(--wy-surface);
+  color: var(--wy-text);
+  border: 1px solid var(--wy-border);
   border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--wy-shadow-sm), 0 24px 64px rgba(0, 0, 0, 0.28);
 }
 .close {
   position: absolute;
@@ -208,8 +210,10 @@ async function onRegister() {
   cursor: pointer;
   padding: 4px;
   line-height: 1;
+  border-radius: 6px;
   &:hover {
     color: var(--wy-text);
+    background: var(--wy-surface-muted);
   }
 }
 .logo-wrap {
@@ -224,7 +228,7 @@ async function onRegister() {
   border-radius: 14px;
   object-fit: cover;
   display: block;
-  box-shadow: 0 4px 14px rgba(236, 65, 65, 0.28);
+  box-shadow: 0 4px 14px var(--wy-brand-soft-strong);
 }
 .logo-text {
   margin-top: 8px;
@@ -272,14 +276,14 @@ async function onRegister() {
   display: flex;
   align-items: center;
   height: 42px;
-  border: 1px solid var(--wy-border);
+  border: 1px solid var(--wy-border-strong);
   border-radius: 8px;
   padding: 0 10px;
   background: var(--wy-surface-muted);
   transition: border-color 0.15s ease, background 0.15s ease;
   &:focus-within {
     border-color: var(--wy-brand);
-    background: var(--wy-surface);
+    background: var(--wy-bg);
   }
   input {
     flex: 1;
@@ -290,6 +294,9 @@ async function onRegister() {
     min-width: 0;
     color: var(--wy-text);
     box-shadow: none;
+    &::placeholder {
+      color: var(--wy-text-muted);
+    }
     &:focus,
     &:focus-visible {
       outline: none;
@@ -304,11 +311,14 @@ async function onRegister() {
 .eye {
   border: none;
   background: none;
-  color: #aaa;
+  color: var(--wy-text-muted);
   cursor: pointer;
   padding: 0 2px;
   display: grid;
   place-items: center;
+  &:hover {
+    color: var(--wy-text-secondary);
+  }
 }
 .row {
   display: flex;
@@ -329,17 +339,20 @@ async function onRegister() {
 .link {
   border: none;
   background: none;
-  color: #507daf;
+  color: var(--wy-brand-tint);
   cursor: pointer;
   font-size: 12px;
   padding: 0;
+  &:hover {
+    color: var(--wy-brand);
+  }
 }
 .submit {
   height: 42px;
   border: none;
   border-radius: 21px;
   background: var(--wy-brand);
-  color: #fff;
+  color: var(--wy-text-on-brand);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -365,7 +378,10 @@ async function onRegister() {
     accent-color: var(--wy-brand);
   }
   a {
-    color: #507daf;
+    color: var(--wy-brand-tint);
+    &:hover {
+      color: var(--wy-brand);
+    }
   }
 }
 </style>

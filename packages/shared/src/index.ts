@@ -27,6 +27,7 @@ export interface UserPublic {
 /**
  * 外部音乐源（并行搜索）
  * - migu/vkeys/tang/kw：皮卡丘等独立接口
+ * - aac_cx：aac.cx HTML 搜索 + 酷我 CDN 直链（服务端代理）
  * - 其余：xm95522 / maicong 聚合（http://www.xm95522.com/mp3/）
  * - xm_migu：聚合站咪咕（与源1 migu 区分，避免 type 冲突）
  */
@@ -54,6 +55,8 @@ export type MusicSource =
   | 'liumingye_quark'
   /** 下歌吧 · 百度网盘 */
   | 'liumingye_baidu'
+  /** aac.cx（酷我 CDN 直链） */
+  | 'aac_cx'
 
 /** 可勾选搜索的音源（不含已废弃的统一「下歌吧」） */
 export const MUSIC_SOURCES: MusicSource[] = [
@@ -63,6 +66,7 @@ export const MUSIC_SOURCES: MusicSource[] = [
   'kw',
   'liumingye_quark',
   'liumingye_baidu',
+  'aac_cx',
   'netease',
   'qq',
   'kugou',
@@ -86,6 +90,7 @@ export const MUSIC_SOURCE_LABEL: Record<MusicSource, string> = {
   liumingye: '下歌吧',
   liumingye_quark: '下歌吧·夸克',
   liumingye_baidu: '下歌吧·百度',
+  aac_cx: 'aac.cx',
   netease: '网易',
   qq: 'QQ',
   kugou: '酷狗',

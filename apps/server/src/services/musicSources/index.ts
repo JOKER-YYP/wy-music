@@ -6,6 +6,7 @@ import { detailTang, searchTang } from './tang.js'
 import { detailKw, searchKw } from './kw.js'
 import { detailXm, searchXm } from './xm.js'
 import { detailLiumingye, searchLiumingye } from './liumingye.js'
+import { detailAacCx, searchAacCx } from './aacCx.js'
 import { toSearchTrackDto, type MusicDetail, type MusicSearchHit } from './types.js'
 
 export type SourceSearchStat = {
@@ -38,6 +39,7 @@ const searchFns: Partial<
   liumingye: (kw, num) => searchLiumingye(kw, num, 'liumingye'),
   liumingye_quark: (kw, num) => searchLiumingye(kw, num, 'liumingye_quark'),
   liumingye_baidu: (kw, num) => searchLiumingye(kw, num, 'liumingye_baidu'),
+  aac_cx: searchAacCx,
   netease: xmSearch('netease'),
   qq: xmSearch('qq'),
   kugou: xmSearch('kugou'),
@@ -61,6 +63,7 @@ const detailFns: Partial<Record<MusicSource, (id: string) => Promise<MusicDetail
   liumingye: detailLiumingye,
   liumingye_quark: detailLiumingye,
   liumingye_baidu: detailLiumingye,
+  aac_cx: detailAacCx,
   netease: xmDetail('netease'),
   qq: xmDetail('qq'),
   kugou: xmDetail('kugou'),
@@ -170,6 +173,13 @@ export async function resolveMusicDetail(
   const fn = detailFns[source]
   if (!fn) throw new Error(`未知音乐源: ${source}`)
   return fn(id)
+}
+
+/** 单源搜索函数（供 /music-source-search 等路由） */
+export function searchFnsForSource(
+  source: MusicSource,
+): ((keyword: string, num: number) => Promise<MusicSearchHit[]>) | undefined {
+  return searchFns[source]
 }
 
 export { toSearchTrackDto, searchXm, detailXm, XM_MUSIC_SOURCES }

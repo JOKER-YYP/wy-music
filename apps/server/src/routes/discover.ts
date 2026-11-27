@@ -1079,6 +1079,36 @@ router.get('/music-search', optionalAuth, async (req: AuthedRequest, res) => {
   })
 })
 
+/** 单源外部搜索（桌面端 aac.cx 等需服务端代理的源） */
+router.get('/music-source-search', optionalAuth, async (req, res) => {
+  const { MUSIC_SOURCES } = await import('@wy-music/shared')
+  const source = String(req.query.source || '').trim()
+  const keyword = String(req.query.keyword || req.query.q || '').trim()
+  const num = Math.min(50, Math.max(1, Number(req.query.num) || 20))
+  if (!(MUSIC_SOURCES as readonly string[]).includes(source)) {
+    return fail(res, 40001, '无效的音乐源')
+  }
+  if (!keyword) return fail(res, 40002, '请输入关键词')
+
+  try {
+    const { searchFnsForSource, toSearchTrackDto } = await import(
+      '../services/musicSources/index.js'
+    )
+    const fn = searchFnsForSource(source as (typeof MUSIC_SOURCES)[number])
+    if (!fn) return fail(res, 40003, '该音源不支持单源搜索')
+    const hits = await fn(keyword, num)
+    return ok(res, {
+      list: hits.map(toSearchTrackDto),
+      source,
+      keyword,
+      count: hits.length,
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '搜索失败'
+    return fail(res, 50001, msg, 502)
+  }
+})
+
 /** 外部曲目点播详情：解析临时播放链 / 歌词 / 封面 */
 router.get('/music-detail', optionalAuth, async (req, res) => {
   const { MUSIC_SOURCES } = await import('@wy-music/shared')

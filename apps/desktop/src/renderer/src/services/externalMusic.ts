@@ -614,6 +614,10 @@ function sliceHitsForPage(
       hasMore: hits.length >= cumulative,
     }
   }
+  // aac.cx HTML 搜索无稳定分页
+  if (source === 'aac_cx') {
+    return { pageHits: hits, hasMore: false }
+  }
   const hasMore =
     source === 'migu' || source === 'tang'
       ? hits.length >= cumulative
@@ -627,6 +631,28 @@ function sliceHitsForPage(
  * - 传入 onSource 时：谁先完成谁先回调，便于渐进渲染
  * - 单源超时（默认 15s）后记为失败，不影响其它源
  */
+/** aac.cx 需人机验证 cookie，经服务端代理搜索 */
+async function searchAacCxViaServer(kw: string, num: number): Promise<ExtHit[]> {
+  const { data } = await http.get<{
+    code: number
+    data?: { list?: TrackDto[] }
+    message?: string
+  }>('/api/discover/music-source-search', {
+    params: { source: 'aac_cx', keyword: kw, num },
+    ...({ silent: true } as never),
+  })
+  const list = data?.data?.list || []
+  return list.map((t) => ({
+    source: 'aac_cx' as const,
+    externalId: String(t.externalId || ''),
+    name: t.name,
+    artists: t.artists || [],
+    album: t.album ?? null,
+    coverUrl: t.coverUrl || null,
+    payTag: t.payTag || null,
+  })).filter((h) => h.externalId)
+}
+
 function searchBySource(
   source: MusicSource,
   kw: string,
@@ -643,6 +669,8 @@ function searchBySource(
       return searchTang(kw, cumulative)
     case 'kw':
       return searchKw(kw, page, pageSize)
+    case 'aac_cx':
+      return page > 1 ? Promise.resolve([]) : searchAacCxViaServer(kw, pageSize)
     default:
       if (isXmMusicSource(source)) return searchXm(source, kw, page, pageSize)
       return Promise.resolve([])
@@ -770,6 +798,36 @@ export async function resolveExternalDetail(
     const prefer =
       source === 'liumingye_baidu' ? 'baidu' : source === 'liumingye_quark' ? 'quark' : 'auto'
     return detailLiumingye(externalId, prefer)
+  }
+
+  if (source === 'aac_cx') {
+    const { data } = await http.get<{
+      code: number
+      data?: {
+        musicUrl?: string
+        coverUrl?: string | null
+        lyricText?: string | null
+        name?: string
+        artists?: string[]
+        album?: string | null
+        link?: string | null
+      }
+      message?: string
+    }>('/api/discover/music-detail', {
+      params: { source: 'aac_cx', id: externalId },
+      ...({ silent: true } as never),
+    })
+    const d = data?.data
+    if (!d?.musicUrl) throw new Error(data?.message || 'aac.cx 未返回播放地址')
+    return {
+      musicUrl: d.musicUrl,
+      coverUrl: d.coverUrl || null,
+      lyricText: d.lyricText || null,
+      name: d.name,
+      artists: d.artists,
+      album: d.album ?? null,
+      link: d.link || null,
+    }
   }
 
   if (source === 'migu') {
